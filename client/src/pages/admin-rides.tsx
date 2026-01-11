@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, MapPin, Calendar, User, Car, ArrowLeft, DollarSign, Play, CheckCircle, XCircle, Wifi } from "lucide-react";
+import { Loader2, MapPin, Calendar, User, Car, ArrowLeft, DollarSign, Play, CheckCircle, XCircle, Wifi, Search, Filter, Calculator } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Header } from "@/components/header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -82,12 +84,29 @@ async function adminApiRequest(method: string, url: string, data?: unknown) {
   return res;
 }
 
+function calculateFare(pickup: string, dropoff: string): number {
+  const baseFare = 500;
+  const perKmRate = 100;
+  const estimatedKm = Math.floor(Math.random() * 15) + 3;
+  return baseFare + (perKmRate * estimatedKm);
+}
+
 export default function AdminRidesPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: rides, isLoading } = useQuery<Ride[]>({
-    queryKey: ["/api/rides"],
+    queryKey: ["/api/rides", statusFilter, searchQuery],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (statusFilter !== "all") params.append("status", statusFilter);
+      if (searchQuery) params.append("search", searchQuery);
+      const res = await fetch(`/api/rides?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch rides");
+      return res.json();
+    },
   });
 
   const { data: availableDrivers } = useQuery<Driver[]>({
@@ -226,11 +245,39 @@ export default function AdminRidesPage() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-3">
-              <MapPin className="h-6 w-6 text-primary" />
-              <div>
-                <CardTitle data-testid="text-page-title">Admin - Rides</CardTitle>
-                <CardDescription>Manage all rides on the platform</CardDescription>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <MapPin className="h-6 w-6 text-primary" />
+                <div>
+                  <CardTitle data-testid="text-page-title">Admin - Rides</CardTitle>
+                  <CardDescription>Manage all rides on the platform</CardDescription>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search locations..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8 w-48"
+                    data-testid="input-search"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-36" data-testid="select-status-filter">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="REQUESTED">Requested</SelectItem>
+                    <SelectItem value="ACCEPTED">Accepted</SelectItem>
+                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                    <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardHeader>
