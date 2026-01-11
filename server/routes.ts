@@ -512,12 +512,16 @@ export async function registerRoutes(
         pendingDrivers,
         suspendedDrivers,
         offlineDrivers,
+        driversOnline,
         totalRides,
         requestedRides,
         acceptedRides,
+        inProgressRides,
         completedRides,
         cancelledRides,
         totalDirectors,
+        avgDriverRating,
+        avgUserRating,
       ] = await Promise.all([
         prisma.user.count(),
         prisma.user.count({ where: { status: "ACTIVE" } }),
@@ -527,12 +531,16 @@ export async function registerRoutes(
         prisma.driver.count({ where: { status: "PENDING" } }),
         prisma.driver.count({ where: { status: "SUSPENDED" } }),
         prisma.driver.count({ where: { status: "OFFLINE" } }),
+        prisma.driver.count({ where: { status: "ACTIVE", isOnline: true } }),
         prisma.ride.count(),
         prisma.ride.count({ where: { status: "REQUESTED" } }),
         prisma.ride.count({ where: { status: "ACCEPTED" } }),
+        prisma.ride.count({ where: { status: "IN_PROGRESS" } }),
         prisma.ride.count({ where: { status: "COMPLETED" } }),
         prisma.ride.count({ where: { status: "CANCELLED" } }),
         prisma.director.count(),
+        prisma.driver.aggregate({ _avg: { averageRating: true }, where: { totalRatings: { gt: 0 } } }),
+        prisma.user.aggregate({ _avg: { averageRating: true }, where: { totalRatings: { gt: 0 } } }),
       ]);
       
       res.json({
@@ -540,6 +548,7 @@ export async function registerRoutes(
           total: totalUsers,
           active: activeUsers,
           suspended: suspendedUsers,
+          avgRating: avgUserRating._avg.averageRating || 0,
         },
         drivers: {
           total: totalDrivers,
@@ -547,14 +556,17 @@ export async function registerRoutes(
           pending: pendingDrivers,
           suspended: suspendedDrivers,
           offline: offlineDrivers,
+          online: driversOnline,
+          avgRating: avgDriverRating._avg.averageRating || 0,
         },
         rides: {
           total: totalRides,
           requested: requestedRides,
           accepted: acceptedRides,
+          inProgress: inProgressRides,
           completed: completedRides,
           cancelled: cancelledRides,
-          active: requestedRides + acceptedRides,
+          active: requestedRides + acceptedRides + inProgressRides,
         },
         directors: {
           total: totalDirectors,
@@ -689,6 +701,377 @@ export async function registerRoutes(
       }
       res.json({ message: "Logged out successfully" });
     });
+  });
+
+  // ==================== RIDE LIFECYCLE ====================
+
+  // Get available drivers for assignment (ACTIVE, isOnline, not on IN_PROGRESS ride)
+  app.get("/api/drivers/available", async (req, res) => {
+    try {
+      const drivers = await prisma.driver.findMany({
+        where: { 
+          status: "ACTIVE",
+          isOnline: true,
+          rides: {
+            none: {
+              status: "IN_PROGRESS"
+            }
+          }
+        },
+        orderBy: { averageRating: "desc" },
+        include: { _count: { select: { rides: true } } },
+      });
+      res.json(drivers);
+    } catch (error) {
+      console.error("Error fetching available drivers:", error);
+      res.status(500).json({ message: "Failed to fetch available drivers" });
+    }
+  });
+
+  // Assign driver to ride (REQUESTED → ACCEPTED)
+  app.post("/api/rides/:id/assign", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { driverId } = req.body;
+      const currentUser = getCurrentUser(req);
+
+      if (currentUser.role !== "admin" && currentUser.role !== "director") {
+        return res.status(403).json({ message: "Only admins and directors can assign rides" });
+      }
+
+      const ride = await prisma.ride.findUnique({ where: { id } });
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.status !== "REQUESTED") {
+        return res.status(400).json({ message: `Cannot assign driver. Ride status is ${ride.status}, expected REQUESTED` });
+      }
+
+      const driver = await prisma.driver.findUnique({ 
+        where: { id: driverId },
+        include: { rides: { where: { status: "IN_PROGRESS" } } }
+      });
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+      if (driver.status !== "ACTIVE") {
+        return res.status(400).json({ message: "Driver must be ACTIVE to be assigned" });
+      }
+      if (!driver.isOnline) {
+        return res.status(400).json({ message: "Driver must be ONLINE to be assigned" });
+      }
+      if (driver.rides.length > 0) {
+        return res.status(400).json({ message: "Driver is currently on another ride" });
+      }
+
+      const updatedRide = await prisma.ride.update({
+        where: { id },
+        data: { 
+          driverId,
+          status: "ACCEPTED"
+        },
+        include: { user: true, driver: true },
+      });
+
+      res.json(updatedRide);
+    } catch (error) {
+      console.error("Error assigning ride:", error);
+      res.status(500).json({ message: "Failed to assign ride" });
+    }
+  });
+
+  // Start ride (ACCEPTED → IN_PROGRESS)
+  app.post("/api/rides/:id/start", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      const ride = await prisma.ride.findUnique({ 
+        where: { id },
+        include: { driver: true }
+      });
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.status !== "ACCEPTED") {
+        return res.status(400).json({ message: `Cannot start ride. Status is ${ride.status}, expected ACCEPTED` });
+      }
+
+      if (!ride.driverId) {
+        return res.status(400).json({ message: "No driver assigned to this ride" });
+      }
+
+      const updatedRide = await prisma.ride.update({
+        where: { id },
+        data: { status: "IN_PROGRESS" },
+        include: { user: true, driver: true },
+      });
+
+      res.json(updatedRide);
+    } catch (error) {
+      console.error("Error starting ride:", error);
+      res.status(500).json({ message: "Failed to start ride" });
+    }
+  });
+
+  // Complete ride (IN_PROGRESS → COMPLETED)
+  app.post("/api/rides/:id/complete", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      const ride = await prisma.ride.findUnique({ 
+        where: { id },
+        include: { driver: true }
+      });
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.status !== "IN_PROGRESS") {
+        return res.status(400).json({ message: `Cannot complete ride. Status is ${ride.status}, expected IN_PROGRESS` });
+      }
+
+      const updatedRide = await prisma.ride.update({
+        where: { id },
+        data: { status: "COMPLETED" },
+        include: { user: true, driver: true },
+      });
+
+      res.json(updatedRide);
+    } catch (error) {
+      console.error("Error completing ride:", error);
+      res.status(500).json({ message: "Failed to complete ride" });
+    }
+  });
+
+  // Cancel ride (REQUESTED or ACCEPTED → CANCELLED)
+  app.post("/api/rides/:id/cancel", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      if (currentUser.role !== "admin" && currentUser.role !== "director") {
+        return res.status(403).json({ message: "Only admins and directors can cancel rides" });
+      }
+
+      const ride = await prisma.ride.findUnique({ where: { id } });
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.status === "COMPLETED") {
+        return res.status(400).json({ message: "Cannot cancel a completed ride" });
+      }
+
+      if (ride.status === "CANCELLED") {
+        return res.status(400).json({ message: "Ride is already cancelled" });
+      }
+
+      if (ride.status === "IN_PROGRESS") {
+        return res.status(400).json({ message: "Cannot cancel a ride in progress" });
+      }
+
+      const updatedRide = await prisma.ride.update({
+        where: { id },
+        data: { status: "CANCELLED" },
+        include: { user: true, driver: true },
+      });
+
+      res.json(updatedRide);
+    } catch (error) {
+      console.error("Error cancelling ride:", error);
+      res.status(500).json({ message: "Failed to cancel ride" });
+    }
+  });
+
+  // ==================== DRIVER ONLINE/OFFLINE ====================
+
+  // Toggle driver online
+  app.post("/api/drivers/:id/online", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const driver = await prisma.driver.findUnique({ where: { id } });
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      if (driver.status !== "ACTIVE") {
+        return res.status(400).json({ message: "Only ACTIVE drivers can go online" });
+      }
+
+      const updatedDriver = await prisma.driver.update({
+        where: { id },
+        data: { isOnline: true },
+      });
+
+      res.json(updatedDriver);
+    } catch (error) {
+      console.error("Error setting driver online:", error);
+      res.status(500).json({ message: "Failed to set driver online" });
+    }
+  });
+
+  // Toggle driver offline
+  app.post("/api/drivers/:id/offline", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const driver = await prisma.driver.findUnique({ 
+        where: { id },
+        include: { rides: { where: { status: "IN_PROGRESS" } } }
+      });
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      if (driver.rides.length > 0) {
+        return res.status(400).json({ message: "Cannot go offline while on an active ride" });
+      }
+
+      const updatedDriver = await prisma.driver.update({
+        where: { id },
+        data: { isOnline: false },
+      });
+
+      res.json(updatedDriver);
+    } catch (error) {
+      console.error("Error setting driver offline:", error);
+      res.status(500).json({ message: "Failed to set driver offline" });
+    }
+  });
+
+  // ==================== RATINGS ====================
+
+  // Rate a driver (after completed ride)
+  app.post("/api/ratings/driver", async (req, res) => {
+    try {
+      const { rideId, rating } = req.body;
+
+      if (!rideId || rating === undefined) {
+        return res.status(400).json({ message: "rideId and rating are required" });
+      }
+
+      if (rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+
+      const ride = await prisma.ride.findUnique({ 
+        where: { id: rideId },
+        include: { driver: true, driverRating: true }
+      });
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.status !== "COMPLETED") {
+        return res.status(400).json({ message: "Can only rate completed rides" });
+      }
+
+      if (!ride.driverId) {
+        return res.status(400).json({ message: "No driver assigned to this ride" });
+      }
+
+      if (ride.driverRating) {
+        return res.status(400).json({ message: "Driver already rated for this ride" });
+      }
+
+      // Create rating
+      const driverRating = await prisma.driverRating.create({
+        data: {
+          rating,
+          rideId,
+          driverId: ride.driverId,
+          userId: ride.userId,
+        },
+      });
+
+      // Update driver's average rating
+      const driver = await prisma.driver.findUnique({ where: { id: ride.driverId } });
+      if (driver) {
+        const newTotal = driver.totalRatings + 1;
+        const newAverage = ((driver.averageRating * driver.totalRatings) + rating) / newTotal;
+        await prisma.driver.update({
+          where: { id: ride.driverId },
+          data: { 
+            averageRating: Math.round(newAverage * 10) / 10,
+            totalRatings: newTotal
+          },
+        });
+      }
+
+      res.status(201).json(driverRating);
+    } catch (error) {
+      console.error("Error rating driver:", error);
+      res.status(500).json({ message: "Failed to rate driver" });
+    }
+  });
+
+  // Rate a user (after completed ride)
+  app.post("/api/ratings/user", async (req, res) => {
+    try {
+      const { rideId, rating } = req.body;
+
+      if (!rideId || rating === undefined) {
+        return res.status(400).json({ message: "rideId and rating are required" });
+      }
+
+      if (rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+
+      const ride = await prisma.ride.findUnique({ 
+        where: { id: rideId },
+        include: { user: true, userRating: true }
+      });
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.status !== "COMPLETED") {
+        return res.status(400).json({ message: "Can only rate completed rides" });
+      }
+
+      if (!ride.driverId) {
+        return res.status(400).json({ message: "No driver assigned to this ride" });
+      }
+
+      if (ride.userRating) {
+        return res.status(400).json({ message: "User already rated for this ride" });
+      }
+
+      // Create rating
+      const userRating = await prisma.userRating.create({
+        data: {
+          rating,
+          rideId,
+          userId: ride.userId,
+          driverId: ride.driverId,
+        },
+      });
+
+      // Update user's average rating
+      const user = await prisma.user.findUnique({ where: { id: ride.userId } });
+      if (user) {
+        const newTotal = user.totalRatings + 1;
+        const newAverage = ((user.averageRating * user.totalRatings) + rating) / newTotal;
+        await prisma.user.update({
+          where: { id: ride.userId },
+          data: { 
+            averageRating: Math.round(newAverage * 10) / 10,
+            totalRatings: newTotal
+          },
+        });
+      }
+
+      res.status(201).json(userRating);
+    } catch (error) {
+      console.error("Error rating user:", error);
+      res.status(500).json({ message: "Failed to rate user" });
+    }
   });
 
   return httpServer;
