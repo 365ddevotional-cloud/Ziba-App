@@ -10,7 +10,7 @@ export async function registerRoutes(
   
   // ==================== USERS ====================
   
-  app.get("/api/users", requireAuth(["user", "admin"]), async (req, res) => {
+  app.get("/api/users", async (req, res) => {
     try {
       const users = await prisma.user.findMany({
         orderBy: { createdAt: "desc" },
@@ -23,7 +23,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/users", requireAuth(["admin"]), async (req, res) => {
+  app.post("/api/users", async (req, res) => {
     try {
       const { fullName, email, phone, city, status } = req.body;
       if (!fullName || !email) {
@@ -42,7 +42,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/users/:id", requireAuth(["admin"]), async (req, res) => {
+  app.patch("/api/users/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const { fullName, email, phone, city, status } = req.body;
@@ -59,7 +59,7 @@ export async function registerRoutes(
 
   // ==================== DRIVERS ====================
   
-  app.get("/api/drivers", requireAuth(["admin"]), async (req, res) => {
+  app.get("/api/drivers", async (req, res) => {
     try {
       const drivers = await prisma.driver.findMany({
         orderBy: { createdAt: "desc" },
@@ -72,48 +72,55 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/drivers/approved", requireAuth(["admin"]), async (req, res) => {
+  app.get("/api/drivers/active", async (req, res) => {
     try {
       const drivers = await prisma.driver.findMany({
-        where: { status: "APPROVED" },
+        where: { status: "ACTIVE" },
         orderBy: { createdAt: "desc" },
       });
       res.json(drivers);
     } catch (error) {
-      console.error("Error fetching approved drivers:", error);
-      res.status(500).json({ message: "Failed to fetch approved drivers" });
+      console.error("Error fetching active drivers:", error);
+      res.status(500).json({ message: "Failed to fetch active drivers" });
     }
   });
 
-  app.post("/api/drivers", requireAuth(["admin"]), async (req, res) => {
+  app.post("/api/drivers", async (req, res) => {
     try {
-      const { fullName, phone, vehicleType, vehiclePlate, status } = req.body;
-      if (!fullName || !phone || !vehiclePlate) {
-        return res.status(400).json({ message: "Full name, phone, and vehicle plate are required" });
+      const { fullName, email, phone, vehicleType, vehiclePlate, status, currentRate, avgStartTime, avgEndTime } = req.body;
+      if (!fullName || !email || !phone || !vehiclePlate) {
+        return res.status(400).json({ message: "Full name, email, phone, and vehicle plate are required" });
       }
       const driver = await prisma.driver.create({
         data: { 
-          fullName, 
+          fullName,
+          email,
           phone, 
           vehicleType: vehicleType || "CAR", 
           vehiclePlate,
-          status: status || "PENDING"
+          status: status || "PENDING",
+          currentRate: currentRate || 1.0,
+          avgStartTime,
+          avgEndTime
         },
       });
       res.status(201).json(driver);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.code === "P2002") {
+        return res.status(400).json({ message: "Email already exists" });
+      }
       console.error("Error creating driver:", error);
       res.status(500).json({ message: "Failed to create driver" });
     }
   });
 
-  app.patch("/api/drivers/:id", requireAuth(["admin"]), async (req, res) => {
+  app.patch("/api/drivers/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { fullName, phone, vehicleType, vehiclePlate, status } = req.body;
+      const { fullName, email, phone, vehicleType, vehiclePlate, status, currentRate, avgStartTime, avgEndTime } = req.body;
       const driver = await prisma.driver.update({
         where: { id },
-        data: { fullName, phone, vehicleType, vehiclePlate, status },
+        data: { fullName, email, phone, vehicleType, vehiclePlate, status, currentRate, avgStartTime, avgEndTime },
       });
       res.json(driver);
     } catch (error) {
@@ -124,7 +131,7 @@ export async function registerRoutes(
 
   // ==================== RIDES ====================
   
-  app.get("/api/rides", requireAuth(["user", "admin"]), async (req, res) => {
+  app.get("/api/rides", async (req, res) => {
     try {
       const rides = await prisma.ride.findMany({
         include: {
@@ -140,7 +147,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/rides", requireAuth(["user", "admin"]), async (req, res) => {
+  app.post("/api/rides", async (req, res) => {
     try {
       const { pickupLocation, dropoffLocation, fareEstimate, userId, driverId } = req.body;
       
@@ -154,14 +161,14 @@ export async function registerRoutes(
         return res.status(400).json({ message: "User not found" });
       }
 
-      // If driver is assigned, verify they are approved
+      // If driver is assigned, verify they are active
       if (driverId) {
         const driver = await prisma.driver.findUnique({ where: { id: driverId } });
         if (!driver) {
           return res.status(400).json({ message: "Driver not found" });
         }
-        if (driver.status !== "APPROVED") {
-          return res.status(400).json({ message: "Only approved drivers can be assigned to rides" });
+        if (driver.status !== "ACTIVE") {
+          return res.status(400).json({ message: "Only active drivers can be assigned to rides" });
         }
       }
 
@@ -183,21 +190,21 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/rides/:id", requireAuth(["admin"]), async (req, res) => {
+  app.patch("/api/rides/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const { pickupLocation, dropoffLocation, fareEstimate, status, driverId } = req.body;
 
       let finalStatus = status;
 
-      // If assigning a driver, verify they are approved and auto-set status to ACCEPTED
+      // If assigning a driver, verify they are active and auto-set status to ACCEPTED
       if (driverId) {
         const driver = await prisma.driver.findUnique({ where: { id: driverId } });
         if (!driver) {
           return res.status(400).json({ message: "Driver not found" });
         }
-        if (driver.status !== "APPROVED") {
-          return res.status(400).json({ message: "Only approved drivers can be assigned to rides" });
+        if (driver.status !== "ACTIVE") {
+          return res.status(400).json({ message: "Only active drivers can be assigned to rides" });
         }
         // Auto-set status to ACCEPTED when driver is assigned (unless explicitly completed/cancelled)
         if (!status || (status !== "COMPLETED" && status !== "CANCELLED")) {
@@ -225,7 +232,7 @@ export async function registerRoutes(
 
   // ==================== DIRECTORS ====================
   
-  app.get("/api/directors", requireAuth(["director", "admin"]), async (req, res) => {
+  app.get("/api/directors", async (req, res) => {
     try {
       const directors = await prisma.director.findMany({
         orderBy: { createdAt: "desc" },
@@ -237,7 +244,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/directors", requireAuth(["admin"]), async (req, res) => {
+  app.post("/api/directors", async (req, res) => {
     try {
       const { fullName, email, role, region } = req.body;
       if (!fullName || !email || !role || !region) {
@@ -258,7 +265,7 @@ export async function registerRoutes(
 
   // ==================== ADMINS ====================
   
-  app.get("/api/admins", requireAuth(["admin"]), async (req, res) => {
+  app.get("/api/admins", async (req, res) => {
     try {
       const admins = await prisma.admin.findMany({
         orderBy: { createdAt: "desc" },
@@ -272,7 +279,7 @@ export async function registerRoutes(
 
   // ==================== ADMIN STATS ====================
   
-  app.get("/api/admin/stats", requireAuth(["admin"]), async (req, res) => {
+  app.get("/api/admin/stats", async (req, res) => {
     try {
       const [
         totalUsers,

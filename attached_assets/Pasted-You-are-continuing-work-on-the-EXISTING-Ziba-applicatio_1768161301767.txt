@@ -1,0 +1,154 @@
+You are continuing work on the EXISTING Ziba application.
+DO NOT create a new app.
+DO NOT reset previous stages.
+DO NOT add authentication or login requirements.
+
+GOAL
+
+Enhance Admin → Drivers and Admin → Directors with richer operational data and editable controls.
+
+1️⃣ DRIVERS — ADMIN VIEW UPGRADE
+Database (Prisma)
+
+Extend the existing Driver model with:
+
+email (string, unique)
+
+status (enum):
+
+PENDING
+
+ACTIVE
+
+SUSPENDED
+
+OFFLINE
+
+currentRate (decimal) — driver’s present fare rate
+
+avgStartTime (string, e.g. "07:30")
+
+avgEndTime (string, e.g. "18:00")
+
+Run migration cleanly without breaking existing data.
+
+Admin UI – Drivers Page
+
+Update Admin → Drivers table to show:
+
+Name
+
+Email
+
+Phone
+
+Vehicle
+
+Plate
+
+Status (CLICKABLE DROPDOWN)
+
+Options: Pending, Active, Suspended, Offline
+
+Change updates DB instantly
+
+Current Rate
+
+Avg Start Time
+
+Avg End Time
+
+Total Rides
+
+Joined Date
+
+Status changes must reflect immediately in UI.
+
+2️⃣ DIRECTORS — ADMIN VIEW UPGRADE
+Database (Prisma)
+
+Extend or update Director model to include:
+
+phone (string)
+
+contractStart (date)
+
+contractEnd (date)
+
+driversAssigned (int)
+
+driversOnline (int)
+
+region (string)
+
+role (enum):
+
+FINANCE
+
+COMPLIANCE
+
+OPERATIONS
+
+Seed realistic sample values.
+
+Admin UI – Directors Page
+
+Update Admin → Directors table to display:
+
+Name
+
+Email
+
+Phone
+
+Role (badge)
+
+Region
+
+Contract Start
+
+Contract End
+
+Drivers Assigned
+
+Drivers Online
+
+Joined Date
+
+Values must come from DB (not hardcoded).
+
+3️⃣ API & STATE
+
+Add/update API endpoints only where needed
+
+No auth guards
+
+No breaking existing routes
+
+All updates must be reflected live in UI
+
+4️⃣ SEED UPDATE
+
+Update seed script to include:
+
+Drivers with emails, rates, avg times, mixed statuses
+
+Directors with phone numbers, contracts, and driver counts
+
+5️⃣ COMPLETION CHECK
+
+When done, I must be able to:
+
+Change driver status from Admin UI
+
+See driver rate and working hours
+
+See director phone numbers
+
+See director contract periods
+
+See assigned vs online drivers per director
+
+DO NOT introduce a new stage.
+DO NOT repeat previous work.
+Finish cleanly and stop.

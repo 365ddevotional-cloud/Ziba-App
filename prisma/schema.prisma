@@ -14,8 +14,9 @@ enum UserStatus {
 
 enum DriverStatus {
   PENDING
-  APPROVED
+  ACTIVE
   SUSPENDED
+  OFFLINE
 }
 
 enum VehicleType {
@@ -46,10 +47,14 @@ model User {
 model Driver {
   id           String       @id @default(uuid())
   fullName     String
+  email        String       @unique
   phone        String
   vehicleType  VehicleType  @default(CAR)
   vehiclePlate String
   status       DriverStatus @default(PENDING)
+  currentRate  Float        @default(1.0)
+  avgStartTime String?
+  avgEndTime   String?
   createdAt    DateTime     @default(now())
   rides        Ride[]
   incentives   Incentive[]
@@ -108,11 +113,16 @@ enum DirectorRole {
 }
 
 model Director {
-  id           String       @id @default(uuid())
-  fullName     String
-  email        String       @unique
-  role         DirectorRole
-  region       String
-  passwordHash String?
-  createdAt    DateTime     @default(now())
+  id              String       @id @default(uuid())
+  fullName        String
+  email           String       @unique
+  phone           String?
+  role            DirectorRole
+  region          String
+  contractStart   DateTime?
+  contractEnd     DateTime?
+  driversAssigned Int          @default(0)
+  driversOnline   Int          @default(0)
+  passwordHash    String?
+  createdAt       DateTime     @default(now())
 }

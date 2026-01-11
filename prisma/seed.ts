@@ -65,35 +65,74 @@ async function main() {
     prisma.driver.create({
       data: {
         fullName: 'Tunde Bakare',
+        email: 'tunde@ziba-drivers.com',
         phone: '+234 806 111 2222',
         vehicleType: 'CAR',
         vehiclePlate: 'LAG-123-AB',
-        status: 'APPROVED',
+        status: 'ACTIVE',
+        currentRate: 1.2,
+        avgStartTime: '06:00',
+        avgEndTime: '18:00',
       },
     }),
     prisma.driver.create({
       data: {
         fullName: 'Yusuf Mohammed',
+        email: 'yusuf@ziba-drivers.com',
         phone: '+234 807 222 3333',
         vehicleType: 'BIKE',
         vehiclePlate: 'ABJ-456-CD',
         status: 'PENDING',
+        currentRate: 1.0,
+        avgStartTime: '08:00',
+        avgEndTime: '16:00',
       },
     }),
     prisma.driver.create({
       data: {
         fullName: 'Kunle Ajayi',
+        email: 'kunle@ziba-drivers.com',
         phone: '+234 808 333 4444',
         vehicleType: 'VAN',
         vehiclePlate: 'KAN-789-EF',
         status: 'SUSPENDED',
+        currentRate: 0.9,
+        avgStartTime: '07:00',
+        avgEndTime: '19:00',
+      },
+    }),
+    prisma.driver.create({
+      data: {
+        fullName: 'Adaeze Okoro',
+        email: 'adaeze@ziba-drivers.com',
+        phone: '+234 809 444 5555',
+        vehicleType: 'CAR',
+        vehiclePlate: 'LAG-321-XY',
+        status: 'ACTIVE',
+        currentRate: 1.5,
+        avgStartTime: '05:30',
+        avgEndTime: '20:00',
+      },
+    }),
+    prisma.driver.create({
+      data: {
+        fullName: 'Musa Ibrahim',
+        email: 'musa@ziba-drivers.com',
+        phone: '+234 810 555 6666',
+        vehicleType: 'CAR',
+        vehiclePlate: 'ABJ-654-ZZ',
+        status: 'OFFLINE',
+        currentRate: 1.1,
+        avgStartTime: '09:00',
+        avgEndTime: '17:00',
       },
     }),
   ]);
 
   console.log(`Created ${drivers.length} drivers`);
 
-  const approvedDriver = drivers[0];
+  const activeDriver = drivers[0];
+  const activeDriver2 = drivers[3];
 
   const rides = await Promise.all([
     prisma.ride.create({
@@ -103,7 +142,7 @@ async function main() {
         fareEstimate: 2500,
         status: 'COMPLETED',
         userId: users[0].id,
-        driverId: approvedDriver.id,
+        driverId: activeDriver.id,
       },
     }),
     prisma.ride.create({
@@ -113,7 +152,7 @@ async function main() {
         fareEstimate: 1800,
         status: 'COMPLETED',
         userId: users[1].id,
-        driverId: approvedDriver.id,
+        driverId: activeDriver.id,
       },
     }),
     prisma.ride.create({
@@ -123,7 +162,7 @@ async function main() {
         fareEstimate: 1500,
         status: 'COMPLETED',
         userId: users[2].id,
-        driverId: approvedDriver.id,
+        driverId: activeDriver2.id,
       },
     }),
     prisma.ride.create({
@@ -133,7 +172,7 @@ async function main() {
         fareEstimate: 3500,
         status: 'ACCEPTED',
         userId: users[0].id,
-        driverId: approvedDriver.id,
+        driverId: activeDriver.id,
       },
     }),
     prisma.ride.create({
@@ -143,7 +182,7 @@ async function main() {
         fareEstimate: 2000,
         status: 'ACCEPTED',
         userId: users[4].id,
-        driverId: approvedDriver.id,
+        driverId: activeDriver2.id,
       },
     }),
     prisma.ride.create({
@@ -193,7 +232,7 @@ async function main() {
         fareEstimate: 1400,
         status: 'COMPLETED',
         userId: users[2].id,
-        driverId: approvedDriver.id,
+        driverId: activeDriver2.id,
       },
     }),
   ]);
@@ -220,14 +259,21 @@ async function main() {
       data: {
         amount: 500,
         reason: 'Weekly bonus for high ratings',
-        driverId: approvedDriver.id,
+        driverId: activeDriver.id,
       },
     }),
     prisma.incentive.create({
       data: {
         amount: 1000,
         reason: 'Completed 50 rides milestone',
-        driverId: approvedDriver.id,
+        driverId: activeDriver.id,
+      },
+    }),
+    prisma.incentive.create({
+      data: {
+        amount: 750,
+        reason: 'New driver welcome bonus',
+        driverId: activeDriver2.id,
       },
     }),
   ]);
@@ -240,24 +286,39 @@ async function main() {
       data: {
         fullName: 'Oluwaseun Adebayo',
         email: 'operations@ziba.com',
+        phone: '+234 811 100 2001',
         role: 'OPERATIONS',
         region: 'Lagos',
+        contractStart: new Date('2024-01-15'),
+        contractEnd: new Date('2026-01-14'),
+        driversAssigned: 45,
+        driversOnline: 28,
       },
     }),
     prisma.director.create({
       data: {
         fullName: 'Aisha Abdullahi',
         email: 'finance@ziba.com',
+        phone: '+234 811 200 3002',
         role: 'FINANCE',
         region: 'National',
+        contractStart: new Date('2023-06-01'),
+        contractEnd: new Date('2025-05-31'),
+        driversAssigned: 120,
+        driversOnline: 75,
       },
     }),
     prisma.director.create({
       data: {
         fullName: 'Ibrahim Musa',
         email: 'compliance@ziba.com',
+        phone: '+234 811 300 4003',
         role: 'COMPLIANCE',
         region: 'Abuja',
+        contractStart: new Date('2024-03-01'),
+        contractEnd: new Date('2026-02-28'),
+        driversAssigned: 30,
+        driversOnline: 18,
       },
     }),
   ]);
