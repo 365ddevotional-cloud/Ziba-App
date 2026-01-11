@@ -1,0 +1,79 @@
+You are building a NEW application from scratch.
+
+APP NAME:
+Ziba
+
+APP TYPE:
+A ride-hailing / logistics platform (Uber-like), but this stage is FOUNDATION ONLY.
+
+STAGE:
+Stage 1 – Core Foundation & Authentication
+
+DO NOT build ride matching, maps, payments, or driver logic yet.
+
+TECH STACK (KEEP SIMPLE):
+- Frontend: React + Vite
+- Backend: Node.js + Express
+- Database: PostgreSQL
+- ORM: Prisma
+- Auth: Email + Password (JWT + session)
+- Styling: Tailwind CSS
+- Colors: Dark blue, white, soft gray (professional, Uber-like feel)
+
+REQUIREMENTS (MUST ALL WORK):
+
+1. ROUTES (NO 404s):
+   - `/` → Ziba landing page
+   - `/login` → User login
+   - `/register` → User registration
+   - `/admin/login` → Admin login
+   - `/admin/setup` → First-time admin password setup
+   - `/admin/dashboard` → Protected admin dashboard
+
+2. ADMIN LOGIC (VERY IMPORTANT):
+   - There is ONE initial admin created via environment variables:
+     ADMIN_EMAIL
+     ADMIN_PHONE
+   - Admin has NO password initially
+   - On first visit to `/admin/login`, redirect admin to `/admin/setup`
+   - Admin sets password ONCE
+   - After setup, admin is auto-logged in
+   - Future visits go directly to `/admin/login`
+
+3. AUTH RULES:
+   - Users CANNOT access admin routes
+   - Admin CANNOT log in via user login
+   - Admin routes are protected
+   - Sessions persist on refresh
+
+4. DATABASE:
+   - User table
+   - Admin table
+   - Passwords hashed
+   - Prisma migrations applied cleanly
+
+5. UI REQUIREMENTS:
+   - Simple, clean pages
+   - Clear labels
+   - No placeholder junk
+   - No broken links
+
+6. OUTPUT EXPECTATION:
+   When finished, I should be able to:
+   - Open `/`
+   - Register a user
+   - Log in a user
+   - Go to `/admin/login`
+   - Be redirected to `/admin/setup`
+   - Set admin password
+   - See `/admin/dashboard`
+
+ABSOLUTE RULES:
+- Do NOT reuse old Ziba code
+- Do NOT create a monorepo
+- Do NOT skip routes
+- Do NOT leave TODO auth logic
+- Do NOT show 404 on any listed route
+
+If anything is unclear, make a reasonable decision and continue.
+Build clean, minimal, and stable.
