@@ -1,0 +1,175 @@
+STAGE 14 — GLOBAL COUNTRY SWITCHER + CURRENCY CONTROL (ADMIN-ONLY)
+🎯 Goal of Stage 14
+
+Add a real Admin-controlled Country Selector that:
+
+Appears in the Admin Dashboard header
+
+Controls:
+
+Currency symbol (₦, $, £, €, ₵, R)
+
+Country context for rides, revenue, incentives
+
+Is persisted (does not reset on refresh)
+
+Is admin-only
+
+Supports current + future countries cleanly
+
+🧠 Countries to Support (NOW)
+
+Nigeria 🇳🇬 → ₦ NGN
+
+Ghana 🇬🇭 → ₵ GHS
+
+Liberia 🇱🇷 → $ USD
+
+South Africa 🇿🇦 → R ZAR
+
+United States 🇺🇸 → $ USD
+
+Mexico 🇲🇽 → $ MXN
+
+United Kingdom 🇬🇧 → £ GBP
+
+France 🇫🇷 → € EUR
+
+🧩 WHAT TO IMPLEMENT (DO NOT SKIP)
+1️⃣ Global Country Configuration (Single Source of Truth)
+
+Create a central config (frontend + backend-safe):
+
+const COUNTRIES = {
+  NG: { name: "Nigeria", currency: "NGN", symbol: "₦" },
+  GH: { name: "Ghana", currency: "GHS", symbol: "₵" },
+  LR: { name: "Liberia", currency: "USD", symbol: "$" },
+  ZA: { name: "South Africa", currency: "ZAR", symbol: "R" },
+  US: { name: "United States", currency: "USD", symbol: "$" },
+  MX: { name: "Mexico", currency: "MXN", symbol: "$" },
+  UK: { name: "United Kingdom", currency: "GBP", symbol: "£" },
+  FR: { name: "France", currency: "EUR", symbol: "€" }
+};
+
+2️⃣ Admin Country Dropdown (HEADER)
+
+Add a 🌍 Country dropdown in the Admin Dashboard header (top-right):
+
+Label: Country
+
+Dropdown options: all countries above
+
+Only visible when:
+
+User role === ADMIN
+
+Default:
+
+Nigeria (NG)
+
+Example UI:
+
+🌍 Country: Nigeria ▾
+
+3️⃣ Persist Selected Country
+
+Save selected country in:
+
+Database (admin_settings table) OR
+
+Server session / localStorage (admin scope)
+
+On reload:
+
+Country MUST remain the same
+
+Do NOT hardcode Nigeria after this stage
+
+4️⃣ Currency Formatting (CRITICAL FIX)
+
+Replace all $ hardcoded formatting.
+
+Every monetary value must use:
+
+formatCurrency(amount, selectedCountry)
+
+
+Where:
+
+Rides fare
+
+Revenue
+
+Driver incentives
+
+Wallets
+
+Payouts
+
+Example:
+
+Nigeria → ₦7,200
+
+UK → £7,200
+
+France → €7,200
+
+⚠️ No screen should decide currency on its own
+
+5️⃣ Admin Dashboard Cards Update
+
+Ensure these cards react to country change immediately:
+
+Revenue
+
+Driver Incentives
+
+Ride Fare totals
+
+No refresh required.
+
+6️⃣ Backend Safety Rule
+
+Admin-selected country must be sent with API requests
+
+Backend validates currency formatting
+
+Prevent mismatched country + currency
+
+7️⃣ Future-Proofing (MANDATORY)
+
+Adding a new country must require:
+
+1 config entry
+
+NO UI rewrites
+
+Do NOT scatter country logic across files
+
+✅ ACCEPTANCE CHECKLIST (Stage 14 is DONE when ALL pass)
+
+ Country dropdown visible in Admin header
+
+ Dropdown switches country live
+
+ ₦ shows for Nigeria everywhere
+
+ £ shows for UK
+
+ € shows for France
+
+ Selection persists after refresh
+
+ Admin-only access
+
+ No hardcoded $ remains
+
+🚦 AFTER STAGE 14
+
+Next stages (optional, not now):
+
+Stage 15: Geo-based default country
+
+Stage 16: Multi-currency wallets
+
+Stage 17: FX conversion layer

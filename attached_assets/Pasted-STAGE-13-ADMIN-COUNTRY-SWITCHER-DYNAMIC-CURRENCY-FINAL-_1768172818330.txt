@@ -1,0 +1,120 @@
+STAGE 13 — ADMIN COUNTRY SWITCHER + DYNAMIC CURRENCY (FINAL UI FIX)
+
+GOAL:
+Make Ziba fully multi-country (Nigeria, Ghana, Liberia, South Africa, USA, Mexico, UK, France)
+with a global Admin Country Switcher that controls:
+- Currency symbol
+- Ride fare display
+- Default country context for admin actions
+
+DO NOT:
+- Reset database
+- Delete rides
+- Remove auth
+- Break existing country logic
+
+────────────────────────────
+1️⃣ ADMIN DASHBOARD — COUNTRY SWITCHER (UI)
+────────────────────────────
+
+Add a dropdown switch button in the Admin Dashboard header (top-right or near Admin menu):
+
+Label:
+🌍 Country
+
+Dropdown Options:
+- 🇳🇬 Nigeria (NGN ₦)
+- 🇬🇭 Ghana (GHS ₵)
+- 🇱🇷 Liberia (LRD $)
+- 🇿🇦 South Africa (ZAR R)
+- 🇺🇸 United States (USD $)
+- 🇲🇽 Mexico (MXN MX$)
+- 🇬🇧 United Kingdom (GBP £)
+- 🇫🇷 France (EUR €)
+
+When Admin selects a country:
+- Store selection in global admin state (Context or Zustand)
+- Persist selection in localStorage
+- Reload data using selected country as filter context
+
+Admin can switch countries WITHOUT logout.
+
+────────────────────────────
+2️⃣ BACKEND CONTEXT (NO DB RESET)
+────────────────────────────
+
+Ensure all admin list endpoints accept:
+- countryCode (e.g. NG, GH, US, UK, FR)
+
+Example:
+GET /api/admin/rides?country=NG
+
+If country not provided:
+- Default to Nigeria (NG)
+
+────────────────────────────
+3️⃣ CURRENCY DISPLAY FIX (MANDATORY)
+────────────────────────────
+
+REMOVE ALL hard-coded "$" usage in frontend.
+
+Create a single currency map:
+
+{
+  NGN: "₦",
+  GHS: "₵",
+  LRD: "$",
+  ZAR: "R",
+  USD: "$",
+  MXN: "MX$",
+  GBP: "£",
+  EUR: "€"
+}
+
+Render fares ONLY as:
+currencySymbol + fareAmount
+
+Example:
+₦1400.00
+£18.00
+€12.50
+
+NO hard-coded symbols anywhere.
+
+────────────────────────────
+4️⃣ ADMIN VISIBILITY RULES
+────────────────────────────
+
+Admin sees:
+- ALL countries
+- ALL currencies
+- Country switch affects displayed data only
+
+Drivers / Users:
+- See ONLY their assigned country
+- Cannot change country
+
+────────────────────────────
+5️⃣ FINAL VALIDATION CHECK
+────────────────────────────
+
+Nigeria rides:
+₦1400, ₦1800, ₦3500
+
+UK rides:
+£18, £25
+
+France rides:
+€12, €20
+
+Switching country updates:
+✔ Rides list
+✔ Currency symbol
+✔ Admin context
+
+NO PAGE REFRESH REQUIRED.
+
+────────────────────────────
+CONFIRM WHEN:
+Admin dashboard shows 🌍 Country dropdown
+Currencies update correctly per country

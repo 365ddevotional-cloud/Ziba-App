@@ -1,0 +1,124 @@
+🎯 STAGE 13.2 GOAL
+
+Add an Admin-only Country Switcher in the Admin Dashboard that:
+
+Controls which country’s data is being viewed
+
+Dynamically updates currency symbols in Rides
+
+Makes Ziba immediately usable across:
+
+Nigeria
+
+Ghana
+
+Liberia
+
+South Africa
+
+United States
+
+Mexico
+
+United Kingdom
+
+France
+
+⚠️ Do NOT reset database
+⚠️ Do NOT delete auth or roles
+⚠️ Do NOT refactor backend logic beyond what’s required
+
+🧭 1️⃣ ADMIN DASHBOARD — COUNTRY SWITCH DROPDOWN (UI)
+
+Add a 🌍 Country dropdown button in the Admin Dashboard header (top-right near Admin menu).
+
+Dropdown Options:
+
+🇳🇬 Nigeria — NG — NGN (₦)
+
+🇬🇭 Ghana — GH — GHS (₵)
+
+🇱🇷 Liberia — LR — LRD ($)
+
+🇿🇦 South Africa — ZA — ZAR (R)
+
+🇺🇸 United States — US — USD ($)
+
+🇲🇽 Mexico — MX — MXN (MX$)
+
+🇬🇧 United Kingdom — UK — GBP (£)
+
+🇫🇷 France — FR — EUR (€)
+
+Behavior:
+
+Selecting a country:
+
+Updates Admin global state
+
+Saves selection to localStorage
+
+Re-renders Admin views using that country context
+
+Admin can switch countries without logout
+
+Default country = Nigeria (NG)
+
+💱 2️⃣ CURRENCY DISPLAY FIX (THIS IS THE BUG)
+REQUIRED FIX
+
+Remove ALL hard-coded $ symbols in the frontend.
+
+Create ONE shared currency map:
+
+{
+  NG: { code: "NGN", symbol: "₦" },
+  GH: { code: "GHS", symbol: "₵" },
+  LR: { code: "LRD", symbol: "$" },
+  ZA: { code: "ZAR", symbol: "R" },
+  US: { code: "USD", symbol: "$" },
+  MX: { code: "MXN", symbol: "MX$" },
+  UK: { code: "GBP", symbol: "£" },
+  FR: { code: "EUR", symbol: "€" }
+}
+
+Rendering Rule:
+
+Fare must ALWAYS render as:
+
+currencySymbol + formattedAmount
+
+Examples:
+
+Nigeria ride → ₦1400.00
+
+UK ride → £18.00
+
+France ride → €12.50
+
+🚫 No $ literals anywhere in JSX.
+
+👁️ 3️⃣ VISIBILITY RULES (UNCHANGED)
+
+Admin
+
+Can view all countries
+
+Country switch only affects what is displayed
+
+Drivers / Users / Directors
+
+See only their assigned country
+
+No country switch access
+
+✅ 4️⃣ FINAL ACCEPTANCE CHECK (VERY IMPORTANT)
+
+Stage 13.2 is COMPLETE only when:
+
+✔ Admin dashboard shows 🌍 Country dropdown
+✔ Switching country updates Rides list
+✔ Currency symbol updates immediately
+✔ Nigeria shows ₦, not $
+✔ No page refresh required
+✔ No database changes occurred
