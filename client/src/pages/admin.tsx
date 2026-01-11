@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog, Wifi } from "lucide-react";
+import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog, Wifi, DollarSign, Gift } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
@@ -33,6 +33,17 @@ interface Stats {
   };
   directors: {
     total: number;
+  };
+  revenue: {
+    totalPaid: number;
+    pending: number;
+    pendingCount: number;
+    paidCount: number;
+    failedCount: number;
+  };
+  incentives: {
+    total: number;
+    count: number;
   };
   platformStatus: string;
 }
@@ -174,6 +185,51 @@ export default function AdminPage() {
               </Card>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-500" data-testid="text-total-revenue">
+                    ₦{(stats?.revenue?.totalPaid ?? 0).toLocaleString()}
+                  </div>
+                  <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-yellow-500" />
+                      ₦{(stats?.revenue?.pending ?? 0).toLocaleString()} pending ({stats?.revenue?.pendingCount ?? 0})
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                      {stats?.revenue?.paidCount ?? 0} paid
+                    </span>
+                    {(stats?.revenue?.failedCount ?? 0) > 0 && (
+                      <span className="flex items-center gap-1">
+                        <XCircle className="h-3 w-3 text-red-500" />
+                        {stats?.revenue?.failedCount ?? 0} failed
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Driver Incentives</CardTitle>
+                  <Gift className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-500" data-testid="text-total-incentives">
+                    ₦{(stats?.incentives?.total ?? 0).toLocaleString()}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {stats?.incentives?.count ?? 0} incentives awarded to drivers
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card className="hover-elevate cursor-pointer">
                 <Link href="/admin/users">
@@ -231,6 +287,36 @@ export default function AdminPage() {
                       <ArrowRight className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <CardDescription>View all rides on the platform</CardDescription>
+                  </CardHeader>
+                </Link>
+              </Card>
+
+              <Card className="hover-elevate cursor-pointer">
+                <Link href="/admin/payments">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <DollarSign className="h-5 w-5 text-primary" />
+                        <CardTitle>Manage Payments</CardTitle>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <CardDescription>Track and manage ride payments</CardDescription>
+                  </CardHeader>
+                </Link>
+              </Card>
+
+              <Card className="hover-elevate cursor-pointer">
+                <Link href="/admin/incentives">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Gift className="h-5 w-5 text-primary" />
+                        <CardTitle>Manage Incentives</CardTitle>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <CardDescription>Award bonuses to drivers</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>

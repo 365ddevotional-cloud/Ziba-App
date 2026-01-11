@@ -15,6 +15,8 @@ import AdminUsersPage from "@/pages/admin-users";
 import AdminDriversPage from "@/pages/admin-drivers";
 import AdminRidesPage from "@/pages/admin-rides";
 import AdminDirectorsPage from "@/pages/admin-directors";
+import AdminPaymentsPage from "@/pages/admin-payments";
+import AdminIncentivesPage from "@/pages/admin-incentives";
 import { UserLoginPage, DirectorLoginPage, AdminLoginPage } from "@/pages/login";
 import NotFound from "@/pages/not-found";
 
@@ -34,6 +36,8 @@ function Router() {
       <Route path="/admin/drivers" component={AdminDriversPage} />
       <Route path="/admin/directors" component={AdminDirectorsPage} />
       <Route path="/admin/rides" component={AdminRidesPage} />
+      <Route path="/admin/payments" component={AdminPaymentsPage} />
+      <Route path="/admin/incentives" component={AdminIncentivesPage} />
       <Route component={NotFound} />
     </Switch>
   );
