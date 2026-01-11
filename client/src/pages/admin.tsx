@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle } from "lucide-react";
+import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
@@ -24,6 +24,9 @@ interface Stats {
     completed: number;
     cancelled: number;
     active: number;
+  };
+  directors: {
+    total: number;
   };
   platformStatus: string;
 }
@@ -141,7 +144,7 @@ export default function AdminPage() {
               </Card>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card className="hover-elevate cursor-pointer">
                 <Link href="/admin/users">
                   <CardHeader>
@@ -168,6 +171,21 @@ export default function AdminPage() {
                       <ArrowRight className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <CardDescription>View and manage all registered drivers</CardDescription>
+                  </CardHeader>
+                </Link>
+              </Card>
+
+              <Card className="hover-elevate cursor-pointer">
+                <Link href="/directors">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <UserCog className="h-5 w-5 text-primary" />
+                        <CardTitle>Directors</CardTitle>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <CardDescription>{stats?.directors?.total ?? 0} directors overseeing operations</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>

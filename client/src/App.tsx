@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import Landing from "@/pages/landing";
 import UsersPage from "@/pages/users";
 import DriversPage from "@/pages/drivers";
+import DirectorsPage from "@/pages/directors";
 import RidesPage from "@/pages/rides";
 import AdminPage from "@/pages/admin";
 import AdminUsersPage from "@/pages/admin-users";
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/" component={Landing} />
       <Route path="/users" component={UsersPage} />
       <Route path="/drivers" component={DriversPage} />
+      <Route path="/directors" component={DirectorsPage} />
       <Route path="/rides" component={RidesPage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/admin/users" component={AdminUsersPage} />

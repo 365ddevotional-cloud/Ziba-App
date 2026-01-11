@@ -234,6 +234,36 @@ async function main() {
 
   console.log(`Created ${incentives.length} incentives`);
 
+  await prisma.director.deleteMany();
+  const directors = await Promise.all([
+    prisma.director.create({
+      data: {
+        fullName: 'Oluwaseun Adebayo',
+        email: 'operations@ziba.com',
+        role: 'OPERATIONS',
+        region: 'Lagos',
+      },
+    }),
+    prisma.director.create({
+      data: {
+        fullName: 'Aisha Abdullahi',
+        email: 'finance@ziba.com',
+        role: 'FINANCE',
+        region: 'National',
+      },
+    }),
+    prisma.director.create({
+      data: {
+        fullName: 'Ibrahim Musa',
+        email: 'compliance@ziba.com',
+        role: 'COMPLIANCE',
+        region: 'Abuja',
+      },
+    }),
+  ]);
+
+  console.log(`Created ${directors.length} directors`);
+
   console.log('Seeding completed successfully!');
 }
 

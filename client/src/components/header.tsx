@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Menu, X, Users, Car, MapPin, Shield } from "lucide-react";
+import { Menu, X, Users, Car, MapPin, Shield, UserCog } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
@@ -7,6 +7,7 @@ import { ThemeToggle } from "./theme-toggle";
 const navLinks = [
   { href: "/users", label: "Users", icon: Users },
   { href: "/drivers", label: "Drivers", icon: Car },
+  { href: "/directors", label: "Directors", icon: UserCog },
   { href: "/rides", label: "Rides", icon: MapPin },
   { href: "/admin", label: "Admin", icon: Shield },
 ];

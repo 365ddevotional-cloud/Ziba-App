@@ -222,6 +222,39 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== DIRECTORS ====================
+  
+  app.get("/api/directors", async (req, res) => {
+    try {
+      const directors = await prisma.director.findMany({
+        orderBy: { createdAt: "desc" },
+      });
+      res.json(directors);
+    } catch (error) {
+      console.error("Error fetching directors:", error);
+      res.status(500).json({ message: "Failed to fetch directors" });
+    }
+  });
+
+  app.post("/api/directors", async (req, res) => {
+    try {
+      const { fullName, email, role, region } = req.body;
+      if (!fullName || !email || !role || !region) {
+        return res.status(400).json({ message: "Full name, email, role, and region are required" });
+      }
+      const director = await prisma.director.create({
+        data: { fullName, email, role, region },
+      });
+      res.status(201).json(director);
+    } catch (error: any) {
+      if (error.code === "P2002") {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+      console.error("Error creating director:", error);
+      res.status(500).json({ message: "Failed to create director" });
+    }
+  });
+
   // ==================== ADMINS ====================
   
   app.get("/api/admins", async (req, res) => {
@@ -253,6 +286,7 @@ export async function registerRoutes(
         acceptedRides,
         completedRides,
         cancelledRides,
+        totalDirectors,
       ] = await Promise.all([
         prisma.user.count(),
         prisma.user.count({ where: { status: "ACTIVE" } }),
@@ -266,6 +300,7 @@ export async function registerRoutes(
         prisma.ride.count({ where: { status: "ACCEPTED" } }),
         prisma.ride.count({ where: { status: "COMPLETED" } }),
         prisma.ride.count({ where: { status: "CANCELLED" } }),
+        prisma.director.count(),
       ]);
       
       res.json({
@@ -287,6 +322,9 @@ export async function registerRoutes(
           completed: completedRides,
           cancelled: cancelledRides,
           active: requestedRides + acceptedRides,
+        },
+        directors: {
+          total: totalDirectors,
         },
         platformStatus: "Operational",
       });

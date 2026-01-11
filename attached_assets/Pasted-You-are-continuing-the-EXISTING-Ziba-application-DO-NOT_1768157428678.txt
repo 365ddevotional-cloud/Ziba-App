@@ -1,0 +1,98 @@
+You are continuing the EXISTING Ziba application.
+
+DO NOT restart the app.
+DO NOT remove completed features.
+DO NOT add authentication or passwords.
+DO NOT introduce external services.
+
+STAGE:
+Stage 7 – Roles & Governance (Preview Mode)
+
+GOAL:
+Introduce Directors as a first-class governance role and prepare the system
+for future authentication without enforcing it yet.
+
+--------------------------------
+1. DATABASE – DIRECTOR MODEL
+--------------------------------
+
+Add a Director model (if not already added):
+
+Director:
+- id
+- fullName
+- email
+- role (OPERATIONS | FINANCE | COMPLIANCE)
+- region
+- createdAt
+
+NO relations yet.
+NO passwords.
+NO auth fields.
+
+--------------------------------
+2. SEED DATA
+--------------------------------
+
+Seed at least 3 Directors:
+- Operations Director – Lagos
+- Finance Director – National
+- Compliance Director – Abuja
+
+Ensure seeding does NOT affect existing seed data.
+
+--------------------------------
+3. ROLE AWARENESS (SOFT)
+--------------------------------
+
+Introduce a lightweight role concept:
+- Admin
+- Director
+
+This is NOT authentication.
+This is NOT permission enforcement.
+
+Use simple flags or context to:
+- Show Director-specific views
+- Prepare routing structure
+
+--------------------------------
+4. UI – DIRECTORS
+--------------------------------
+
+Add:
+- /directors → Directors list page (table view)
+- Admin → Directors section
+- Director overview page (read-only)
+
+Columns:
+- Name
+- Role
+- Region
+
+--------------------------------
+5. ACCESS BEHAVIOR (PREVIEW ONLY)
+--------------------------------
+
+For now:
+- Everyone can view everything
+- NO login required
+- NO route blocking
+
+But structure code so that:
+- Directors are logically separated from Admin
+- Admin has broader visibility than Director
+
+--------------------------------
+6. VERIFY
+--------------------------------
+
+Confirm:
+- Directors appear in UI
+- Admin dashboard shows Directors count
+- No existing pages break
+- No Prisma or console errors
+- Preview works everywhere
+
+STOP after completion.
+DO NOT suggest next stages.
