@@ -1,0 +1,104 @@
+You are continuing the EXISTING Ziba application.
+
+DO NOT restart the app.
+DO NOT remove completed stages.
+DO NOT refactor unrelated code.
+
+STAGE:
+Stage 8 – Authentication & Access Control
+
+GOAL:
+Introduce secure authentication and role-based access
+for Admins, Directors, and Users.
+
+--------------------------------
+1. AUTH STRATEGY
+--------------------------------
+
+- Use email + password authentication
+- Hash passwords securely (bcrypt)
+- Use session-based auth or JWT (choose one, keep simple)
+- Persist sessions across refresh
+
+--------------------------------
+2. DATABASE UPDATES (SAFE)
+--------------------------------
+
+Add auth fields:
+
+User:
+- passwordHash
+
+Director:
+- passwordHash
+
+Admin:
+- passwordHash
+
+⚠️ Do NOT delete existing rows
+⚠️ Backfill passwordHash as NULL initially
+
+--------------------------------
+3. FIRST-TIME SETUP FLOW
+--------------------------------
+
+- For existing seeded users/directors/admins:
+  - On first login, force password setup
+  - Password is set once
+  - After setup, normal login applies
+
+--------------------------------
+4. LOGIN ROUTES
+--------------------------------
+
+Add routes:
+
+/login          → User login
+/director/login → Director login
+/admin/login    → Admin login
+
+--------------------------------
+5. ACCESS CONTROL
+--------------------------------
+
+Enforce:
+- Users can access:
+  - /users
+  - /rides (their own)
+
+/directors:
+  - /directors
+  - reports (read-only)
+
+/admin:
+  - full access:
+    - users
+    - drivers
+    - rides
+    - payments
+    - incentives
+    - directors
+
+--------------------------------
+6. UI RULES
+--------------------------------
+
+- Clear login screens
+- Role-specific dashboards
+- Friendly error messages
+- Redirect unauthenticated users to correct login
+
+--------------------------------
+7. VERIFY
+--------------------------------
+
+Confirm:
+- Password setup works
+- Login works for all roles
+- Role access is enforced correctly
+- No seeded data lost
+- No console or Prisma errors
+- Preview works without publishing
+
+STOP after completion.
+DO NOT suggest payments.

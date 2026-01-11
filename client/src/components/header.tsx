@@ -1,8 +1,16 @@
 import { Link, useLocation } from "wouter";
-import { Menu, X, Users, Car, MapPin, Shield, UserCog } from "lucide-react";
+import { Menu, X, Users, Car, MapPin, Shield, UserCog, LogIn, LogOut } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
+import { useAuth } from "@/lib/auth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 const navLinks = [
   { href: "/users", label: "Users", icon: Users },
@@ -15,6 +23,7 @@ const navLinks = [
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
+  const { user, logout, isLoading } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -43,7 +52,55 @@ export function Header() {
               </Link>
             );
           })}
-          <div className="ml-2">
+          <div className="ml-2 flex items-center gap-2">
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-user-menu">
+                    {user.email}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem disabled className="text-muted-foreground">
+                    Logged in as {user.role}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => logout()} data-testid="button-logout">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Log Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-login-menu">
+                    <LogIn className="h-4 w-4 mr-1" />
+                    Log In
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href="/login" data-testid="link-user-login">
+                      <Users className="h-4 w-4 mr-2" />
+                      User Login
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/director/login" data-testid="link-director-login">
+                      <UserCog className="h-4 w-4 mr-2" />
+                      Director Login
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/login" data-testid="link-admin-login">
+                      <Shield className="h-4 w-4 mr-2" />
+                      Admin Login
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <ThemeToggle />
           </div>
         </nav>

@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { prisma } from "./prisma";
+import { hashPassword, verifyPassword, requireAuth, getCurrentUser, UserRole } from "./auth";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -332,6 +333,130 @@ export async function registerRoutes(
       console.error("Error fetching stats:", error);
       res.status(500).json({ message: "Failed to fetch stats" });
     }
+  });
+
+  // ==================== AUTHENTICATION ====================
+
+  app.get("/api/auth/me", (req, res) => {
+    const user = getCurrentUser(req);
+    if (!user.id) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    res.json(user);
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password, role } = req.body;
+      if (!email || !role) {
+        return res.status(400).json({ message: "Email and role are required" });
+      }
+
+      let account: any = null;
+      let needsPasswordSetup = false;
+
+      if (role === "user") {
+        account = await prisma.user.findUnique({ where: { email } });
+      } else if (role === "director") {
+        account = await prisma.director.findUnique({ where: { email } });
+      } else if (role === "admin") {
+        account = await prisma.admin.findUnique({ where: { email } });
+      } else {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      if (!account) {
+        return res.status(401).json({ message: "Account not found" });
+      }
+
+      if (!account.passwordHash) {
+        needsPasswordSetup = true;
+        req.session.userId = account.id;
+        req.session.userRole = role as UserRole;
+        req.session.userEmail = account.email;
+        req.session.needsPasswordSetup = true;
+        return res.json({ 
+          needsPasswordSetup: true, 
+          message: "Password setup required",
+          user: { id: account.id, email: account.email, role }
+        });
+      }
+
+      if (!password) {
+        return res.status(400).json({ message: "Password is required" });
+      }
+
+      const isValid = await verifyPassword(password, account.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid password" });
+      }
+
+      req.session.userId = account.id;
+      req.session.userRole = role as UserRole;
+      req.session.userEmail = account.email;
+      req.session.needsPasswordSetup = false;
+
+      res.json({ 
+        message: "Login successful",
+        user: { 
+          id: account.id, 
+          email: account.email, 
+          role,
+          fullName: account.fullName
+        }
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/setup-password", async (req, res) => {
+    try {
+      const { password } = req.body;
+      if (!req.session.userId || !req.session.needsPasswordSetup) {
+        return res.status(401).json({ message: "Unauthorized or no password setup required" });
+      }
+
+      if (!password || password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const hash = await hashPassword(password);
+      const role = req.session.userRole;
+
+      if (role === "user") {
+        await prisma.user.update({ 
+          where: { id: req.session.userId }, 
+          data: { passwordHash: hash } 
+        });
+      } else if (role === "director") {
+        await prisma.director.update({ 
+          where: { id: req.session.userId }, 
+          data: { passwordHash: hash } 
+        });
+      } else if (role === "admin") {
+        await prisma.admin.update({ 
+          where: { id: req.session.userId }, 
+          data: { passwordHash: hash } 
+        });
+      }
+
+      req.session.needsPasswordSetup = false;
+      res.json({ message: "Password set successfully" });
+    } catch (error) {
+      console.error("Password setup error:", error);
+      res.status(500).json({ message: "Failed to set password" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
   });
 
   return httpServer;

@@ -264,6 +264,18 @@ async function main() {
 
   console.log(`Created ${directors.length} directors`);
 
+  await prisma.admin.deleteMany();
+  const admins = await Promise.all([
+    prisma.admin.create({
+      data: {
+        email: 'admin@ziba.com',
+        phone: '+234 800 000 0001',
+      },
+    }),
+  ]);
+
+  console.log(`Created ${admins.length} admins`);
+
   console.log('Seeding completed successfully!');
 }
 

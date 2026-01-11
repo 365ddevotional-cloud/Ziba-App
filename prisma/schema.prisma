@@ -32,14 +32,15 @@ enum RideStatus {
 }
 
 model User {
-  id        String     @id @default(uuid())
-  fullName  String
-  email     String     @unique
-  phone     String?
-  city      String?
-  status    UserStatus @default(ACTIVE)
-  createdAt DateTime   @default(now())
-  rides     Ride[]
+  id           String     @id @default(uuid())
+  fullName     String
+  email        String     @unique
+  phone        String?
+  city         String?
+  status       UserStatus @default(ACTIVE)
+  passwordHash String?
+  createdAt    DateTime   @default(now())
+  rides        Ride[]
 }
 
 model Driver {
@@ -69,10 +70,11 @@ model Ride {
 }
 
 model Admin {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  phone     String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  email        String   @unique
+  phone        String?
+  passwordHash String?
+  createdAt    DateTime @default(now())
 }
 
 enum PaymentStatus {
@@ -106,10 +108,11 @@ enum DirectorRole {
 }
 
 model Director {
-  id        String       @id @default(uuid())
-  fullName  String
-  email     String       @unique
-  role      DirectorRole
-  region    String
-  createdAt DateTime     @default(now())
+  id           String       @id @default(uuid())
+  fullName     String
+  email        String       @unique
+  role         DirectorRole
+  region       String
+  passwordHash String?
+  createdAt    DateTime     @default(now())
 }
