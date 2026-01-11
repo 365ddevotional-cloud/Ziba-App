@@ -1,0 +1,289 @@
+STAGE 12 — RIDE LIFECYCLE, ASSIGNMENT & RATINGS (EXECUTION PROMPT)
+
+OBJECTIVE
+Extend Stage 12 to include full ride lifecycle, driver assignment, online tracking AND Uber-style 5-star rating systems for Drivers, Users, and Directors, visible appropriately across the platform. Auth enforcement remains disabled.
+
+1️⃣ RIDE STATUS LIFECYCLE (STRICT)
+
+Implement enforced ride states:
+
+REQUESTED
+ACCEPTED
+IN_PROGRESS
+COMPLETED
+CANCELLED
+
+
+Rules (SERVER-SIDE ENFORCED):
+
+REQUESTED → ACCEPTED (Admin or Director assigns driver)
+
+ACCEPTED → IN_PROGRESS (Driver starts ride)
+
+IN_PROGRESS → COMPLETED (Driver completes ride)
+
+REQUESTED / ACCEPTED → CANCELLED (Admin or Director only)
+
+❌ No skipping states
+
+❌ Backend rejects invalid transitions
+
+2️⃣ DRIVER ASSIGNMENT LOGIC
+
+Assignment rules:
+
+Driver must be:
+
+ACTIVE
+
+ONLINE
+
+Not currently on an IN_PROGRESS ride
+
+On assignment:
+
+Ride.status → ACCEPTED
+
+ride.driverId set
+
+Driver marked BUSY
+
+On completion / cancellation:
+
+Driver returns to AVAILABLE
+
+Online state preserved
+
+3️⃣ DRIVER ONLINE / OFFLINE TRACKING
+
+Implement:
+
+isOnline: boolean on Driver
+
+Toggle endpoint (simulated UI toggle is fine)
+
+Driver cannot go offline during IN_PROGRESS ride
+
+Live updates must reflect in:
+
+Admin dashboard
+
+Director dashboard
+
+Drivers Online counters
+
+4️⃣ RATING SYSTEMS (NEW – REQUIRED)
+⭐ DRIVER RATING (1–5 STARS)
+
+Based on completed rides
+
+Stored as:
+
+averageRating (float)
+
+totalRatings (int)
+
+Visible to:
+
+Admin (all drivers)
+
+Directors (region drivers)
+
+Driver (self only)
+
+⭐ USER (RIDER) RATING (1–5 STARS)
+
+Based on completed rides
+
+Stored as:
+
+averageRating
+
+totalRatings
+
+Visible to:
+
+Admin (all users)
+
+Directors (region users)
+
+User (self only)
+
+⭐ DIRECTOR RATING (SPECIAL LOGIC – IMPORTANT)
+
+Director rating is NOT manually set.
+
+RULE:
+
+1 star = 20% of assigned drivers ONLINE
+
+5 stars = 100% of assigned drivers ONLINE
+
+Formula:
+
+directorRating = ceil((driversOnline / driversAssigned) * 5)
+
+
+Examples:
+
+0–20% → ⭐
+
+21–40% → ⭐⭐
+
+41–60% → ⭐⭐⭐
+
+61–80% → ⭐⭐⭐⭐
+
+81–100% → ⭐⭐⭐⭐⭐
+
+Live recalculation whenever:
+
+Driver goes online/offline
+
+Driver assigned/unassigned to Director
+
+Visible to:
+
+Admin (all directors)
+
+Director (self only)
+
+5️⃣ ADMIN & DIRECTOR CONTROLS
+Admin
+
+Can:
+
+Assign / reassign rides
+
+Cancel rides (except COMPLETED)
+
+Override Director assignments
+
+View & sort by ratings (Drivers, Users, Directors)
+
+Director
+
+Can:
+
+Assign rides only within their region
+
+View:
+
+Regional rides
+
+Regional driver ratings
+
+Regional user ratings
+
+Their own rating
+Cannot:
+
+Modify rides outside region
+
+Override Admin
+
+Backend must enforce region boundaries.
+
+6️⃣ DASHBOARD SYNCHRONIZATION (REAL DATA)
+Admin Dashboard
+
+Show:
+
+Total rides
+
+Active rides
+
+Completed / Cancelled rides
+
+Drivers online / total
+
+⭐ Avg Driver Rating
+
+⭐ Avg User Rating
+
+⭐ Director Ratings (table)
+
+Director Dashboard (Region-Scoped)
+
+Show:
+
+Same metrics but region-only
+
+Director rating (live star display)
+
+Driver View
+
+Current ride
+
+Ride status
+
+Start / Complete actions
+
+⭐ Driver rating (read-only)
+
+7️⃣ API ENDPOINTS (MANDATORY)
+
+Verify or implement:
+
+POST /api/rides/:id/assign
+POST /api/rides/:id/start
+POST /api/rides/:id/complete
+POST /api/rides/:id/cancel
+
+POST /api/drivers/:id/online
+POST /api/drivers/:id/offline
+
+POST /api/ratings/driver
+POST /api/ratings/user
+
+
+Director ratings must be derived, not stored.
+
+All endpoints must:
+
+Validate role
+
+Validate state
+
+Reject invalid actions clearly
+
+8️⃣ UI REQUIREMENTS
+
+Star icons (★★★★★) — no decimals shown
+
+Hover shows numeric value (e.g. 4.2)
+
+Assignment dropdown shows:
+
+Driver name
+
+Online status
+
+Rating
+
+Disabled buttons when invalid
+
+Toasts on backend rejection
+
+9️⃣ DO NOT TOUCH
+
+❌ Do NOT remove auth code
+❌ Do NOT enforce login globally
+❌ Do NOT add payments here
+❌ Do NOT hardcode ratings
+
+🔟 FINAL ACCEPTANCE CHECK
+
+Stage 12 is DONE when:
+
+Ride lifecycle works end-to-end
+
+Drivers go online/offline correctly
+
+Director rating updates live from driver availability
+
+Ratings visible correctly by role
+
+Backend blocks invalid actions
+
+No console errors
