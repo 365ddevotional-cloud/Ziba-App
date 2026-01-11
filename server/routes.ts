@@ -133,10 +133,42 @@ export async function registerRoutes(
   
   app.get("/api/rides", async (req, res) => {
     try {
+      const { status, search, startDate, endDate } = req.query;
+      
+      const where: any = {};
+      
+      // Filter by status
+      if (status && status !== "all") {
+        where.status = status;
+      }
+      
+      // Filter by date range
+      if (startDate || endDate) {
+        where.createdAt = {};
+        if (startDate) {
+          where.createdAt.gte = new Date(startDate as string);
+        }
+        if (endDate) {
+          const end = new Date(endDate as string);
+          end.setHours(23, 59, 59, 999);
+          where.createdAt.lte = end;
+        }
+      }
+      
+      // Search by pickup/dropoff location
+      if (search) {
+        where.OR = [
+          { pickupLocation: { contains: search as string, mode: "insensitive" } },
+          { dropoffLocation: { contains: search as string, mode: "insensitive" } },
+        ];
+      }
+      
       const rides = await prisma.ride.findMany({
+        where,
         include: {
           user: true,
           driver: true,
+          payment: true,
         },
         orderBy: { createdAt: "desc" },
       });
@@ -506,6 +538,11 @@ export async function registerRoutes(
         totalDirectors,
         avgDriverRating,
         avgUserRating,
+        totalRevenue,
+        pendingPayments,
+        paidPayments,
+        failedPayments,
+        totalIncentives,
       ] = await Promise.all([
         prisma.user.count(),
         prisma.user.count({ where: { status: "ACTIVE" } }),
@@ -525,6 +562,11 @@ export async function registerRoutes(
         prisma.director.count(),
         prisma.driver.aggregate({ _avg: { averageRating: true }, where: { totalRatings: { gt: 0 } } }),
         prisma.user.aggregate({ _avg: { averageRating: true }, where: { totalRatings: { gt: 0 } } }),
+        prisma.payment.aggregate({ _sum: { amount: true }, where: { status: "PAID" } }),
+        prisma.payment.aggregate({ _sum: { amount: true }, _count: true, where: { status: "PENDING" } }),
+        prisma.payment.aggregate({ _sum: { amount: true }, _count: true, where: { status: "PAID" } }),
+        prisma.payment.aggregate({ _count: true, where: { status: "FAILED" } }),
+        prisma.incentive.aggregate({ _sum: { amount: true }, _count: true }),
       ]);
       
       res.json({
@@ -555,11 +597,188 @@ export async function registerRoutes(
         directors: {
           total: totalDirectors,
         },
+        revenue: {
+          totalPaid: totalRevenue._sum.amount || 0,
+          pending: pendingPayments._sum.amount || 0,
+          pendingCount: pendingPayments._count || 0,
+          paidCount: paidPayments._count || 0,
+          failedCount: failedPayments._count || 0,
+        },
+        incentives: {
+          total: totalIncentives._sum.amount || 0,
+          count: totalIncentives._count || 0,
+        },
         platformStatus: "Operational",
       });
     } catch (error) {
       console.error("Error fetching stats:", error);
       res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  // ==================== PAYMENTS ====================
+
+  app.get("/api/payments", async (req, res) => {
+    try {
+      const payments = await prisma.payment.findMany({
+        include: {
+          ride: {
+            include: {
+              user: true,
+              driver: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+      res.status(500).json({ message: "Failed to fetch payments" });
+    }
+  });
+
+  app.patch("/api/payments/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const currentUser = getCurrentUser(req);
+
+      if (currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can update payment status" });
+      }
+
+      const validStatuses = ["PENDING", "PAID", "FAILED"];
+      if (!status || !validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status. Must be PENDING, PAID, or FAILED" });
+      }
+
+      const payment = await prisma.payment.update({
+        where: { id },
+        data: { status },
+        include: {
+          ride: {
+            include: { user: true, driver: true },
+          },
+        },
+      });
+      res.json(payment);
+    } catch (error) {
+      console.error("Error updating payment status:", error);
+      res.status(500).json({ message: "Failed to update payment status" });
+    }
+  });
+
+  // ==================== INCENTIVES ====================
+
+  app.get("/api/incentives", async (req, res) => {
+    try {
+      const incentives = await prisma.incentive.findMany({
+        include: { driver: true },
+        orderBy: { createdAt: "desc" },
+      });
+      res.json(incentives);
+    } catch (error) {
+      console.error("Error fetching incentives:", error);
+      res.status(500).json({ message: "Failed to fetch incentives" });
+    }
+  });
+
+  app.post("/api/incentives", async (req, res) => {
+    try {
+      const { driverId, amount, reason } = req.body;
+      const currentUser = getCurrentUser(req);
+
+      if (currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can create incentives" });
+      }
+
+      if (!driverId || !amount || !reason) {
+        return res.status(400).json({ message: "Driver, amount, and reason are required" });
+      }
+
+      const driver = await prisma.driver.findUnique({ where: { id: driverId } });
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      const incentive = await prisma.incentive.create({
+        data: {
+          driverId,
+          amount: parseFloat(amount),
+          reason,
+        },
+        include: { driver: true },
+      });
+      res.status(201).json(incentive);
+    } catch (error) {
+      console.error("Error creating incentive:", error);
+      res.status(500).json({ message: "Failed to create incentive" });
+    }
+  });
+
+  app.delete("/api/incentives/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      if (currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can delete incentives" });
+      }
+
+      await prisma.incentive.delete({ where: { id } });
+      res.json({ message: "Incentive deleted" });
+    } catch (error) {
+      console.error("Error deleting incentive:", error);
+      res.status(500).json({ message: "Failed to delete incentive" });
+    }
+  });
+
+  // Driver earnings (sum of fare from completed rides + incentives)
+  app.get("/api/drivers/:id/earnings", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const driver = await prisma.driver.findUnique({ where: { id } });
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      const [completedRides, incentives] = await Promise.all([
+        prisma.ride.findMany({
+          where: { driverId: id, status: "COMPLETED" },
+          include: { payment: true },
+        }),
+        prisma.incentive.aggregate({
+          where: { driverId: id },
+          _sum: { amount: true },
+        }),
+      ]);
+
+      const rideEarnings = completedRides.reduce((sum, ride) => {
+        return sum + (ride.fareEstimate || 0);
+      }, 0);
+
+      const paidRideEarnings = completedRides.reduce((sum, ride) => {
+        if (ride.payment?.status === "PAID") {
+          return sum + (ride.fareEstimate || 0);
+        }
+        return sum;
+      }, 0);
+
+      res.json({
+        driverId: id,
+        driverName: driver.fullName,
+        totalRides: completedRides.length,
+        totalEarnings: rideEarnings,
+        paidEarnings: paidRideEarnings,
+        pendingEarnings: rideEarnings - paidRideEarnings,
+        incentives: incentives._sum.amount || 0,
+        grandTotal: rideEarnings + (incentives._sum.amount || 0),
+      });
+    } catch (error) {
+      console.error("Error fetching driver earnings:", error);
+      res.status(500).json({ message: "Failed to fetch driver earnings" });
     }
   });
 
@@ -821,10 +1040,27 @@ export async function registerRoutes(
       const updatedRide = await prisma.ride.update({
         where: { id },
         data: { status: "COMPLETED" },
-        include: { user: true, driver: true },
+        include: { user: true, driver: true, payment: true },
       });
 
-      res.json(updatedRide);
+      // Auto-create payment if fare estimate exists and no payment exists
+      if (updatedRide.fareEstimate && !updatedRide.payment) {
+        await prisma.payment.create({
+          data: {
+            amount: updatedRide.fareEstimate,
+            status: "PENDING",
+            rideId: id,
+          },
+        });
+      }
+
+      // Fetch the updated ride with payment
+      const rideWithPayment = await prisma.ride.findUnique({
+        where: { id },
+        include: { user: true, driver: true, payment: true },
+      });
+
+      res.json(rideWithPayment);
     } catch (error) {
       console.error("Error completing ride:", error);
       res.status(500).json({ message: "Failed to complete ride" });
