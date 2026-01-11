@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Car, Phone, Calendar, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, Car, Phone, Calendar, CheckCircle, Clock, XCircle, Bike, Truck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -9,11 +9,26 @@ interface Driver {
   id: string;
   fullName: string;
   phone: string;
-  vehicleType: string;
+  vehicleType: "CAR" | "BIKE" | "VAN";
   vehiclePlate: string;
-  isActive: boolean;
+  status: "PENDING" | "APPROVED" | "SUSPENDED";
   createdAt: string;
+  _count: {
+    rides: number;
+  };
 }
+
+const statusConfig = {
+  PENDING: { color: "bg-yellow-600", icon: Clock, label: "Pending" },
+  APPROVED: { color: "bg-green-600", icon: CheckCircle, label: "Approved" },
+  SUSPENDED: { color: "bg-red-600", icon: XCircle, label: "Suspended" },
+};
+
+const vehicleIcons = {
+  CAR: Car,
+  BIKE: Bike,
+  VAN: Truck,
+};
 
 export default function DriversPage() {
   const { data: drivers, isLoading } = useQuery<Driver[]>({
@@ -48,42 +63,48 @@ export default function DriversPage() {
                     <TableHead>Vehicle</TableHead>
                     <TableHead>Plate</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Rides</TableHead>
                     <TableHead>Joined</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {drivers.map((driver) => (
-                    <TableRow key={driver.id} data-testid={`row-driver-${driver.id}`}>
-                      <TableCell className="font-medium">{driver.fullName}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          {driver.phone}
-                        </div>
-                      </TableCell>
-                      <TableCell>{driver.vehicleType}</TableCell>
-                      <TableCell className="font-mono">{driver.vehiclePlate}</TableCell>
-                      <TableCell>
-                        {driver.isActive ? (
-                          <Badge variant="default" className="bg-green-600">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Active
+                  {drivers.map((driver) => {
+                    const StatusIcon = statusConfig[driver.status].icon;
+                    const VehicleIcon = vehicleIcons[driver.vehicleType];
+                    return (
+                      <TableRow key={driver.id} data-testid={`row-driver-${driver.id}`}>
+                        <TableCell className="font-medium">{driver.fullName}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            {driver.phone}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <VehicleIcon className="h-4 w-4 text-muted-foreground" />
+                            {driver.vehicleType}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono">{driver.vehiclePlate}</TableCell>
+                        <TableCell>
+                          <Badge className={statusConfig[driver.status].color}>
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {statusConfig[driver.status].label}
                           </Badge>
-                        ) : (
-                          <Badge variant="secondary">
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Inactive
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          {new Date(driver.createdAt).toLocaleDateString()}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{driver._count.rides}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            {new Date(driver.createdAt).toLocaleDateString()}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             ) : (

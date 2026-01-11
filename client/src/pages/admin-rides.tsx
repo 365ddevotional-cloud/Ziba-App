@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, MapPin, Calendar, User, Car, ArrowLeft } from "lucide-react";
+import { Loader2, MapPin, Calendar, User, Car, ArrowLeft, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ interface Ride {
   id: string;
   pickupLocation: string;
   dropoffLocation: string;
+  fareEstimate: number | null;
   status: "REQUESTED" | "ACCEPTED" | "COMPLETED" | "CANCELLED";
   userId: string;
   driverId: string | null;
@@ -70,6 +71,7 @@ export default function AdminRidesPage() {
                     <TableHead>ID</TableHead>
                     <TableHead>Pickup</TableHead>
                     <TableHead>Dropoff</TableHead>
+                    <TableHead>Fare</TableHead>
                     <TableHead>User</TableHead>
                     <TableHead>Driver</TableHead>
                     <TableHead>Status</TableHead>
@@ -91,6 +93,16 @@ export default function AdminRidesPage() {
                           <MapPin className="h-4 w-4 text-red-500" />
                           {ride.dropoffLocation}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {ride.fareEstimate !== null ? (
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-4 w-4 text-muted-foreground" />
+                            {ride.fareEstimate.toFixed(2)}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

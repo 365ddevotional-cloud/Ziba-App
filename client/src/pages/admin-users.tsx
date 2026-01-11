@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, Users, Mail, Phone, Calendar, ArrowLeft } from "lucide-react";
+import { Loader2, Users, Mail, Phone, Calendar, ArrowLeft, MapPin, UserCheck, UserX } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
 
@@ -11,7 +12,12 @@ interface User {
   fullName: string;
   email: string;
   phone: string | null;
+  city: string | null;
+  status: "ACTIVE" | "SUSPENDED";
   createdAt: string;
+  _count: {
+    rides: number;
+  };
 }
 
 export default function AdminUsersPage() {
@@ -55,6 +61,9 @@ export default function AdminUsersPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
+                    <TableHead>City</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Rides</TableHead>
                     <TableHead>Joined</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -78,6 +87,32 @@ export default function AdminUsersPage() {
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        {user.city ? (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            {user.city}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.status === "ACTIVE" ? (
+                          <Badge variant="default" className="bg-green-600">
+                            <UserCheck className="h-3 w-3 mr-1" />
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">
+                            <UserX className="h-3 w-3 mr-1" />
+                            Suspended
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{user._count.rides}</Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

@@ -1,14 +1,30 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, Users, Car, MapPin, Shield, ArrowRight } from "lucide-react";
+import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
 
 interface Stats {
-  totalUsers: number;
-  totalDrivers: number;
-  totalRides: number;
+  users: {
+    total: number;
+    active: number;
+    suspended: number;
+  };
+  drivers: {
+    total: number;
+    approved: number;
+    pending: number;
+    suspended: number;
+  };
+  rides: {
+    total: number;
+    requested: number;
+    accepted: number;
+    completed: number;
+    cancelled: number;
+    active: number;
+  };
   platformStatus: string;
 }
 
@@ -24,9 +40,9 @@ export default function AdminPage() {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Shield className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold" data-testid="text-page-title">Admin Overview</h1>
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">Admin Dashboard</h1>
           </div>
-          <p className="text-muted-foreground">Platform statistics and management</p>
+          <p className="text-muted-foreground">Real-time platform statistics and management</p>
         </div>
 
         {isLoading ? (
@@ -35,7 +51,7 @@ export default function AdminPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -43,7 +59,17 @@ export default function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold" data-testid="text-total-users">
-                    {stats?.totalUsers ?? 0}
+                    {stats?.users.total ?? 0}
+                  </div>
+                  <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                      {stats?.users.active ?? 0} active
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <XCircle className="h-3 w-3 text-red-500" />
+                      {stats?.users.suspended ?? 0} suspended
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -55,7 +81,39 @@ export default function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold" data-testid="text-total-drivers">
-                    {stats?.totalDrivers ?? 0}
+                    {stats?.drivers.total ?? 0}
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                      {stats?.drivers.approved ?? 0} approved
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-yellow-500" />
+                      {stats?.drivers.pending ?? 0} pending
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Active Rides</CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-500" data-testid="text-active-rides">
+                    {stats?.rides.active ?? 0}
+                  </div>
+                  <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-yellow-500" />
+                      {stats?.rides.requested ?? 0} requested
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3 text-blue-500" />
+                      {stats?.rides.accepted ?? 0} accepted
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -67,7 +125,17 @@ export default function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold" data-testid="text-total-rides">
-                    {stats?.totalRides ?? 0}
+                    {stats?.rides.total ?? 0}
+                  </div>
+                  <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                      {stats?.rides.completed ?? 0} completed
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <XCircle className="h-3 w-3 text-red-500" />
+                      {stats?.rides.cancelled ?? 0} cancelled
+                    </span>
                   </div>
                 </CardContent>
               </Card>

@@ -1,7 +1,7 @@
 # Ziba - Ride-Hailing Platform
 
 ## Overview
-Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 2 - Database Models & Public Previews. This stage focuses on data models and public-facing read-only views without authentication.
+Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 4 - Real-World Structure & States. This stage introduces proper status fields, validation rules, and real-time statistics.
 
 ## Tech Stack
 - **Frontend**: React + Vite + TypeScript
@@ -26,7 +26,7 @@ client/
 │   │   ├── users.tsx          # Users list (/users)
 │   │   ├── drivers.tsx        # Drivers list (/drivers)
 │   │   ├── rides.tsx          # Rides list (/rides)
-│   │   ├── admin.tsx          # Admin overview (/admin)
+│   │   ├── admin.tsx          # Admin dashboard (/admin)
 │   │   ├── admin-users.tsx    # Admin users (/admin/users)
 │   │   ├── admin-drivers.tsx  # Admin drivers (/admin/drivers)
 │   │   ├── admin-rides.tsx    # Admin rides (/admin/rides)
@@ -45,44 +45,65 @@ prisma/
 | Path | Description |
 |------|-------------|
 | `/` | Landing page with hero, features, how it works |
-| `/users` | Public users list |
-| `/drivers` | Public drivers list |
-| `/rides` | Public rides list |
-| `/admin` | Admin overview with stats |
+| `/users` | Public users list with status indicators |
+| `/drivers` | Public drivers list with approval status |
+| `/rides` | Public rides list with fare and status |
+| `/admin` | Admin dashboard with real-time stats |
 | `/admin/users` | Admin users management |
 | `/admin/drivers` | Admin drivers management |
 | `/admin/rides` | Admin rides management |
 
-## API Endpoints (All Public)
-- `GET /api/users` - List all users
-- `GET /api/drivers` - List all drivers
+## API Endpoints
+
+### Users
+- `GET /api/users` - List all users with ride counts
+- `POST /api/users` - Create a user (fullName, email required)
+- `PATCH /api/users/:id` - Update user status/details
+
+### Drivers
+- `GET /api/drivers` - List all drivers with ride counts
+- `GET /api/drivers/approved` - List only approved drivers
+- `POST /api/drivers` - Create a driver (fullName, phone, vehiclePlate required)
+- `PATCH /api/drivers/:id` - Update driver status/details
+
+### Rides
 - `GET /api/rides` - List all rides with user/driver info
+- `POST /api/rides` - Create a ride (requires userId, only approved drivers can be assigned)
+- `PATCH /api/rides/:id` - Update ride status/assignment
+
+### Admin
 - `GET /api/admins` - List all admins
-- `GET /api/admin/stats` - Platform statistics
+- `GET /api/admin/stats` - Comprehensive platform statistics
 
 ## Database Schema (Prisma)
+
 ### User
 - id (UUID)
-- fullName
+- fullName (string)
 - email (unique)
 - phone (optional)
+- city (optional)
+- status (ACTIVE | SUSPENDED)
 - createdAt
+- rides (relation)
 
 ### Driver
 - id (UUID)
-- fullName
-- phone
-- vehicleType
-- vehiclePlate
-- isActive (boolean)
+- fullName (string)
+- phone (string)
+- vehicleType (CAR | BIKE | VAN)
+- vehiclePlate (string)
+- status (PENDING | APPROVED | SUSPENDED)
 - createdAt
+- rides (relation)
 
 ### Ride
 - id (UUID)
-- pickupLocation
-- dropoffLocation
-- status (REQUESTED, ACCEPTED, COMPLETED, CANCELLED)
-- userId (relation to User)
+- pickupLocation (string)
+- dropoffLocation (string)
+- fareEstimate (float, optional)
+- status (REQUESTED | ACCEPTED | COMPLETED | CANCELLED)
+- userId (required relation to User)
 - driverId (optional relation to Driver)
 - createdAt
 
@@ -91,7 +112,19 @@ prisma/
 - email (unique)
 - phone (optional)
 - createdAt
-- NOTE: No password field in Stage 2
+- NOTE: No password field yet
+
+## Business Rules (Stage 4)
+1. A ride MUST be linked to a user
+2. Only APPROVED drivers can be assigned to rides
+3. When a driver is assigned, ride status automatically changes to ACCEPTED
+4. Status changes reflect immediately in UI
+
+## Admin Dashboard Stats
+- Total users (active/suspended breakdown)
+- Total drivers (approved/pending/suspended breakdown)
+- Active rides (requested + accepted)
+- Total rides (completed/cancelled breakdown)
 
 ## Design
 - Dark blue primary color
@@ -100,8 +133,8 @@ prisma/
 - Inter font family
 - Responsive mobile-first design
 
-## Stage 2 Notes
+## Stage 4 Notes
 - All routes are public (no authentication required)
-- All pages are read-only previews
-- Database tables are empty by default
-- No login/register functionality in this stage
+- Real status states and lifecycle tracking
+- Validation rules enforced on API
+- Real counts only - no fake numbers
