@@ -187,7 +187,9 @@ export async function registerRoutes(
       const { id } = req.params;
       const { pickupLocation, dropoffLocation, fareEstimate, status, driverId } = req.body;
 
-      // If assigning a driver, verify they are approved
+      let finalStatus = status;
+
+      // If assigning a driver, verify they are approved and auto-set status to ACCEPTED
       if (driverId) {
         const driver = await prisma.driver.findUnique({ where: { id: driverId } });
         if (!driver) {
@@ -195,6 +197,10 @@ export async function registerRoutes(
         }
         if (driver.status !== "APPROVED") {
           return res.status(400).json({ message: "Only approved drivers can be assigned to rides" });
+        }
+        // Auto-set status to ACCEPTED when driver is assigned (unless explicitly completed/cancelled)
+        if (!status || (status !== "COMPLETED" && status !== "CANCELLED")) {
+          finalStatus = "ACCEPTED";
         }
       }
 
@@ -204,7 +210,7 @@ export async function registerRoutes(
           pickupLocation, 
           dropoffLocation, 
           fareEstimate: fareEstimate !== undefined ? parseFloat(fareEstimate) : undefined,
-          status,
+          status: finalStatus,
           driverId
         },
         include: { user: true, driver: true },
