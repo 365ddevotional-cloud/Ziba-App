@@ -1148,24 +1148,6 @@ export async function registerRoutes(
         return res.status(400).json({ message: `Cannot complete ride. Status is ${ride.status}, expected IN_PROGRESS` });
       }
 
-      const updatedRide = await prisma.ride.update({
-        where: { id },
-        data: { status: "COMPLETED" },
-        include: { user: true, driver: true, payment: true },
-      });
-
-      // Auto-create payment if fare estimate exists and no payment exists
-      const fareAmount = updatedRide.fareEstimate || 1000;
-      if (!updatedRide.payment) {
-        await prisma.payment.create({
-          data: {
-            amount: fareAmount,
-            status: "PAID",
-            rideId: id,
-          },
-        });
-      }
-
       // Get platform config for commission rate
       let config = await prisma.platformConfig.findFirst();
       if (!config) {
@@ -1174,88 +1156,113 @@ export async function registerRoutes(
         });
       }
 
-      // Process wallet transactions
+      const fareAmount = ride.fareEstimate || 1000;
       const commissionAmount = fareAmount * config.commissionRate;
       const driverEarnings = fareAmount - commissionAmount;
 
-      // Debit user wallet
-      let userWallet = await prisma.wallet.findUnique({
-        where: { ownerId_ownerType: { ownerId: ride.userId, ownerType: "USER" } },
-      });
-      if (!userWallet) {
-        userWallet = await prisma.wallet.create({
-          data: { ownerId: ride.userId, ownerType: "USER", balance: 5000 },
+      // Use transaction for atomic wallet operations
+      const result = await prisma.$transaction(async (tx) => {
+        // Update ride status
+        const updatedRide = await tx.ride.update({
+          where: { id },
+          data: { status: "COMPLETED" },
+          include: { user: true, driver: true, payment: true },
         });
-      }
 
-      await prisma.transaction.create({
-        data: {
-          walletId: userWallet.id,
-          type: "DEBIT",
-          amount: -fareAmount,
-          reference: `Ride payment - ${ride.pickupLocation} to ${ride.dropoffLocation}`,
-        },
-      });
-      await prisma.wallet.update({
-        where: { id: userWallet.id },
-        data: { balance: { decrement: fareAmount } },
-      });
-
-      // Create notification for user
-      await prisma.notification.create({
-        data: {
-          userId: ride.userId,
-          role: "user",
-          message: `Ride completed! ₦${fareAmount.toLocaleString()} has been debited from your wallet`,
-          type: "RIDE_COMPLETED",
-        },
-      });
-
-      // Credit driver wallet (if driver exists)
-      if (ride.driverId) {
-        let driverWallet = await prisma.wallet.findUnique({
-          where: { ownerId_ownerType: { ownerId: ride.driverId, ownerType: "DRIVER" } },
-        });
-        if (!driverWallet) {
-          driverWallet = await prisma.wallet.create({
-            data: { ownerId: ride.driverId, ownerType: "DRIVER", balance: 0 },
+        // Auto-create payment if no payment exists
+        if (!updatedRide.payment) {
+          await tx.payment.create({
+            data: {
+              amount: fareAmount,
+              status: "PAID",
+              rideId: id,
+            },
           });
         }
 
-        await prisma.transaction.create({
+        // Get or create user wallet
+        let userWallet = await tx.wallet.findUnique({
+          where: { ownerId_ownerType: { ownerId: ride.userId, ownerType: "USER" } },
+        });
+        if (!userWallet) {
+          userWallet = await tx.wallet.create({
+            data: { ownerId: ride.userId, ownerType: "USER", balance: 5000 },
+          });
+        }
+
+        // Debit user wallet
+        await tx.transaction.create({
           data: {
-            walletId: driverWallet.id,
-            type: "CREDIT",
-            amount: driverEarnings,
-            reference: `Earnings from ride - ${ride.pickupLocation} to ${ride.dropoffLocation}`,
+            walletId: userWallet.id,
+            type: "DEBIT",
+            amount: -fareAmount,
+            reference: `Ride payment - ${ride.pickupLocation} to ${ride.dropoffLocation}`,
           },
         });
-
-        // Record commission
-        await prisma.transaction.create({
-          data: {
-            walletId: driverWallet.id,
-            type: "COMMISSION",
-            amount: -commissionAmount,
-            reference: `Platform commission (${config.commissionRate * 100}%)`,
-          },
+        await tx.wallet.update({
+          where: { id: userWallet.id },
+          data: { balance: { decrement: fareAmount } },
         });
 
-        await prisma.wallet.update({
-          where: { id: driverWallet.id },
-          data: { balance: { increment: driverEarnings } },
-        });
-
-        // Create notification for driver
-        await prisma.notification.create({
+        // Create notification for user
+        await tx.notification.create({
           data: {
-            userId: ride.driverId,
-            role: "driver",
-            message: `Ride completed! ₦${driverEarnings.toLocaleString()} has been credited to your wallet`,
+            userId: ride.userId,
+            role: "user",
+            message: `Ride completed! ₦${fareAmount.toLocaleString()} has been debited from your wallet`,
             type: "RIDE_COMPLETED",
           },
         });
-      }
+
+        // Credit driver wallet (if driver exists)
+        if (ride.driverId) {
+          let driverWallet = await tx.wallet.findUnique({
+            where: { ownerId_ownerType: { ownerId: ride.driverId, ownerType: "DRIVER" } },
+          });
+          if (!driverWallet) {
+            driverWallet = await tx.wallet.create({
+              data: { ownerId: ride.driverId, ownerType: "DRIVER", balance: 0 },
+            });
+          }
+
+          // Credit driver earnings
+          await tx.transaction.create({
+            data: {
+              walletId: driverWallet.id,
+              type: "CREDIT",
+              amount: driverEarnings,
+              reference: `Earnings from ride - ${ride.pickupLocation} to ${ride.dropoffLocation}`,
+            },
+          });
+
+          // Record commission
+          await tx.transaction.create({
+            data: {
+              walletId: driverWallet.id,
+              type: "COMMISSION",
+              amount: -commissionAmount,
+              reference: `Platform commission (${config.commissionRate * 100}%)`,
+            },
+          });
+
+          await tx.wallet.update({
+            where: { id: driverWallet.id },
+            data: { balance: { increment: driverEarnings } },
+          });
+
+          // Create notification for driver
+          await tx.notification.create({
+            data: {
+              userId: ride.driverId,
+              role: "driver",
+              message: `Ride completed! ₦${driverEarnings.toLocaleString()} has been credited to your wallet`,
+              type: "RIDE_COMPLETED",
+            },
+          });
+        }
+
+        return updatedRide;
+      });
 
       // Fetch the updated ride with payment
       const rideWithPayment = await prisma.ride.findUnique({
@@ -1632,41 +1639,54 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Valid amount required" });
       }
 
-      const wallet = await prisma.wallet.findUnique({ where: { id: walletId } });
-      if (!wallet) {
-        return res.status(404).json({ message: "Wallet not found" });
-      }
+      // Use transaction for atomic payout operations
+      const transaction = await prisma.$transaction(async (tx) => {
+        const wallet = await tx.wallet.findUnique({ where: { id: walletId } });
+        if (!wallet) {
+          throw new Error("Wallet not found");
+        }
 
-      if (wallet.balance < amount) {
-        return res.status(400).json({ message: "Insufficient balance" });
-      }
+        if (wallet.balance < amount) {
+          throw new Error("Insufficient balance");
+        }
 
-      // Create payout transaction and update balance
-      const transaction = await prisma.transaction.create({
-        data: {
-          walletId,
-          type: "PAYOUT",
-          amount: -amount,
-          reference: `Payout processed by admin`,
-        },
+        // Create payout transaction and update balance atomically
+        const payoutTx = await tx.transaction.create({
+          data: {
+            walletId,
+            type: "PAYOUT",
+            amount: -amount,
+            reference: `Payout processed by admin`,
+          },
+        });
+
+        await tx.wallet.update({
+          where: { id: walletId },
+          data: { balance: { decrement: amount } },
+        });
+
+        // Create notification
+        await tx.notification.create({
+          data: {
+            userId: wallet.ownerId,
+            role: wallet.ownerType === "USER" ? "user" : "driver",
+            message: `Payout of ₦${amount.toLocaleString()} has been processed`,
+            type: "WALLET_UPDATED",
+          },
+        });
+
+        return payoutTx;
       });
-
-      await prisma.wallet.update({
-        where: { id: walletId },
-        data: { balance: { decrement: amount } },
-      });
-
-      // Create notification
-      await createNotification(
-        wallet.ownerId,
-        wallet.ownerType === "USER" ? "user" : "driver",
-        `Payout of ₦${amount.toLocaleString()} has been processed`,
-        "WALLET_UPDATED"
-      );
 
       res.json(transaction);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing payout:", error);
+      if (error.message === "Wallet not found") {
+        return res.status(404).json({ message: "Wallet not found" });
+      }
+      if (error.message === "Insufficient balance") {
+        return res.status(400).json({ message: "Insufficient balance" });
+      }
       res.status(500).json({ message: "Failed to process payout" });
     }
   });
