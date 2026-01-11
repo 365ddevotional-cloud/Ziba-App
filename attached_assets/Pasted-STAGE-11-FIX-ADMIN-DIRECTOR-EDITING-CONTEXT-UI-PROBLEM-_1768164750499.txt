@@ -1,0 +1,88 @@
+STAGE 11 — FIX ADMIN DIRECTOR EDITING (CONTEXT + UI)
+
+PROBLEM:
+Admin is blocked from updating Director fields because auth enforcement is disabled but admin role context is missing. Backend correctly enforces admin-only rules, but frontend is not providing admin identity.
+
+GOAL:
+Allow Admin to edit Director fields ONLY on admin routes while keeping backend protection intact.
+
+--------------------------------
+1. ADMIN CONTEXT BRIDGE (CRITICAL)
+--------------------------------
+When auth enforcement is disabled (preview mode):
+
+- On ALL /admin/* routes:
+  - Inject admin context explicitly:
+    { role: "ADMIN", previewAdmin: true }
+
+- This context must:
+  - Be passed with API requests
+  - Be validated server-side ONLY when preview mode is active
+
+Backend rule:
+- If auth is disabled AND previewAdmin === true → treat as ADMIN
+- In production auth mode → ignore previewAdmin completely
+
+--------------------------------
+2. FIX DIRECTOR STATUS UPDATES
+--------------------------------
+Ensure /admin/directors UI:
+- Sends admin context with PATCH requests
+- Uses correct admin endpoints
+
+Update endpoint validation:
+- Allow updates when:
+  - role === ADMIN OR previewAdmin === true
+
+--------------------------------
+3. MAKE CONTRACT DATES EDITABLE
+--------------------------------
+Enable editing for:
+- Contract Start
+- Contract End
+
+UI:
+- Pencil icon (admin-only)
+- Date picker input
+- Save on confirm
+
+Backend:
+- Same admin/previewAdmin rule
+- Reject all non-admin attempts
+
+--------------------------------
+4. MAKE ROLE EDITABLE (ADMIN ONLY)
+--------------------------------
+Role column becomes dropdown:
+Options:
+- Compliance
+- Finance
+- Operations
+- Growth
+- Regional Manager
+
+Backend:
+- Validate enum
+- Admin-only update
+
+--------------------------------
+5. MAKE REGION EDITABLE (ADMIN ONLY)
+--------------------------------
+Region column:
+- Dropdown suggestions (Abuja, Lagos, National, etc.)
+- Allow custom input
+
+--------------------------------
+6. FINAL VALIDATION
+--------------------------------
+Confirm:
+- Admin can update Status
+- Admin can update Contract Start & End
+- Admin can update Role
+- Admin can update Region
+- Directors cannot update themselves
+- Backend still blocks unauthorized requests
+- No auth enforcement is re-enabled
+
+STOP AFTER COMPLETION.
+DO NOT ADD NEW STAGES.

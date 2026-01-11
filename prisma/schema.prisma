@@ -110,6 +110,8 @@ enum DirectorRole {
   OPERATIONS
   FINANCE
   COMPLIANCE
+  GROWTH
+  REGIONAL_MANAGER
 }
 
 enum DirectorStatus {

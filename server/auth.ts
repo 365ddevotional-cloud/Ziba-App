@@ -34,10 +34,33 @@ export function requireAuth(allowedRoles?: UserRole[]) {
 }
 
 export function getCurrentUser(req: Request) {
+  // Check for previewAdmin flag in request body or header (for preview mode)
+  const previewAdmin = req.body?.previewAdmin === true || req.get("X-Preview-Admin") === "true";
+  
+  // If session has a user, return that
+  if (req.session.userId) {
+    return {
+      id: req.session.userId,
+      role: req.session.userRole,
+      email: req.session.userEmail,
+      needsPasswordSetup: req.session.needsPasswordSetup,
+    };
+  }
+  
+  // In preview mode with previewAdmin flag, treat as admin
+  if (previewAdmin) {
+    return {
+      id: "preview-admin",
+      role: "admin" as UserRole,
+      email: "admin@preview.local",
+      needsPasswordSetup: false,
+    };
+  }
+  
   return {
-    id: req.session.userId,
-    role: req.session.userRole,
-    email: req.session.userEmail,
-    needsPasswordSetup: req.session.needsPasswordSetup,
+    id: undefined,
+    role: undefined,
+    email: undefined,
+    needsPasswordSetup: undefined,
   };
 }

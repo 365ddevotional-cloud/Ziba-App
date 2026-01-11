@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Car, Phone, Calendar, CheckCircle, Clock, XCircle, Bike, Truck } from "lucide-react";
+import { Loader2, Car, Phone, Calendar, CheckCircle, Clock, XCircle, Bike, Truck, WifiOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/header";
+
+type DriverStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "OFFLINE";
 
 interface Driver {
   id: string;
@@ -11,17 +13,18 @@ interface Driver {
   phone: string;
   vehicleType: "CAR" | "BIKE" | "VAN";
   vehiclePlate: string;
-  status: "PENDING" | "APPROVED" | "SUSPENDED";
+  status: DriverStatus;
   createdAt: string;
   _count: {
     rides: number;
   };
 }
 
-const statusConfig = {
+const statusConfig: Record<DriverStatus, { color: string; icon: typeof CheckCircle; label: string }> = {
   PENDING: { color: "bg-yellow-600", icon: Clock, label: "Pending" },
-  APPROVED: { color: "bg-green-600", icon: CheckCircle, label: "Approved" },
+  ACTIVE: { color: "bg-green-600", icon: CheckCircle, label: "Active" },
   SUSPENDED: { color: "bg-red-600", icon: XCircle, label: "Suspended" },
+  OFFLINE: { color: "bg-gray-600", icon: WifiOff, label: "Offline" },
 };
 
 const vehicleIcons = {

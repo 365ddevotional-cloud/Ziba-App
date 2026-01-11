@@ -419,6 +419,72 @@ export async function registerRoutes(
     }
   });
 
+  // Update director role (Admin only)
+  app.patch("/api/admin/directors/:id/role", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { role } = req.body;
+      const currentUser = getCurrentUser(req);
+
+      // Only admin can update role
+      if (currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can update director role" });
+      }
+
+      // Validate role
+      const validRoles = ["OPERATIONS", "FINANCE", "COMPLIANCE", "GROWTH", "REGIONAL_MANAGER"];
+      if (!role || !validRoles.includes(role)) {
+        return res.status(400).json({ message: "Invalid role. Must be OPERATIONS, FINANCE, COMPLIANCE, GROWTH, or REGIONAL_MANAGER" });
+      }
+
+      const director = await prisma.director.findUnique({ where: { id } });
+      if (!director) {
+        return res.status(404).json({ message: "Director not found" });
+      }
+
+      const updatedDirector = await prisma.director.update({
+        where: { id },
+        data: { role },
+      });
+      res.json(updatedDirector);
+    } catch (error) {
+      console.error("Error updating director role:", error);
+      res.status(500).json({ message: "Failed to update director role" });
+    }
+  });
+
+  // Update director region (Admin only)
+  app.patch("/api/admin/directors/:id/region", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { region } = req.body;
+      const currentUser = getCurrentUser(req);
+
+      // Only admin can update region
+      if (currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can update director region" });
+      }
+
+      if (!region || typeof region !== "string" || region.trim().length === 0) {
+        return res.status(400).json({ message: "Region is required" });
+      }
+
+      const director = await prisma.director.findUnique({ where: { id } });
+      if (!director) {
+        return res.status(404).json({ message: "Director not found" });
+      }
+
+      const updatedDirector = await prisma.director.update({
+        where: { id },
+        data: { region: region.trim() },
+      });
+      res.json(updatedDirector);
+    } catch (error) {
+      console.error("Error updating director region:", error);
+      res.status(500).json({ message: "Failed to update director region" });
+    }
+  });
+
   // ==================== ADMINS ====================
   
   app.get("/api/admins", async (req, res) => {

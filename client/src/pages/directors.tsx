@@ -5,12 +5,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/header";
 
+type DirectorRole = "OPERATIONS" | "FINANCE" | "COMPLIANCE" | "GROWTH" | "REGIONAL_MANAGER";
+
 interface Director {
   id: string;
   fullName: string;
   email: string;
   phone: string | null;
-  role: "OPERATIONS" | "FINANCE" | "COMPLIANCE";
+  role: DirectorRole;
   region: string;
   status: "ACTIVE" | "PENDING" | "SUSPENDED" | "TERMINATED";
   contractStart: string | null;
@@ -27,10 +29,12 @@ const statusConfig = {
   TERMINATED: { color: "bg-gray-600", icon: Ban, label: "Terminated" },
 };
 
-const roleConfig = {
+const roleConfig: Record<DirectorRole, { color: string; label: string }> = {
   OPERATIONS: { color: "bg-blue-600", label: "Operations" },
   FINANCE: { color: "bg-green-600", label: "Finance" },
   COMPLIANCE: { color: "bg-purple-600", label: "Compliance" },
+  GROWTH: { color: "bg-orange-600", label: "Growth" },
+  REGIONAL_MANAGER: { color: "bg-teal-600", label: "Regional Manager" },
 };
 
 export default function DirectorsPage() {
