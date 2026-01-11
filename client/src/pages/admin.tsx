@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog, Wifi, DollarSign, Gift } from "lucide-react";
+import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog, Wifi, DollarSign, Gift, Wallet, BarChart3 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
@@ -317,6 +317,36 @@ export default function AdminPage() {
                       <ArrowRight className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <CardDescription>Award bonuses to drivers</CardDescription>
+                  </CardHeader>
+                </Link>
+              </Card>
+
+              <Card className="hover-elevate cursor-pointer">
+                <Link href="/admin/wallets">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Wallet className="h-5 w-5 text-primary" />
+                        <CardTitle>Manage Wallets</CardTitle>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <CardDescription>View and process driver payouts</CardDescription>
+                  </CardHeader>
+                </Link>
+              </Card>
+
+              <Card className="hover-elevate cursor-pointer">
+                <Link href="/admin/analytics">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <BarChart3 className="h-5 w-5 text-primary" />
+                        <CardTitle>Analytics</CardTitle>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <CardDescription>Platform metrics and director performance</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>

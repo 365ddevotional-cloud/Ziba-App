@@ -1,7 +1,7 @@
 # Ziba - Ride-Hailing Platform
 
 ## Overview
-Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 13 - Payments & Incentives. The platform is in preview mode with public routes (no login enforcement) but maintains full authentication system, login pages, and role-based access control for future deployment.
+Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 13 - Financials, Analytics & Notifications. The platform is in preview mode with public routes (no login enforcement) but maintains full authentication system, login pages, and role-based access control for future deployment.
 
 ## Tech Stack
 - **Frontend**: React + Vite + TypeScript
@@ -16,7 +16,7 @@ client/
 ├── src/
 │   ├── components/     # Reusable UI components
 │   │   ├── ui/         # Shadcn components
-│   │   ├── header.tsx  # Navigation header with auth
+│   │   ├── header.tsx  # Navigation header with auth & notifications
 │   │   ├── protected-route.tsx  # Route protection
 │   │   ├── theme-provider.tsx   # Dark/light theme
 │   │   └── theme-toggle.tsx     # Theme toggle button
@@ -36,6 +36,10 @@ client/
 │   │   ├── admin-drivers.tsx   # Admin drivers management
 │   │   ├── admin-directors.tsx # Admin directors management
 │   │   ├── admin-rides.tsx     # Admin rides management
+│   │   ├── admin-payments.tsx  # Admin payments management
+│   │   ├── admin-incentives.tsx # Admin incentives management
+│   │   ├── admin-wallets.tsx   # Admin wallets & payouts
+│   │   ├── admin-analytics.tsx # Platform analytics & director performance
 │   │   └── not-found.tsx
 │   ├── App.tsx         # Main app with routes
 │   └── index.css       # Global styles
@@ -67,6 +71,10 @@ prisma/
 | `/admin/drivers` | Admin drivers management (status editable) |
 | `/admin/directors` | Admin directors management (status, contract dates editable) |
 | `/admin/rides` | Admin rides management |
+| `/admin/payments` | Admin payments management |
+| `/admin/incentives` | Admin driver incentives |
+| `/admin/wallets` | Admin wallet management & payouts |
+| `/admin/analytics` | Platform analytics & director performance |
 
 ## API Endpoints
 
@@ -105,12 +113,29 @@ prisma/
 - `PATCH /api/rides/:id` - Update ride details (pickup, dropoff, fare only)
 - `POST /api/rides/:id/assign` - Assign driver (REQUESTED → ACCEPTED)
 - `POST /api/rides/:id/start` - Start ride (ACCEPTED → IN_PROGRESS)
-- `POST /api/rides/:id/complete` - Complete ride (IN_PROGRESS → COMPLETED)
+- `POST /api/rides/:id/complete` - Complete ride (IN_PROGRESS → COMPLETED) - auto-processes wallet transactions
 - `POST /api/rides/:id/cancel` - Cancel ride (REQUESTED/ACCEPTED → CANCELLED)
 
 ### Ratings
 - `POST /api/ratings/driver` - Rate driver after completed ride (rideId, rating 1-5)
 - `POST /api/ratings/user` - Rate user after completed ride (rideId, rating 1-5)
+
+### Wallets (Admin Only)
+- `GET /api/wallets` - List all wallets with transactions
+- `POST /api/wallets/:id/payout` - Process driver payout (amount required)
+
+### Notifications
+- `GET /api/notifications` - Get notifications (filtered by user/role or all for admin)
+- `GET /api/notifications/unread-count` - Get unread notification count
+- `PATCH /api/notifications/:id/read` - Mark notification as read
+- `POST /api/notifications/read-all` - Mark all notifications as read
+
+### Analytics (Admin Only)
+- `GET /api/analytics` - Platform analytics with director performance metrics
+
+### Configuration (Admin Only)
+- `GET /api/config` - Get platform configuration (commission rate)
+- `PATCH /api/config` - Update platform configuration
 
 ### Admin
 - `GET /api/admins` - List all admins
@@ -131,6 +156,8 @@ prisma/
 - createdAt
 - rides (relation)
 - userRatings (relation)
+- wallet (relation)
+- notifications (relation)
 
 ### Driver
 - id (UUID)
@@ -150,13 +177,14 @@ prisma/
 - rides (relation)
 - incentives (relation)
 - driverRatings (relation)
+- wallet (relation)
 
 ### Director
 - id (UUID)
 - fullName (string)
 - email (unique)
 - phone (optional)
-- role (OPERATIONS | FINANCE | COMPLIANCE)
+- role (OPERATIONS | FINANCE | COMPLIANCE | GROWTH | REGIONAL_MANAGER)
 - region (string)
 - status (ACTIVE | PENDING | SUSPENDED | TERMINATED)
 - contractStart (DateTime, optional)
@@ -178,7 +206,7 @@ prisma/
 - pickupLocation (string)
 - dropoffLocation (string)
 - fareEstimate (float, optional)
-- status (REQUESTED | ACCEPTED | COMPLETED | CANCELLED)
+- status (REQUESTED | ACCEPTED | IN_PROGRESS | COMPLETED | CANCELLED)
 - userId (required relation to User)
 - driverId (optional relation to Driver)
 - createdAt
@@ -197,6 +225,37 @@ prisma/
 - driverId (relation to Driver)
 - createdAt
 
+### Wallet
+- id (UUID)
+- ownerId (string - userId or driverId)
+- ownerType (USER | DRIVER)
+- balance (float, default 0)
+- createdAt
+- transactions (relation)
+
+### Transaction
+- id (UUID)
+- walletId (relation to Wallet)
+- type (CREDIT | DEBIT | COMMISSION | PAYOUT)
+- amount (float)
+- reference (string, optional)
+- createdAt
+
+### Notification
+- id (UUID)
+- userId (string - any user/driver/director id)
+- role (string - user/driver/director/admin)
+- message (string)
+- type (RIDE_REQUESTED | RIDE_ASSIGNED | RIDE_COMPLETED | WALLET_UPDATED | STATUS_CHANGE)
+- read (boolean, default false)
+- createdAt
+
+### PlatformConfig
+- id (UUID)
+- commissionRate (float, default 0.15 = 15%)
+- createdAt
+- updatedAt
+
 ## Business Rules
 1. A ride MUST be linked to a user
 2. Only ACTIVE drivers can be assigned to rides
@@ -205,6 +264,11 @@ prisma/
 5. First-time login requires password setup (passwordHash is NULL)
 6. Sessions persist across browser refresh
 7. Only admins can update director status and contract dates (backend enforced)
+8. Ride completion automatically debits user wallet and credits driver wallet minus commission
+9. User wallets start with ₦5,000 initial balance
+10. Driver wallets start with ₦0 balance
+11. Commission rate is configurable via platform config (default 15%)
+12. Notifications are created automatically for ride events and wallet updates
 
 ## Authentication Flow
 1. User enters email on login page
@@ -213,6 +277,14 @@ prisma/
 4. Password is hashed with bcrypt and stored
 5. User is logged in with session cookie
 6. Future logins require email + password
+
+## Wallet & Payment Flow
+1. When ride completes, payment is auto-created as PAID
+2. User wallet is debited the fare amount
+3. Driver wallet is credited fare minus commission
+4. Commission transaction is recorded separately
+5. Notifications sent to both user and driver
+6. Admin can process driver payouts from wallet page
 
 ## Test Accounts (Seeded)
 - **Admin**: admin@ziba.com
@@ -229,12 +301,12 @@ All accounts require password setup on first login.
 - Inter font family
 - Responsive mobile-first design
 
-## Stage 11 Notes
-- Added previewAdmin context bridge for /admin/* routes when auth is disabled
-- Backend accepts X-Preview-Admin header or previewAdmin body flag to treat requests as admin
-- Director Role now editable via dropdown (added GROWTH and REGIONAL_MANAGER options)
-- Director Region editable with dropdown suggestions + custom text input
-- All admin edits (status, role, region, contract dates) work in preview mode
-- Driver status types updated to PENDING, ACTIVE, SUSPENDED, OFFLINE
-- Public pages remain read-only; admin pages have full edit capabilities
-- Backend still enforces admin role validation (403 for non-admin without previewAdmin)
+## Stage 13 Notes
+- Added Wallet model for users and drivers with transaction tracking
+- Added Notification model with real-time bell icon in header
+- Added PlatformConfig for commission rate management
+- Ride completion now auto-processes wallet transactions
+- Admin Wallets page for viewing balances and processing payouts
+- Admin Analytics page with director performance ratings (1-5 stars based on online driver %)
+- Notifications dropdown with mark-as-read functionality
+- Auto-refresh every 30 seconds for notifications and analytics

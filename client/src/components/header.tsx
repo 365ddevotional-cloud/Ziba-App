@@ -14,11 +14,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 
 interface Notification {
   id: string;
@@ -40,7 +35,6 @@ const navLinks = [
 
 function NotificationBell() {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
 
   const { data: notifications } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
@@ -122,8 +116,8 @@ function NotificationBell() {
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
@@ -132,16 +126,19 @@ function NotificationBell() {
             </span>
           )}
         </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
-        <div className="flex items-center justify-between p-3 border-b">
-          <h4 className="font-semibold">Notifications</h4>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-80" align="end">
+        <div className="flex items-center justify-between p-2 border-b">
+          <span className="font-semibold text-sm">Notifications</span>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              className="text-xs"
-              onClick={() => markAllReadMutation.mutate()}
+              className="text-xs h-7"
+              onClick={(e) => {
+                e.preventDefault();
+                markAllReadMutation.mutate();
+              }}
               data-testid="button-mark-all-read"
             >
               <Check className="h-3 w-3 mr-1" />
@@ -149,13 +146,13 @@ function NotificationBell() {
             </Button>
           )}
         </div>
-        <ScrollArea className="h-80">
+        <ScrollArea className="h-64">
           {notifications && notifications.length > 0 ? (
-            <div className="divide-y">
-              {notifications.slice(0, 20).map((notification) => (
-                <div
+            <div>
+              {notifications.slice(0, 10).map((notification) => (
+                <DropdownMenuItem
                   key={notification.id}
-                  className={`p-3 cursor-pointer hover:bg-muted/50 transition-colors ${
+                  className={`flex items-start gap-3 p-3 cursor-pointer ${
                     !notification.read ? "bg-primary/5" : ""
                   }`}
                   onClick={() => {
@@ -165,26 +162,24 @@ function NotificationBell() {
                   }}
                   data-testid={`notification-${notification.id}`}
                 >
-                  <div className="flex items-start gap-3">
-                    {getNotificationIcon(notification.type)}
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm ${!notification.read ? "font-medium" : ""}`}>
-                        {notification.message}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-muted-foreground">
-                          {formatTime(notification.createdAt)}
-                        </span>
-                        <Badge variant="outline" className="text-xs py-0">
-                          {notification.role}
-                        </Badge>
-                      </div>
+                  {getNotificationIcon(notification.type)}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm ${!notification.read ? "font-medium" : ""}`}>
+                      {notification.message}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-muted-foreground">
+                        {formatTime(notification.createdAt)}
+                      </span>
+                      <Badge variant="outline" className="text-xs py-0 h-4">
+                        {notification.role}
+                      </Badge>
                     </div>
-                    {!notification.read && (
-                      <div className="w-2 h-2 rounded-full bg-primary" />
-                    )}
                   </div>
-                </div>
+                  {!notification.read && (
+                    <div className="w-2 h-2 rounded-full bg-primary mt-1" />
+                  )}
+                </DropdownMenuItem>
               ))}
             </div>
           ) : (
@@ -194,15 +189,15 @@ function NotificationBell() {
             </div>
           )}
         </ScrollArea>
-      </PopoverContent>
-    </Popover>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
