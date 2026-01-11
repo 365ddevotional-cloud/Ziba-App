@@ -10,7 +10,7 @@ export async function registerRoutes(
   
   // ==================== USERS ====================
   
-  app.get("/api/users", async (req, res) => {
+  app.get("/api/users", requireAuth(["user", "admin"]), async (req, res) => {
     try {
       const users = await prisma.user.findMany({
         orderBy: { createdAt: "desc" },
@@ -23,7 +23,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/users", async (req, res) => {
+  app.post("/api/users", requireAuth(["admin"]), async (req, res) => {
     try {
       const { fullName, email, phone, city, status } = req.body;
       if (!fullName || !email) {
@@ -42,7 +42,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/users/:id", async (req, res) => {
+  app.patch("/api/users/:id", requireAuth(["admin"]), async (req, res) => {
     try {
       const { id } = req.params;
       const { fullName, email, phone, city, status } = req.body;
@@ -59,7 +59,7 @@ export async function registerRoutes(
 
   // ==================== DRIVERS ====================
   
-  app.get("/api/drivers", async (req, res) => {
+  app.get("/api/drivers", requireAuth(["admin"]), async (req, res) => {
     try {
       const drivers = await prisma.driver.findMany({
         orderBy: { createdAt: "desc" },
@@ -72,7 +72,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/drivers/approved", async (req, res) => {
+  app.get("/api/drivers/approved", requireAuth(["admin"]), async (req, res) => {
     try {
       const drivers = await prisma.driver.findMany({
         where: { status: "APPROVED" },
@@ -85,7 +85,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/drivers", async (req, res) => {
+  app.post("/api/drivers", requireAuth(["admin"]), async (req, res) => {
     try {
       const { fullName, phone, vehicleType, vehiclePlate, status } = req.body;
       if (!fullName || !phone || !vehiclePlate) {
@@ -107,7 +107,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/drivers/:id", async (req, res) => {
+  app.patch("/api/drivers/:id", requireAuth(["admin"]), async (req, res) => {
     try {
       const { id } = req.params;
       const { fullName, phone, vehicleType, vehiclePlate, status } = req.body;
@@ -124,7 +124,7 @@ export async function registerRoutes(
 
   // ==================== RIDES ====================
   
-  app.get("/api/rides", async (req, res) => {
+  app.get("/api/rides", requireAuth(["user", "admin"]), async (req, res) => {
     try {
       const rides = await prisma.ride.findMany({
         include: {
@@ -140,7 +140,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/rides", async (req, res) => {
+  app.post("/api/rides", requireAuth(["user", "admin"]), async (req, res) => {
     try {
       const { pickupLocation, dropoffLocation, fareEstimate, userId, driverId } = req.body;
       
@@ -183,7 +183,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/rides/:id", async (req, res) => {
+  app.patch("/api/rides/:id", requireAuth(["admin"]), async (req, res) => {
     try {
       const { id } = req.params;
       const { pickupLocation, dropoffLocation, fareEstimate, status, driverId } = req.body;
@@ -225,7 +225,7 @@ export async function registerRoutes(
 
   // ==================== DIRECTORS ====================
   
-  app.get("/api/directors", async (req, res) => {
+  app.get("/api/directors", requireAuth(["director", "admin"]), async (req, res) => {
     try {
       const directors = await prisma.director.findMany({
         orderBy: { createdAt: "desc" },
@@ -237,7 +237,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/directors", async (req, res) => {
+  app.post("/api/directors", requireAuth(["admin"]), async (req, res) => {
     try {
       const { fullName, email, role, region } = req.body;
       if (!fullName || !email || !role || !region) {
@@ -258,7 +258,7 @@ export async function registerRoutes(
 
   // ==================== ADMINS ====================
   
-  app.get("/api/admins", async (req, res) => {
+  app.get("/api/admins", requireAuth(["admin"]), async (req, res) => {
     try {
       const admins = await prisma.admin.findMany({
         orderBy: { createdAt: "desc" },
@@ -272,7 +272,7 @@ export async function registerRoutes(
 
   // ==================== ADMIN STATS ====================
   
-  app.get("/api/admin/stats", async (req, res) => {
+  app.get("/api/admin/stats", requireAuth(["admin"]), async (req, res) => {
     try {
       const [
         totalUsers,
