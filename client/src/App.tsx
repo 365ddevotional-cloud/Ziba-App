@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth";
+import { ProtectedRoute } from "@/components/protected-route";
 import Landing from "@/pages/landing";
 import UsersPage from "@/pages/users";
 import DriversPage from "@/pages/drivers";
@@ -24,14 +25,46 @@ function Router() {
       <Route path="/login" component={UserLoginPage} />
       <Route path="/director/login" component={DirectorLoginPage} />
       <Route path="/admin/login" component={AdminLoginPage} />
-      <Route path="/users" component={UsersPage} />
-      <Route path="/drivers" component={DriversPage} />
-      <Route path="/directors" component={DirectorsPage} />
-      <Route path="/rides" component={RidesPage} />
-      <Route path="/admin" component={AdminPage} />
-      <Route path="/admin/users" component={AdminUsersPage} />
-      <Route path="/admin/drivers" component={AdminDriversPage} />
-      <Route path="/admin/rides" component={AdminRidesPage} />
+      <Route path="/users">
+        <ProtectedRoute allowedRoles={["user", "admin"]}>
+          <UsersPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/drivers">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <DriversPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/directors">
+        <ProtectedRoute allowedRoles={["director", "admin"]}>
+          <DirectorsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/rides">
+        <ProtectedRoute allowedRoles={["user", "admin"]}>
+          <RidesPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin">
+        <ProtectedRoute allowedRoles={["admin"]} redirectTo="/admin/login">
+          <AdminPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/users">
+        <ProtectedRoute allowedRoles={["admin"]} redirectTo="/admin/login">
+          <AdminUsersPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/drivers">
+        <ProtectedRoute allowedRoles={["admin"]} redirectTo="/admin/login">
+          <AdminDriversPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/rides">
+        <ProtectedRoute allowedRoles={["admin"]} redirectTo="/admin/login">
+          <AdminRidesPage />
+        </ProtectedRoute>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
