@@ -1,9 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
-import { Loader2, UserCog, Calendar, MapPin, Briefcase, Phone, Users, Wifi } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { Loader2, UserCog, Calendar, MapPin, Briefcase, Phone, Users, Wifi, Pencil, Check, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Header } from "@/components/header";
+import { useAuth } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface Director {
   id: string;
@@ -26,13 +32,78 @@ const roleConfig = {
 };
 
 export default function DirectorsPage() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>("");
+
   const { data: directors, isLoading } = useQuery<Director[]>({
     queryKey: ["/api/directors"],
+  });
+
+  const updateContractEndMutation = useMutation({
+    mutationFn: async ({ id, contractEnd }: { id: string; contractEnd: string }) => {
+      return apiRequest("PATCH", `/api/directors/${id}`, { contractEnd });
+    },
+    onMutate: async ({ id, contractEnd }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/directors"] });
+      const previousDirectors = queryClient.getQueryData<Director[]>(["/api/directors"]);
+      
+      queryClient.setQueryData<Director[]>(["/api/directors"], (old) =>
+        old?.map((d) => (d.id === id ? { ...d, contractEnd } : d))
+      );
+      
+      return { previousDirectors };
+    },
+    onSuccess: () => {
+      setEditingId(null);
+      toast({
+        title: "Contract updated",
+        description: "Contract end date has been updated successfully.",
+      });
+    },
+    onError: (error: any, _, context) => {
+      if (context?.previousDirectors) {
+        queryClient.setQueryData(["/api/directors"], context.previousDirectors);
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update contract end date.",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/directors"] });
+    },
   });
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "-";
     return new Date(dateStr).toLocaleDateString();
+  };
+
+  const formatDateForInput = (dateStr: string | null) => {
+    if (!dateStr) return "";
+    return new Date(dateStr).toISOString().split("T")[0];
+  };
+
+  const handleStartEdit = (director: Director) => {
+    setEditingId(director.id);
+    setEditValue(formatDateForInput(director.contractEnd));
+  };
+
+  const handleSave = (id: string) => {
+    if (editValue) {
+      updateContractEndMutation.mutate({ id, contractEnd: editValue });
+    }
+  };
+
+  const handleCancel = () => {
+    setEditingId(null);
+    setEditValue("");
   };
 
   return (
@@ -105,10 +176,55 @@ export default function DirectorsPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            {formatDate(director.contractEnd)}
-                          </div>
+                          {isAdmin ? (
+                            editingId === director.id ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="date"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  className="w-36 h-8"
+                                  data-testid={`input-contract-end-${director.id}`}
+                                />
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleSave(director.id)}
+                                  disabled={updateContractEndMutation.isPending}
+                                  data-testid={`button-save-${director.id}`}
+                                >
+                                  <Check className="h-4 w-4 text-green-500" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={handleCancel}
+                                  disabled={updateContractEndMutation.isPending}
+                                  data-testid={`button-cancel-${director.id}`}
+                                >
+                                  <X className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                <span>{formatDate(director.contractEnd)}</span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleStartEdit(director)}
+                                  data-testid={`button-edit-contract-${director.id}`}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              {formatDate(director.contractEnd)}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
