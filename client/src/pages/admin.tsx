@@ -13,9 +13,10 @@ interface Stats {
   };
   drivers: {
     total: number;
-    approved: number;
+    active: number;
     pending: number;
     suspended: number;
+    offline: number;
   };
   rides: {
     total: number;
@@ -89,7 +90,7 @@ export default function AdminPage() {
                   <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <CheckCircle className="h-3 w-3 text-green-500" />
-                      {stats?.drivers.approved ?? 0} approved
+                      {stats?.drivers.active ?? 0} active
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3 text-yellow-500" />
