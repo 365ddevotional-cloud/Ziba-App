@@ -51,6 +51,7 @@ model Driver {
   status       DriverStatus @default(PENDING)
   createdAt    DateTime     @default(now())
   rides        Ride[]
+  incentives   Incentive[]
 }
 
 model Ride {
@@ -64,6 +65,7 @@ model Ride {
   createdAt       DateTime   @default(now())
   user            User       @relation(fields: [userId], references: [id])
   driver          Driver?    @relation(fields: [driverId], references: [id])
+  payment         Payment?
 }
 
 model Admin {
@@ -71,4 +73,28 @@ model Admin {
   email     String   @unique
   phone     String?
   createdAt DateTime @default(now())
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model Payment {
+  id        String        @id @default(uuid())
+  amount    Float
+  status    PaymentStatus @default(PENDING)
+  rideId    String        @unique
+  createdAt DateTime      @default(now())
+  ride      Ride          @relation(fields: [rideId], references: [id])
+}
+
+model Incentive {
+  id        String   @id @default(uuid())
+  amount    Float
+  reason    String
+  driverId  String
+  createdAt DateTime @default(now())
+  driver    Driver   @relation(fields: [driverId], references: [id])
 }

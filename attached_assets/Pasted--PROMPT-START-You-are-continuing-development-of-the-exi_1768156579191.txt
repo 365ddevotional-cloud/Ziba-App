@@ -1,0 +1,161 @@
+📌 PROMPT START
+
+You are continuing development of the existing Ziba application.
+
+⚠️ DO NOT restart the project
+⚠️ DO NOT refactor architecture
+⚠️ DO NOT add authentication, payments, or external APIs
+⚠️ DO NOT change existing routes or UI layouts
+
+This stage is DATA SEEDING + VISUAL VERIFICATION ONLY.
+
+APP CONTEXT
+
+App Name: Ziba
+Type: Ride-hailing / logistics platform
+Current State:
+
+UI pages exist for:
+
+/users
+
+/drivers
+
+/rides
+
+/admin
+
+Database schema already exists
+
+Prisma is installed and configured
+
+App runs and previews correctly
+
+Auth/passwords are intentionally disabled for now
+
+STAGE 6 GOAL
+
+Populate the database with safe, fake data so the app looks alive and all dashboards render meaningful content without requiring login.
+
+TASKS (EXECUTE IN THIS ORDER)
+1️⃣ CREATE A PRISMA SEED SCRIPT
+
+Add a seed script that inserts:
+
+USERS (5 total)
+
+Fields: id, name, email, phone, status
+
+Status mix:
+
+3 ACTIVE
+
+1 SUSPENDED
+
+1 ACTIVE
+
+DRIVERS (3 total)
+
+Each driver must be linked to a user
+
+Fields: vehicleType, plateNumber, status
+
+Status mix:
+
+1 APPROVED
+
+1 PENDING
+
+1 SUSPENDED
+
+RIDES (10 total)
+
+Each ride MUST be linked to:
+
+a user
+
+a driver (except REQUESTED rides)
+
+Status mix:
+
+REQUESTED
+
+ACCEPTED
+
+COMPLETED
+
+CANCELLED
+
+Include pickup & dropoff locations (simple strings)
+
+Include timestamps
+
+PAYMENTS
+
+Only for COMPLETED rides
+
+Fields: amount, status, linkedRideId
+
+Status: PAID
+
+INCENTIVES
+
+Linked to drivers
+
+Fields: amount, reason, linkedDriverId
+
+At least 1 incentive per APPROVED driver
+
+2️⃣ CONNECT SEED SCRIPT TO PRISMA
+
+Add seed config to package.json
+
+Ensure this command works without error:
+
+npx prisma db seed
+
+3️⃣ DO NOT TOUCH UI LOGIC
+
+No UI redesign
+
+No route changes
+
+No guards
+
+No auth
+
+Pages must simply render seeded data
+
+4️⃣ VERIFY VISUALLY
+
+After seeding, confirm:
+
+/users shows 5 users
+
+/drivers shows 3 drivers with mixed statuses
+
+/rides shows 10 rides with mixed statuses
+
+Admin/dashboard stats reflect real counts
+
+No console errors
+
+No Prisma errors
+
+OUTPUT REQUIREMENT
+
+When finished, report ONLY:
+
+✅ Seed script created
+
+✅ Prisma seed runs successfully
+
+✅ Data visible on all pages
+
+✅ No errors
+
+DO NOT ask questions.
+DO NOT suggest next stages.
+STOP after confirmation.
+
+📌 PROMPT END
