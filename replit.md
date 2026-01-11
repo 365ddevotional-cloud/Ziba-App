@@ -1,7 +1,7 @@
 # Ziba - Ride-Hailing Platform
 
 ## Overview
-Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 10 - Admin Directors Management. The platform is in preview mode with public routes (no login enforcement) but maintains full authentication system, login pages, and role-based access control for future deployment.
+Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 12 - Ride Lifecycle & Ratings. The platform is in preview mode with public routes (no login enforcement) but maintains full authentication system, login pages, and role-based access control for future deployment.
 
 ## Tech Stack
 - **Frontend**: React + Vite + TypeScript
@@ -82,10 +82,13 @@ prisma/
 - `PATCH /api/users/:id` - Update user status/details
 
 ### Drivers
-- `GET /api/drivers` - List all drivers with ride counts
+- `GET /api/drivers` - List all drivers with ride counts, ratings, online status
 - `GET /api/drivers/active` - List only active drivers
+- `GET /api/drivers/available` - List drivers available for assignment (ACTIVE, isOnline, not on ride)
 - `POST /api/drivers` - Create a driver (fullName, email, phone, vehiclePlate required)
 - `PATCH /api/drivers/:id` - Update driver status/details
+- `POST /api/drivers/:id/online` - Set driver online (ACTIVE drivers only)
+- `POST /api/drivers/:id/offline` - Set driver offline (not during active ride)
 
 ### Directors
 - `GET /api/directors` - List all directors
@@ -98,8 +101,16 @@ prisma/
 
 ### Rides
 - `GET /api/rides` - List all rides with user/driver info
-- `POST /api/rides` - Create a ride (requires userId, only ACTIVE drivers can be assigned)
-- `PATCH /api/rides/:id` - Update ride status/assignment
+- `POST /api/rides` - Create a ride (requires userId)
+- `PATCH /api/rides/:id` - Update ride details (pickup, dropoff, fare only)
+- `POST /api/rides/:id/assign` - Assign driver (REQUESTED → ACCEPTED)
+- `POST /api/rides/:id/start` - Start ride (ACCEPTED → IN_PROGRESS)
+- `POST /api/rides/:id/complete` - Complete ride (IN_PROGRESS → COMPLETED)
+- `POST /api/rides/:id/cancel` - Cancel ride (REQUESTED/ACCEPTED → CANCELLED)
+
+### Ratings
+- `POST /api/ratings/driver` - Rate driver after completed ride (rideId, rating 1-5)
+- `POST /api/ratings/user` - Rate user after completed ride (rideId, rating 1-5)
 
 ### Admin
 - `GET /api/admins` - List all admins
@@ -115,8 +126,11 @@ prisma/
 - city (optional)
 - status (ACTIVE | SUSPENDED)
 - passwordHash (optional - set on first login)
+- averageRating (float, default 0)
+- totalRatings (int, default 0)
 - createdAt
 - rides (relation)
+- userRatings (relation)
 
 ### Driver
 - id (UUID)
@@ -126,12 +140,16 @@ prisma/
 - vehicleType (CAR | BIKE | VAN)
 - vehiclePlate (string)
 - status (PENDING | ACTIVE | SUSPENDED | OFFLINE)
+- isOnline (boolean, default false)
 - currentRate (float, default 1.0)
+- averageRating (float, default 0)
+- totalRatings (int, default 0)
 - avgStartTime (optional)
 - avgEndTime (optional)
 - createdAt
 - rides (relation)
 - incentives (relation)
+- driverRatings (relation)
 
 ### Director
 - id (UUID)
