@@ -1,7 +1,7 @@
 # Ziba - Ride-Hailing Platform
 
 ## Overview
-Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 13 - Financials, Analytics & Notifications. The platform is in preview mode with public routes (no login enforcement) but maintains full authentication system, login pages, and role-based access control for future deployment.
+Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 14 - Multi-Country Currency Support. The platform is in preview mode with public routes (no login enforcement) but maintains full authentication system, login pages, and role-based access control for future deployment.
 
 ## Tech Stack
 - **Frontend**: React + Vite + TypeScript
@@ -310,3 +310,12 @@ All accounts require password setup on first login.
 - Admin Analytics page with director performance ratings (1-5 stars based on online driver %)
 - Notifications dropdown with mark-as-read functionality
 - Auto-refresh every 30 seconds for notifications and analytics
+
+## Stage 14 Notes - Multi-Country Currency Support
+- Added CountryProvider context with localStorage persistence (client/src/lib/country.tsx)
+- Added CountrySelector dropdown in admin dashboard header
+- Supports 8 countries: Nigeria, Ghana, Liberia, South Africa, UK, US, Mexico, France
+- Currency formatting uses Intl.NumberFormat for proper locale-based display
+- All admin pages (dashboard, payments, incentives, wallets, analytics) use dynamic currency formatting
+- Currency selection persists across page refreshes via localStorage
+- Fallback to symbol prefix if Intl.NumberFormat fails
