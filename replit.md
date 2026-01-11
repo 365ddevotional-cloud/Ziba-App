@@ -211,11 +211,12 @@ All accounts require password setup on first login.
 - Inter font family
 - Responsive mobile-first design
 
-## Stage 10 Notes
-- Added DirectorStatus enum (ACTIVE, PENDING, SUSPENDED, TERMINATED)
-- Created /admin/directors page with full management capabilities
-- Status dropdown editable by admin only
-- Contract start/end dates editable by admin only (pencil icon + date picker)
-- Backend validates admin role before allowing updates (403 Forbidden for non-admin)
-- Public /directors page remains read-only
-- Preview mode maintained - all routes publicly accessible
+## Stage 11 Notes
+- Added previewAdmin context bridge for /admin/* routes when auth is disabled
+- Backend accepts X-Preview-Admin header or previewAdmin body flag to treat requests as admin
+- Director Role now editable via dropdown (added GROWTH and REGIONAL_MANAGER options)
+- Director Region editable with dropdown suggestions + custom text input
+- All admin edits (status, role, region, contract dates) work in preview mode
+- Driver status types updated to PENDING, ACTIVE, SUSPENDED, OFFLINE
+- Public pages remain read-only; admin pages have full edit capabilities
+- Backend still enforces admin role validation (403 for non-admin without previewAdmin)
