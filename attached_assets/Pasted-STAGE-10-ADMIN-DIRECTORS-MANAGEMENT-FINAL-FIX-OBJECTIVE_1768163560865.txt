@@ -1,0 +1,109 @@
+STAGE 10 — ADMIN DIRECTORS MANAGEMENT (FINAL FIX)
+
+OBJECTIVE:
+Add a full Admin-Directors management section with editable controls identical in behavior to Admin-Drivers, while enforcing admin-only permissions at both UI and backend levels.
+
+DO NOT:
+- Delete auth code
+- Delete roles
+- Touch database structure unnecessarily
+- Break preview mode
+- Remove public /directors page
+
+----------------------
+1. ROUTING
+----------------------
+Create a new admin-only route:
+- /admin/directors
+
+This must be separate from:
+- /directors (read-only, public)
+
+Add navigation entry:
+- Admin → Directors
+
+----------------------
+2. ADMIN DIRECTORS TABLE
+----------------------
+In /admin/directors, render a table with columns:
+
+- Name
+- Email
+- Phone
+- Role
+- Region
+- Status (DROPDOWN — ADMIN ONLY)
+- Contract Start (EDITABLE — ADMIN ONLY)
+- Contract End (EDITABLE — ADMIN ONLY)
+- Drivers Assigned
+- Drivers Online
+- Joined
+
+----------------------
+3. STATUS DROPDOWN (LIKE DRIVERS)
+----------------------
+Add clickable Status control identical to Admin-Drivers.
+
+Allowed values:
+- Active
+- Pending
+- Suspended
+- Terminated
+
+UI:
+- Color-coded pills
+- Dropdown selectable by Admin only
+
+----------------------
+4. CONTRACT DATE EDITING
+----------------------
+Make BOTH fields editable:
+- Contract Start
+- Contract End
+
+UI:
+- Pencil icon appears ONLY for Admin
+- Date picker input
+- Save on blur or confirm
+
+----------------------
+5. PERMISSION ENFORCEMENT (CRITICAL)
+----------------------
+Backend rules:
+- Only users with role === "ADMIN" may update:
+  - director.status
+  - director.contractStart
+  - director.contractEnd
+
+If non-admin attempts update:
+- Reject with 403 Forbidden
+
+Frontend:
+- Hide edit controls for non-admin
+- Do not rely on UI only — backend must enforce
+
+----------------------
+6. API UPDATES
+----------------------
+Update or add endpoints:
+- PATCH /api/admin/directors/:id/status
+- PATCH /api/admin/directors/:id/contract
+
+Validate:
+- Admin role
+- Valid enum values
+- Valid dates
+
+----------------------
+7. FINAL CHECK
+----------------------
+Confirm:
+- Admin → Directors page exists
+- Status is clickable and updates live
+- Contract Start & End are editable by Admin
+- Directors cannot modify their own data
+- Public /directors remains read-only
+- No login enforcement is re-enabled
+
+STOP AFTER COMPLETION.
+DO NOT PROCEED TO NEXT STAGE.

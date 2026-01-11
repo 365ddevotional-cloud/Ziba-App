@@ -177,16 +177,16 @@ export default function AdminPage() {
               </Card>
 
               <Card className="hover-elevate cursor-pointer">
-                <Link href="/directors">
+                <Link href="/admin/directors">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <UserCog className="h-5 w-5 text-primary" />
-                        <CardTitle>Directors</CardTitle>
+                        <CardTitle>Manage Directors</CardTitle>
                       </div>
                       <ArrowRight className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <CardDescription>{stats?.directors?.total ?? 0} directors overseeing operations</CardDescription>
+                    <CardDescription>Manage {stats?.directors?.total ?? 0} directors overseeing operations</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
