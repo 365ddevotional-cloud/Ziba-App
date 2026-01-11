@@ -14,7 +14,18 @@ export async function registerRoutes(
     try {
       const users = await prisma.user.findMany({
         orderBy: { createdAt: "desc" },
-        include: { _count: { select: { rides: true } } },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          phone: true,
+          city: true,
+          status: true,
+          averageRating: true,
+          totalRatings: true,
+          createdAt: true,
+          _count: { select: { rides: true } },
+        },
       });
       res.json(users);
     } catch (error) {
@@ -44,6 +55,11 @@ export async function registerRoutes(
 
   app.patch("/api/users/:id", async (req, res) => {
     try {
+      const currentUser = getCurrentUser(req);
+      if (currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can update user status" });
+      }
+
       const { id } = req.params;
       const { fullName, email, phone, city, status } = req.body;
       const user = await prisma.user.update({
