@@ -5,17 +5,18 @@ export interface Country {
   name: string;
   currency: string;
   symbol: string;
+  locale: string;
 }
 
 export const countries: Country[] = [
-  { code: "NG", name: "Nigeria", currency: "NGN", symbol: "₦" },
-  { code: "GH", name: "Ghana", currency: "GHS", symbol: "₵" },
-  { code: "LR", name: "Liberia", currency: "LRD", symbol: "$" },
-  { code: "ZA", name: "South Africa", currency: "ZAR", symbol: "R" },
-  { code: "GB", name: "United Kingdom", currency: "GBP", symbol: "£" },
-  { code: "US", name: "United States", currency: "USD", symbol: "$" },
-  { code: "MX", name: "Mexico", currency: "MXN", symbol: "MX$" },
-  { code: "FR", name: "France", currency: "EUR", symbol: "€" },
+  { code: "NG", name: "Nigeria", currency: "NGN", symbol: "₦", locale: "en-NG" },
+  { code: "GH", name: "Ghana", currency: "GHS", symbol: "₵", locale: "en-GH" },
+  { code: "LR", name: "Liberia", currency: "LRD", symbol: "$", locale: "en-LR" },
+  { code: "ZA", name: "South Africa", currency: "ZAR", symbol: "R", locale: "en-ZA" },
+  { code: "GB", name: "United Kingdom", currency: "GBP", symbol: "£", locale: "en-GB" },
+  { code: "US", name: "United States", currency: "USD", symbol: "$", locale: "en-US" },
+  { code: "MX", name: "Mexico", currency: "MXN", symbol: "$", locale: "es-MX" },
+  { code: "FR", name: "France", currency: "EUR", symbol: "€", locale: "fr-FR" },
 ];
 
 const STORAGE_KEY = "ziba-country";
@@ -49,7 +50,16 @@ export function CountryProvider({ children }: { children: ReactNode }) {
   };
 
   const formatCurrency = (amount: number): string => {
-    return `${country.symbol}${amount.toLocaleString()}`;
+    try {
+      return new Intl.NumberFormat(country.locale, {
+        style: "currency",
+        currency: country.currency,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } catch {
+      return `${country.symbol}${amount.toLocaleString()}`;
+    }
   };
 
   return (
