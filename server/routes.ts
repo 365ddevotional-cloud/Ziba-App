@@ -364,38 +364,48 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Director not found" });
       }
 
-      const updateData: { contractStart?: Date; contractEnd?: Date } = {};
+      const updateData: { contractStart?: Date | null; contractEnd?: Date | null } = {};
 
-      // Validate contractStart if provided
+      // Handle contractStart - can be set to null to clear
       if (contractStart !== undefined) {
-        const startDate = new Date(contractStart);
-        if (isNaN(startDate.getTime())) {
-          return res.status(400).json({ message: "Invalid contract start date" });
+        if (contractStart === null || contractStart === "") {
+          updateData.contractStart = null;
+        } else {
+          const startDate = new Date(contractStart);
+          if (isNaN(startDate.getTime())) {
+            return res.status(400).json({ message: "Invalid contract start date" });
+          }
+          updateData.contractStart = startDate;
         }
-        updateData.contractStart = startDate;
       }
 
-      // Validate contractEnd if provided
+      // Handle contractEnd - can be set to null to clear
       if (contractEnd !== undefined) {
-        const endDate = new Date(contractEnd);
-        if (isNaN(endDate.getTime())) {
-          return res.status(400).json({ message: "Invalid contract end date" });
-        }
+        if (contractEnd === null || contractEnd === "") {
+          updateData.contractEnd = null;
+        } else {
+          const endDate = new Date(contractEnd);
+          if (isNaN(endDate.getTime())) {
+            return res.status(400).json({ message: "Invalid contract end date" });
+          }
 
-        // Validate contractEnd is in the future
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (endDate < today) {
-          return res.status(400).json({ message: "Contract end date must be in the future" });
-        }
+          // Validate contractEnd is in the future
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (endDate < today) {
+            return res.status(400).json({ message: "Contract end date must be in the future" });
+          }
 
-        // Validate contractEnd is after contractStart
-        const effectiveStart = updateData.contractStart || director.contractStart;
-        if (effectiveStart && endDate <= effectiveStart) {
-          return res.status(400).json({ message: "Contract end date must be after contract start date" });
-        }
+          // Validate contractEnd is after contractStart (only if start is set)
+          const effectiveStart = updateData.contractStart !== undefined 
+            ? updateData.contractStart 
+            : director.contractStart;
+          if (effectiveStart && endDate <= effectiveStart) {
+            return res.status(400).json({ message: "Contract end date must be after contract start date" });
+          }
 
-        updateData.contractEnd = endDate;
+          updateData.contractEnd = endDate;
+        }
       }
 
       const updatedDirector = await prisma.director.update({

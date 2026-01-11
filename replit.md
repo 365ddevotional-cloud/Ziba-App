@@ -1,7 +1,7 @@
 # Ziba - Ride-Hailing Platform
 
 ## Overview
-Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 8 - Authentication & Access Control. This stage introduces secure authentication and role-based access for Admins, Directors, and Users.
+Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 10 - Admin Directors Management. The platform is in preview mode with public routes (no login enforcement) but maintains full authentication system, login pages, and role-based access control for future deployment.
 
 ## Tech Stack
 - **Frontend**: React + Vite + TypeScript
@@ -29,9 +29,13 @@ client/
 │   │   ├── login.tsx    # Login pages for all roles
 │   │   ├── users.tsx    # Users list (/users)
 │   │   ├── drivers.tsx  # Drivers list (/drivers)
-│   │   ├── directors.tsx # Directors list (/directors)
+│   │   ├── directors.tsx # Directors list (/directors - read-only)
 │   │   ├── rides.tsx    # Rides list (/rides)
 │   │   ├── admin.tsx    # Admin dashboard (/admin)
+│   │   ├── admin-users.tsx     # Admin users management
+│   │   ├── admin-drivers.tsx   # Admin drivers management
+│   │   ├── admin-directors.tsx # Admin directors management
+│   │   ├── admin-rides.tsx     # Admin rides management
 │   │   └── not-found.tsx
 │   ├── App.tsx         # Main app with routes
 │   └── index.css       # Global styles
@@ -47,25 +51,22 @@ prisma/
 
 ## Routes & Access Control
 
-### Public Routes (No Auth Required)
+### Public Routes (Preview Mode - All routes accessible)
 | Path | Description |
 |------|-------------|
 | `/` | Landing page with hero, features, how it works |
 | `/login` | User login page |
 | `/director/login` | Director login page |
 | `/admin/login` | Admin login page |
-
-### Protected Routes (Auth Required)
-| Path | Allowed Roles | Description |
-|------|---------------|-------------|
-| `/users` | user, admin | Users list with status indicators |
-| `/rides` | user, admin | Rides list with fare and status |
-| `/directors` | director, admin | Directors list with roles |
-| `/drivers` | admin | Drivers list with approval status |
-| `/admin` | admin | Admin dashboard with real-time stats |
-| `/admin/users` | admin | Admin users management |
-| `/admin/drivers` | admin | Admin drivers management |
-| `/admin/rides` | admin | Admin rides management |
+| `/users` | Users list with status indicators |
+| `/drivers` | Drivers list (read-only) |
+| `/directors` | Directors list (read-only) |
+| `/rides` | Rides list with fare and status |
+| `/admin` | Admin dashboard with real-time stats |
+| `/admin/users` | Admin users management |
+| `/admin/drivers` | Admin drivers management (status editable) |
+| `/admin/directors` | Admin directors management (status, contract dates editable) |
+| `/admin/rides` | Admin rides management |
 
 ## API Endpoints
 
@@ -82,17 +83,22 @@ prisma/
 
 ### Drivers
 - `GET /api/drivers` - List all drivers with ride counts
-- `GET /api/drivers/approved` - List only approved drivers
-- `POST /api/drivers` - Create a driver (fullName, phone, vehiclePlate required)
+- `GET /api/drivers/active` - List only active drivers
+- `POST /api/drivers` - Create a driver (fullName, email, phone, vehiclePlate required)
 - `PATCH /api/drivers/:id` - Update driver status/details
 
 ### Directors
 - `GET /api/directors` - List all directors
 - `POST /api/directors` - Create a director
+- `PATCH /api/directors/:id` - Update director (contractEnd - admin only)
+
+### Admin Directors (Admin Only)
+- `PATCH /api/admin/directors/:id/status` - Update director status (ACTIVE, PENDING, SUSPENDED, TERMINATED)
+- `PATCH /api/admin/directors/:id/contract` - Update director contract dates (contractStart, contractEnd)
 
 ### Rides
 - `GET /api/rides` - List all rides with user/driver info
-- `POST /api/rides` - Create a ride (requires userId, only approved drivers can be assigned)
+- `POST /api/rides` - Create a ride (requires userId, only ACTIVE drivers can be assigned)
 - `PATCH /api/rides/:id` - Update ride status/assignment
 
 ### Admin
@@ -115,19 +121,30 @@ prisma/
 ### Driver
 - id (UUID)
 - fullName (string)
+- email (unique)
 - phone (string)
 - vehicleType (CAR | BIKE | VAN)
 - vehiclePlate (string)
-- status (PENDING | APPROVED | SUSPENDED)
+- status (PENDING | ACTIVE | SUSPENDED | OFFLINE)
+- currentRate (float, default 1.0)
+- avgStartTime (optional)
+- avgEndTime (optional)
 - createdAt
 - rides (relation)
+- incentives (relation)
 
 ### Director
 - id (UUID)
 - fullName (string)
 - email (unique)
+- phone (optional)
 - role (OPERATIONS | FINANCE | COMPLIANCE)
 - region (string)
+- status (ACTIVE | PENDING | SUSPENDED | TERMINATED)
+- contractStart (DateTime, optional)
+- contractEnd (DateTime, optional)
+- driversAssigned (int, default 0)
+- driversOnline (int, default 0)
 - passwordHash (optional - set on first login)
 - createdAt
 
@@ -164,11 +181,12 @@ prisma/
 
 ## Business Rules
 1. A ride MUST be linked to a user
-2. Only APPROVED drivers can be assigned to rides
+2. Only ACTIVE drivers can be assigned to rides
 3. When a driver is assigned, ride status automatically changes to ACCEPTED
 4. Status changes reflect immediately in UI
 5. First-time login requires password setup (passwordHash is NULL)
 6. Sessions persist across browser refresh
+7. Only admins can update director status and contract dates (backend enforced)
 
 ## Authentication Flow
 1. User enters email on login page
@@ -193,9 +211,11 @@ All accounts require password setup on first login.
 - Inter font family
 - Responsive mobile-first design
 
-## Stage 8 Notes
-- Email + password authentication with bcrypt
-- Session-based auth with PostgreSQL store
-- Role-based access control (user, director, admin)
-- First-time password setup flow
-- Existing seeded data preserved (passwordHash backfilled as NULL)
+## Stage 10 Notes
+- Added DirectorStatus enum (ACTIVE, PENDING, SUSPENDED, TERMINATED)
+- Created /admin/directors page with full management capabilities
+- Status dropdown editable by admin only
+- Contract start/end dates editable by admin only (pencil icon + date picker)
+- Backend validates admin role before allowing updates (403 Forbidden for non-admin)
+- Public /directors page remains read-only
+- Preview mode maintained - all routes publicly accessible

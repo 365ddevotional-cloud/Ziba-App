@@ -73,7 +73,7 @@ export default function AdminDirectorsPage() {
   });
 
   const updateContractMutation = useMutation({
-    mutationFn: async ({ id, contractStart, contractEnd }: { id: string; contractStart?: string; contractEnd?: string }) => {
+    mutationFn: async ({ id, contractStart, contractEnd }: { id: string; contractStart?: string | null; contractEnd?: string | null }) => {
       return apiRequest("PATCH", `/api/admin/directors/${id}/contract`, { contractStart, contractEnd });
     },
     onMutate: async ({ id, contractStart, contractEnd }) => {
@@ -134,11 +134,11 @@ export default function AdminDirectorsPage() {
   };
 
   const handleSave = (id: string) => {
-    if (editValue && editingField) {
+    if (editingField) {
       if (editingField === "start") {
-        updateContractMutation.mutate({ id, contractStart: editValue });
+        updateContractMutation.mutate({ id, contractStart: editValue || null });
       } else {
-        updateContractMutation.mutate({ id, contractEnd: editValue });
+        updateContractMutation.mutate({ id, contractEnd: editValue || null });
       }
     }
   };
