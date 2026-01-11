@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useCountry } from "@/lib/country";
 import {
   Select,
   SelectContent,
@@ -49,6 +50,7 @@ function adminApiRequest(method: string, url: string, body?: any) {
 
 export default function AdminPaymentsPage() {
   const { toast } = useToast();
+  const { formatCurrency } = useCountry();
   const { data: payments, isLoading } = useQuery<Payment[]>({
     queryKey: ["/api/payments"],
     queryFn: async () => {
@@ -115,7 +117,7 @@ export default function AdminPaymentsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-500" data-testid="text-total-paid">
-                ₦{totalPaid.toLocaleString()}
+                {formatCurrency(totalPaid)}
               </div>
             </CardContent>
           </Card>
@@ -125,7 +127,7 @@ export default function AdminPaymentsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-500" data-testid="text-total-pending">
-                ₦{totalPending.toLocaleString()}
+                {formatCurrency(totalPending)}
               </div>
             </CardContent>
           </Card>
@@ -160,7 +162,7 @@ export default function AdminPaymentsPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <span className="text-xl font-bold" data-testid={`text-amount-${payment.id}`}>
-                          ₦{payment.amount.toLocaleString()}
+                          {formatCurrency(payment.amount)}
                         </span>
                         {getStatusBadge(payment.status)}
                       </div>

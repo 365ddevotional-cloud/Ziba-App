@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useState } from "react";
+import { useCountry } from "@/lib/country";
 
 interface Transaction {
   id: string;
@@ -54,6 +55,7 @@ function adminApiRequest(method: string, url: string, body?: any) {
 export default function AdminWalletsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { formatCurrency } = useCountry();
   const [payoutAmount, setPayoutAmount] = useState("");
   const [selectedWallet, setSelectedWallet] = useState<WalletData | null>(null);
   const [payoutDialogOpen, setPayoutDialogOpen] = useState(false);
@@ -204,7 +206,7 @@ export default function AdminWalletsPage() {
               <User className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-user-balance">₦{totalUserBalance.toLocaleString()}</div>
+              <div className="text-2xl font-bold" data-testid="text-user-balance">{formatCurrency(totalUserBalance)}</div>
               <p className="text-xs text-muted-foreground">{userWallets.length} wallets</p>
             </CardContent>
           </Card>
@@ -215,7 +217,7 @@ export default function AdminWalletsPage() {
               <Car className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-driver-balance">₦{totalDriverBalance.toLocaleString()}</div>
+              <div className="text-2xl font-bold" data-testid="text-driver-balance">{formatCurrency(totalDriverBalance)}</div>
               <p className="text-xs text-muted-foreground">{driverWallets.length} wallets</p>
             </CardContent>
           </Card>
@@ -284,7 +286,7 @@ export default function AdminWalletsPage() {
                         </TableCell>
                         <TableCell>
                           <span className={`font-bold ${wallet.balance >= 0 ? "text-green-500" : "text-red-500"}`}>
-                            ₦{wallet.balance.toLocaleString()}
+                            {formatCurrency(wallet.balance)}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -293,7 +295,7 @@ export default function AdminWalletsPage() {
                               <div key={tx.id} className="flex items-center gap-2 text-xs">
                                 {getTransactionIcon(tx.type)}
                                 <span className={tx.amount >= 0 ? "text-green-500" : "text-red-500"}>
-                                  {tx.amount >= 0 ? "+" : ""}₦{tx.amount.toLocaleString()}
+                                  {tx.amount >= 0 ? "+" : ""}{formatCurrency(Math.abs(tx.amount))}
                                 </span>
                                 <span className="text-muted-foreground truncate">{tx.reference?.slice(0, 20)}...</span>
                               </div>
@@ -324,7 +326,7 @@ export default function AdminWalletsPage() {
                                     Driver: {wallet.owner?.fullName}
                                   </p>
                                   <p className="text-sm">
-                                    Available Balance: <span className="font-bold text-green-500">₦{wallet.balance.toLocaleString()}</span>
+                                    Available Balance: <span className="font-bold text-green-500">{formatCurrency(wallet.balance)}</span>
                                   </p>
                                   <div>
                                     <label className="text-sm text-muted-foreground">Payout Amount</label>

@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
 import { StarRating } from "@/components/star-rating";
+import { CountrySelector } from "@/components/country-selector";
+import { useCountry } from "@/lib/country";
 
 interface Stats {
   users: {
@@ -52,15 +54,19 @@ export default function AdminPage() {
   const { data: stats, isLoading } = useQuery<Stats>({
     queryKey: ["/api/admin/stats"],
   });
+  const { formatCurrency } = useCountry();
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto py-8 px-4">
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Shield className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold" data-testid="text-page-title">Admin Dashboard</h1>
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
+            <div className="flex items-center gap-3">
+              <Shield className="h-8 w-8 text-primary" />
+              <h1 className="text-3xl font-bold" data-testid="text-page-title">Admin Dashboard</h1>
+            </div>
+            <CountrySelector />
           </div>
           <p className="text-muted-foreground">Real-time platform statistics and management</p>
         </div>
@@ -193,12 +199,12 @@ export default function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-500" data-testid="text-total-revenue">
-                    ₦{(stats?.revenue?.totalPaid ?? 0).toLocaleString()}
+                    {formatCurrency(stats?.revenue?.totalPaid ?? 0)}
                   </div>
                   <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3 text-yellow-500" />
-                      ₦{(stats?.revenue?.pending ?? 0).toLocaleString()} pending ({stats?.revenue?.pendingCount ?? 0})
+                      {formatCurrency(stats?.revenue?.pending ?? 0)} pending ({stats?.revenue?.pendingCount ?? 0})
                     </span>
                     <span className="flex items-center gap-1">
                       <CheckCircle className="h-3 w-3 text-green-500" />
@@ -221,7 +227,7 @@ export default function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-purple-500" data-testid="text-total-incentives">
-                    ₦{(stats?.incentives?.total ?? 0).toLocaleString()}
+                    {formatCurrency(stats?.incentives?.total ?? 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
                     {stats?.incentives?.count ?? 0} incentives awarded to drivers

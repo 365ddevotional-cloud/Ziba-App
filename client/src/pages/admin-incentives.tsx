@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { useCountry } from "@/lib/country";
 import {
   Dialog,
   DialogContent,
@@ -74,6 +75,7 @@ function adminApiRequest(method: string, url: string, body?: any) {
 
 export default function AdminIncentivesPage() {
   const { toast } = useToast();
+  const { formatCurrency, country } = useCountry();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState("");
   const [amount, setAmount] = useState("");
@@ -191,7 +193,7 @@ export default function AdminIncentivesPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="amount">Amount (₦)</Label>
+                    <Label htmlFor="amount">Amount ({country.symbol})</Label>
                     <Input
                       id="amount"
                       type="number"
@@ -231,7 +233,7 @@ export default function AdminIncentivesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-purple-500" data-testid="text-total-incentives">
-                ₦{totalIncentives.toLocaleString()}
+                {formatCurrency(totalIncentives)}
               </div>
             </CardContent>
           </Card>
@@ -276,7 +278,7 @@ export default function AdminIncentivesPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <span className="text-xl font-bold text-purple-500" data-testid={`text-amount-${incentive.id}`}>
-                          ₦{incentive.amount.toLocaleString()}
+                          {formatCurrency(incentive.amount)}
                         </span>
                       </div>
                       <div className="text-sm text-muted-foreground space-y-1">
@@ -300,7 +302,7 @@ export default function AdminIncentivesPage() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Incentive</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete this ₦{incentive.amount.toLocaleString()} incentive for {incentive.driver.fullName}?
+                            Are you sure you want to delete this {formatCurrency(incentive.amount)} incentive for {incentive.driver.fullName}?
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

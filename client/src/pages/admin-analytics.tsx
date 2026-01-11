@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
 import { Progress } from "@/components/ui/progress";
+import { useCountry } from "@/lib/country";
 
 interface DirectorMetric {
   id: string;
@@ -54,6 +55,7 @@ function StarDisplay({ rating }: { rating: number }) {
 }
 
 export default function AdminAnalyticsPage() {
+  const { formatCurrency } = useCountry();
   const { data: analytics, isLoading } = useQuery<Analytics>({
     queryKey: ["/api/analytics"],
     queryFn: () => adminApiRequest("GET", "/api/analytics"),
@@ -141,10 +143,10 @@ export default function AdminAnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-total-revenue">
-                ₦{(analytics?.revenue.total || 0).toLocaleString()}
+                {formatCurrency(analytics?.revenue.total || 0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Commission: ₦{(analytics?.revenue.commissions || 0).toLocaleString()}
+                Commission: {formatCurrency(analytics?.revenue.commissions || 0)}
               </p>
             </CardContent>
           </Card>
@@ -163,19 +165,19 @@ export default function AdminAnalyticsPage() {
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">User Wallets Total</span>
                 <span className="font-bold" data-testid="text-user-wallet-total">
-                  ₦{(analytics?.wallets.userBalance || 0).toLocaleString()}
+                  {formatCurrency(analytics?.wallets.userBalance || 0)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Driver Wallets Total</span>
                 <span className="font-bold text-green-500" data-testid="text-driver-wallet-total">
-                  ₦{(analytics?.wallets.driverBalance || 0).toLocaleString()}
+                  {formatCurrency(analytics?.wallets.driverBalance || 0)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Total Payouts</span>
                 <span className="font-bold text-blue-500" data-testid="text-total-payouts">
-                  ₦{(analytics?.wallets.totalPayouts || 0).toLocaleString()}
+                  {formatCurrency(analytics?.wallets.totalPayouts || 0)}
                 </span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t">
