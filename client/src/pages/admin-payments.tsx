@@ -51,6 +51,13 @@ export default function AdminPaymentsPage() {
   const { toast } = useToast();
   const { data: payments, isLoading } = useQuery<Payment[]>({
     queryKey: ["/api/payments"],
+    queryFn: async () => {
+      const res = await fetch("/api/payments", {
+        headers: { "X-Preview-Admin": "true" },
+      });
+      if (!res.ok) throw new Error("Failed to fetch payments");
+      return res.json();
+    },
   });
 
   const updateStatusMutation = useMutation({

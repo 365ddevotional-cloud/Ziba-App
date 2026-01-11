@@ -1,7 +1,7 @@
 # Ziba - Ride-Hailing Platform
 
 ## Overview
-Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 12 - Ride Lifecycle & Ratings. The platform is in preview mode with public routes (no login enforcement) but maintains full authentication system, login pages, and role-based access control for future deployment.
+Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 13 - Payments & Incentives. The platform is in preview mode with public routes (no login enforcement) but maintains full authentication system, login pages, and role-based access control for future deployment.
 
 ## Tech Stack
 - **Frontend**: React + Vite + TypeScript

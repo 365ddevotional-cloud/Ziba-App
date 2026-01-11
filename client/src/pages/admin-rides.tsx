@@ -87,7 +87,8 @@ async function adminApiRequest(method: string, url: string, data?: unknown) {
 function calculateFare(pickup: string, dropoff: string): number {
   const baseFare = 500;
   const perKmRate = 100;
-  const estimatedKm = Math.floor(Math.random() * 15) + 3;
+  const hash = (pickup.length + dropoff.length) * 7 + pickup.charCodeAt(0) + dropoff.charCodeAt(0);
+  const estimatedKm = (hash % 15) + 3;
   return baseFare + (perKmRate * estimatedKm);
 }
 

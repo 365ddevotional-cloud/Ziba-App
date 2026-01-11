@@ -321,9 +321,102 @@ export default function AdminPage() {
                 </Link>
               </Card>
             </div>
+
+            <ActivityFeed />
           </>
         )}
       </main>
     </div>
+  );
+}
+
+interface Activity {
+  type: string;
+  message: string;
+  timestamp: string;
+  icon: string;
+}
+
+function ActivityFeed() {
+  const { data: activities, isLoading } = useQuery<Activity[]>({
+    queryKey: ["/api/admin/activity"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/activity", {
+        headers: { "X-Preview-Admin": "true" },
+      });
+      if (!res.ok) throw new Error("Failed to fetch activity");
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
+  const getIcon = (iconType: string) => {
+    switch (iconType) {
+      case "map":
+        return <MapPin className="h-4 w-4 text-blue-500" />;
+      case "dollar":
+        return <DollarSign className="h-4 w-4 text-green-500" />;
+      case "gift":
+        return <Gift className="h-4 w-4 text-purple-500" />;
+      case "user":
+        return <Users className="h-4 w-4 text-cyan-500" />;
+      case "car":
+        return <Car className="h-4 w-4 text-orange-500" />;
+      default:
+        return <Activity className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+  };
+
+  return (
+    <Card className="mt-8">
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <Activity className="h-5 w-5 text-primary" />
+          <CardTitle>Recent Activity</CardTitle>
+        </div>
+        <CardDescription>Latest platform activity</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : activities && activities.length > 0 ? (
+          <div className="space-y-4">
+            {activities.map((activity, index) => (
+              <div key={index} className="flex items-start gap-3 pb-3 border-b last:border-0 last:pb-0">
+                <div className="mt-0.5">{getIcon(activity.icon)}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate" data-testid={`text-activity-${index}`}>
+                    {activity.message}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatTime(activity.timestamp)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No recent activity
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -616,6 +616,102 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== RECENT ACTIVITY ====================
+
+  app.get("/api/admin/activity", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (currentUser.role !== "admin" && currentUser.role !== "director") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const [recentRides, recentPayments, recentIncentives, recentUsers, recentDrivers] = await Promise.all([
+        prisma.ride.findMany({
+          take: 5,
+          orderBy: { createdAt: "desc" },
+          include: { user: true, driver: true },
+        }),
+        prisma.payment.findMany({
+          take: 5,
+          orderBy: { createdAt: "desc" },
+          include: { ride: { include: { user: true } } },
+        }),
+        prisma.incentive.findMany({
+          take: 5,
+          orderBy: { createdAt: "desc" },
+          include: { driver: true },
+        }),
+        prisma.user.findMany({
+          take: 3,
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.driver.findMany({
+          take: 3,
+          orderBy: { createdAt: "desc" },
+        }),
+      ]);
+
+      const activities: Array<{
+        type: string;
+        message: string;
+        timestamp: Date;
+        icon: string;
+      }> = [];
+
+      recentRides.forEach((ride) => {
+        activities.push({
+          type: "ride",
+          message: `${ride.user.fullName} requested a ride to ${ride.dropoffLocation}`,
+          timestamp: ride.createdAt,
+          icon: "map",
+        });
+      });
+
+      recentPayments.forEach((payment) => {
+        activities.push({
+          type: "payment",
+          message: `Payment of ₦${payment.amount.toLocaleString()} ${payment.status.toLowerCase()}`,
+          timestamp: payment.createdAt,
+          icon: "dollar",
+        });
+      });
+
+      recentIncentives.forEach((incentive) => {
+        activities.push({
+          type: "incentive",
+          message: `₦${incentive.amount.toLocaleString()} incentive for ${incentive.driver.fullName}`,
+          timestamp: incentive.createdAt,
+          icon: "gift",
+        });
+      });
+
+      recentUsers.forEach((user) => {
+        activities.push({
+          type: "user",
+          message: `${user.fullName} joined the platform`,
+          timestamp: user.createdAt,
+          icon: "user",
+        });
+      });
+
+      recentDrivers.forEach((driver) => {
+        activities.push({
+          type: "driver",
+          message: `${driver.fullName} registered as a driver`,
+          timestamp: driver.createdAt,
+          icon: "car",
+        });
+      });
+
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      res.json(activities.slice(0, 10));
+    } catch (error) {
+      console.error("Error fetching activity:", error);
+      res.status(500).json({ message: "Failed to fetch activity" });
+    }
+  });
+
   // ==================== PAYMENTS ====================
 
   app.get("/api/payments", async (req, res) => {

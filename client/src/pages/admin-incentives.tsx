@@ -88,7 +88,7 @@ export default function AdminIncentivesPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { driverId: string; amount: string; reason: string }) => {
+    mutationFn: async (data: { driverId: string; amount: number; reason: string }) => {
       return adminApiRequest("POST", "/api/incentives", data);
     },
     onSuccess: () => {
@@ -124,7 +124,12 @@ export default function AdminIncentivesPage() {
       toast({ title: "Error", description: "Please fill in all fields", variant: "destructive" });
       return;
     }
-    createMutation.mutate({ driverId: selectedDriver, amount, reason });
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      toast({ title: "Error", description: "Please enter a valid amount", variant: "destructive" });
+      return;
+    }
+    createMutation.mutate({ driverId: selectedDriver, amount: numericAmount, reason });
   };
 
   const totalIncentives = incentives?.reduce((sum, i) => sum + i.amount, 0) || 0;
