@@ -1,14 +1,13 @@
-# Ziba - Ride-Hailing Platform Foundation
+# Ziba - Ride-Hailing Platform
 
 ## Overview
-Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 1 - Core Foundation & Authentication. This stage focuses on user authentication, admin management, and the foundational UI/UX.
+Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 2 - Database Models & Public Previews. This stage focuses on data models and public-facing read-only views without authentication.
 
 ## Tech Stack
 - **Frontend**: React + Vite + TypeScript
 - **Backend**: Node.js + Express
-- **Database**: PostgreSQL with Drizzle ORM
+- **Database**: PostgreSQL with Prisma ORM
 - **Styling**: Tailwind CSS with Shadcn UI components
-- **Auth**: Email + Password with session-based authentication
 
 ## Project Structure
 ```
@@ -16,86 +15,83 @@ client/
 ├── src/
 │   ├── components/     # Reusable UI components
 │   │   ├── ui/         # Shadcn components
-│   │   ├── header.tsx  # Main header component
+│   │   ├── header.tsx  # Navigation header
 │   │   ├── theme-provider.tsx  # Dark/light theme
 │   │   └── theme-toggle.tsx    # Theme toggle button
 │   ├── lib/
-│   │   ├── auth.tsx    # Auth context and hooks
 │   │   ├── queryClient.ts
 │   │   └── utils.ts
 │   ├── pages/          # Route pages
 │   │   ├── landing.tsx        # Home page (/)
-│   │   ├── login.tsx          # User login (/login)
-│   │   ├── register.tsx       # User registration (/register)
-│   │   ├── admin-login.tsx    # Admin login (/admin/login)
-│   │   ├── admin-setup.tsx    # Admin setup (/admin/setup)
-│   │   ├── admin-dashboard.tsx # Admin dashboard (/admin/dashboard)
+│   │   ├── users.tsx          # Users list (/users)
+│   │   ├── drivers.tsx        # Drivers list (/drivers)
+│   │   ├── rides.tsx          # Rides list (/rides)
+│   │   ├── admin.tsx          # Admin overview (/admin)
+│   │   ├── admin-users.tsx    # Admin users (/admin/users)
+│   │   ├── admin-drivers.tsx  # Admin drivers (/admin/drivers)
+│   │   ├── admin-rides.tsx    # Admin rides (/admin/rides)
 │   │   └── not-found.tsx
 │   ├── App.tsx         # Main app with routes
 │   └── index.css       # Global styles
 server/
-├── db.ts               # Database connection
+├── prisma.ts           # Prisma client instance
 ├── routes.ts           # API endpoints
-├── storage.ts          # Database operations
 └── index.ts            # Server entry
-shared/
-└── schema.ts           # Database schemas and validation
+prisma/
+└── schema.prisma       # Database schema
 ```
 
-## Routes
+## Routes (All Public - No Auth Required)
 | Path | Description |
 |------|-------------|
 | `/` | Landing page with hero, features, how it works |
-| `/login` | User login |
-| `/register` | User registration |
-| `/admin/login` | Admin login (redirects to setup if needed) |
-| `/admin/setup` | First-time admin password setup |
-| `/admin/dashboard` | Protected admin dashboard |
+| `/users` | Public users list |
+| `/drivers` | Public drivers list |
+| `/rides` | Public rides list |
+| `/admin` | Admin overview with stats |
+| `/admin/users` | Admin users management |
+| `/admin/drivers` | Admin drivers management |
+| `/admin/rides` | Admin rides management |
 
-## API Endpoints
-### User Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - User login
-- `GET /api/auth/me` - Get current session
-- `POST /api/auth/logout` - Logout
+## API Endpoints (All Public)
+- `GET /api/users` - List all users
+- `GET /api/drivers` - List all drivers
+- `GET /api/rides` - List all rides with user/driver info
+- `GET /api/admins` - List all admins
+- `GET /api/admin/stats` - Platform statistics
 
-### Admin Authentication
-- `GET /api/admin/status` - Check if admin needs setup
-- `POST /api/admin/setup` - Set admin password (one-time)
-- `POST /api/admin/login` - Admin login
-- `GET /api/admin/me` - Get admin session
-- `POST /api/admin/logout` - Admin logout
-- `GET /api/admin/stats` - Dashboard statistics
-- `GET /api/admin/recent-users` - Recent registrations
-
-## Environment Variables
-- `DATABASE_URL` - PostgreSQL connection string
-- `SESSION_SECRET` - Session encryption key
-- `ADMIN_EMAIL` - Initial admin email
-- `ADMIN_PHONE` - Initial admin phone (optional)
-
-## Admin Setup Flow
-1. Admin email/phone set via environment variables
-2. On first `/admin/login`, admin is redirected to `/admin/setup`
-3. Admin sets password (one-time setup)
-4. Future logins use `/admin/login` directly
-
-## Database Schema
-### Users Table
+## Database Schema (Prisma)
+### User
 - id (UUID)
+- fullName
 - email (unique)
-- name
 - phone (optional)
-- password (hashed)
 - createdAt
 
-### Admins Table
+### Driver
+- id (UUID)
+- fullName
+- phone
+- vehicleType
+- vehiclePlate
+- isActive (boolean)
+- createdAt
+
+### Ride
+- id (UUID)
+- pickupLocation
+- dropoffLocation
+- status (REQUESTED, ACCEPTED, COMPLETED, CANCELLED)
+- userId (relation to User)
+- driverId (optional relation to Driver)
+- createdAt
+
+### Admin
 - id (UUID)
 - email (unique)
 - phone (optional)
-- password (hashed, nullable initially)
-- isPasswordSet (boolean)
 - createdAt
+- NOTE: No password field in Stage 2
 
 ## Design
 - Dark blue primary color
@@ -103,3 +99,9 @@ shared/
 - Dark mode default with light mode toggle
 - Inter font family
 - Responsive mobile-first design
+
+## Stage 2 Notes
+- All routes are public (no authentication required)
+- All pages are read-only previews
+- Database tables are empty by default
+- No login/register functionality in this stage

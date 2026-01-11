@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { ArrowRight, Shield, Clock, MapPin, Smartphone, CreditCard, Users } from "lucide-react";
+import { ArrowRight, Shield, Clock, MapPin, Smartphone, CreditCard, Users, Car } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Header } from "@/components/header";
@@ -66,15 +66,22 @@ export default function Landing() {
             </div>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/register">
-                <Button size="lg" className="w-full sm:w-auto gap-2" data-testid="button-hero-get-started">
-                  Get Started
-                  <ArrowRight className="h-4 w-4" />
+              <Link href="/users">
+                <Button size="lg" className="w-full sm:w-auto gap-2" data-testid="button-hero-view-users">
+                  <Users className="h-4 w-4" />
+                  View Users
                 </Button>
               </Link>
-              <Link href="/login">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto" data-testid="button-hero-login">
-                  Log In
+              <Link href="/drivers">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2" data-testid="button-hero-view-drivers">
+                  <Car className="h-4 w-4" />
+                  View Drivers
+                </Button>
+              </Link>
+              <Link href="/admin">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2" data-testid="button-hero-admin">
+                  <Shield className="h-4 w-4" />
+                  Admin
                 </Button>
               </Link>
             </div>
@@ -178,21 +185,34 @@ export default function Landing() {
 
       <section className="py-20 bg-primary text-primary-foreground">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to Get Moving?</h2>
+          <h2 className="text-3xl font-bold mb-4">Explore the Platform</h2>
           <p className="text-primary-foreground/80 mb-8 max-w-xl mx-auto">
-            Join thousands of riders who trust Ziba for their daily commute.
+            Browse users, drivers, and rides on the Ziba platform.
           </p>
-          <Link href="/register">
-            <Button 
-              size="lg" 
-              variant="secondary" 
-              className="gap-2 bg-white text-primary hover:bg-white/90 border-white"
-              data-testid="button-cta-register"
-            >
-              Create Free Account
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link href="/rides">
+              <Button 
+                size="lg" 
+                variant="secondary" 
+                className="gap-2 bg-white text-primary hover:bg-white/90 border-white"
+                data-testid="button-cta-rides"
+              >
+                <MapPin className="h-4 w-4" />
+                View Rides
+              </Button>
+            </Link>
+            <Link href="/admin">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="gap-2 border-white/50 text-white hover:bg-white/10"
+                data-testid="button-cta-admin"
+              >
+                <Shield className="h-4 w-4" />
+                Admin Dashboard
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -241,7 +261,7 @@ export default function Landing() {
 
           <div className="mt-8 pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-muted-foreground text-sm">
-              © 2024 Ziba. All rights reserved.
+              2024 Ziba. All rights reserved.
             </p>
             <div className="flex gap-4">
               <Users className="w-5 h-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
