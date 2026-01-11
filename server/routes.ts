@@ -1811,6 +1811,157 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== FARE CONFIG ====================
+
+  // Get all fare configs
+  app.get("/api/fare-configs", async (req, res) => {
+    try {
+      const fareConfigs = await prisma.fareConfig.findMany({
+        orderBy: { countryName: "asc" },
+      });
+      res.json(fareConfigs);
+    } catch (error) {
+      console.error("Error fetching fare configs:", error);
+      res.status(500).json({ message: "Failed to fetch fare configs" });
+    }
+  });
+
+  // Get fare config by country code
+  app.get("/api/fare-configs/:countryCode", async (req, res) => {
+    try {
+      const { countryCode } = req.params;
+      const fareConfig = await prisma.fareConfig.findUnique({
+        where: { countryCode },
+      });
+      if (!fareConfig) {
+        return res.status(404).json({ message: "Fare config not found" });
+      }
+      res.json(fareConfig);
+    } catch (error) {
+      console.error("Error fetching fare config:", error);
+      res.status(500).json({ message: "Failed to fetch fare config" });
+    }
+  });
+
+  // Create or update fare config (admin only)
+  app.post("/api/fare-configs", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can manage fare configs" });
+      }
+
+      const { 
+        countryCode, 
+        countryName, 
+        currency, 
+        currencySymbol,
+        baseFare, 
+        pricePerKm, 
+        pricePerMinute, 
+        minimumFare,
+        driverCommission,
+        platformCommission 
+      } = req.body;
+
+      if (!countryCode || !countryName || !currency || !currencySymbol) {
+        return res.status(400).json({ message: "Country code, name, currency and symbol are required" });
+      }
+
+      const fareConfig = await prisma.fareConfig.upsert({
+        where: { countryCode },
+        create: {
+          countryCode,
+          countryName,
+          currency,
+          currencySymbol,
+          baseFare: baseFare || 500,
+          pricePerKm: pricePerKm || 120,
+          pricePerMinute: pricePerMinute || 30,
+          minimumFare: minimumFare || 300,
+          driverCommission: driverCommission || 0.85,
+          platformCommission: platformCommission || 0.15,
+          updatedBy: currentUser.email,
+        },
+        update: {
+          countryName,
+          currency,
+          currencySymbol,
+          baseFare,
+          pricePerKm,
+          pricePerMinute,
+          minimumFare,
+          driverCommission,
+          platformCommission,
+          updatedBy: currentUser.email,
+        },
+      });
+
+      res.json(fareConfig);
+    } catch (error) {
+      console.error("Error saving fare config:", error);
+      res.status(500).json({ message: "Failed to save fare config" });
+    }
+  });
+
+  // Update fare config (admin only)
+  app.patch("/api/fare-configs/:countryCode", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can manage fare configs" });
+      }
+
+      const { countryCode } = req.params;
+      const { 
+        baseFare, 
+        pricePerKm, 
+        pricePerMinute, 
+        minimumFare,
+        driverCommission,
+        platformCommission 
+      } = req.body;
+
+      const fareConfig = await prisma.fareConfig.update({
+        where: { countryCode },
+        data: {
+          baseFare,
+          pricePerKm,
+          pricePerMinute,
+          minimumFare,
+          driverCommission,
+          platformCommission,
+          updatedBy: currentUser.email,
+        },
+      });
+
+      res.json(fareConfig);
+    } catch (error) {
+      console.error("Error updating fare config:", error);
+      res.status(500).json({ message: "Failed to update fare config" });
+    }
+  });
+
+  // Delete fare config (admin only)
+  app.delete("/api/fare-configs/:countryCode", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can manage fare configs" });
+      }
+
+      const { countryCode } = req.params;
+      await prisma.fareConfig.delete({
+        where: { countryCode },
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting fare config:", error);
+      res.status(500).json({ message: "Failed to delete fare config" });
+    }
+  });
+
   // ==================== ANALYTICS ====================
 
   app.get("/api/analytics", async (req, res) => {

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog, Wifi, DollarSign, Gift, Wallet, BarChart3 } from "lucide-react";
+import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog, Wifi, DollarSign, Gift, Wallet, BarChart3, Calculator } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
@@ -353,6 +353,21 @@ export default function AdminPage() {
                       <ArrowRight className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <CardDescription>Platform metrics and director performance</CardDescription>
+                  </CardHeader>
+                </Link>
+              </Card>
+
+              <Card className="hover-elevate cursor-pointer">
+                <Link href="/admin/fares">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Calculator className="h-5 w-5 text-primary" />
+                        <CardTitle>Manage Ride Fares</CardTitle>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <CardDescription>Configure pricing for each country</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
