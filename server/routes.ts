@@ -193,33 +193,17 @@ export async function registerRoutes(
   app.patch("/api/rides/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { pickupLocation, dropoffLocation, fareEstimate, status, driverId } = req.body;
+      const { pickupLocation, dropoffLocation, fareEstimate } = req.body;
 
-      let finalStatus = status;
-
-      // If assigning a driver, verify they are active and auto-set status to ACCEPTED
-      if (driverId) {
-        const driver = await prisma.driver.findUnique({ where: { id: driverId } });
-        if (!driver) {
-          return res.status(400).json({ message: "Driver not found" });
-        }
-        if (driver.status !== "ACTIVE") {
-          return res.status(400).json({ message: "Only active drivers can be assigned to rides" });
-        }
-        // Auto-set status to ACCEPTED when driver is assigned (unless explicitly completed/cancelled)
-        if (!status || (status !== "COMPLETED" && status !== "CANCELLED")) {
-          finalStatus = "ACCEPTED";
-        }
-      }
-
+      // This endpoint now only allows updating ride details, NOT status or driver assignment
+      // Use the dedicated lifecycle endpoints for status changes: /assign, /start, /complete, /cancel
+      
       const ride = await prisma.ride.update({
         where: { id },
         data: { 
           pickupLocation, 
           dropoffLocation, 
           fareEstimate: fareEstimate !== undefined ? parseFloat(fareEstimate) : undefined,
-          status: finalStatus,
-          driverId
         },
         include: { user: true, driver: true },
       });

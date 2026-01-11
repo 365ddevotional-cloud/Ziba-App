@@ -1,15 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog } from "lucide-react";
+import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog, Wifi } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
+import { StarRating } from "@/components/star-rating";
 
 interface Stats {
   users: {
     total: number;
     active: number;
     suspended: number;
+    avgRating: number;
   };
   drivers: {
     total: number;
@@ -17,11 +19,14 @@ interface Stats {
     pending: number;
     suspended: number;
     offline: number;
+    online: number;
+    avgRating: number;
   };
   rides: {
     total: number;
     requested: number;
     accepted: number;
+    inProgress: number;
     completed: number;
     cancelled: number;
     active: number;
@@ -65,15 +70,23 @@ export default function AdminPage() {
                   <div className="text-2xl font-bold" data-testid="text-total-users">
                     {stats?.users.total ?? 0}
                   </div>
-                  <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <CheckCircle className="h-3 w-3 text-green-500" />
-                      {stats?.users.active ?? 0} active
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <XCircle className="h-3 w-3 text-red-500" />
-                      {stats?.users.suspended ?? 0} suspended
-                    </span>
+                  <div className="flex flex-col gap-1 mt-2">
+                    <div className="flex gap-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3 text-green-500" />
+                        {stats?.users.active ?? 0} active
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <XCircle className="h-3 w-3 text-red-500" />
+                        {stats?.users.suspended ?? 0} suspended
+                      </span>
+                    </div>
+                    {(stats?.users.avgRating ?? 0) > 0 && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">Avg:</span>
+                        <StarRating rating={stats?.users.avgRating ?? 0} size="xs" />
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -87,15 +100,27 @@ export default function AdminPage() {
                   <div className="text-2xl font-bold" data-testid="text-total-drivers">
                     {stats?.drivers.total ?? 0}
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <CheckCircle className="h-3 w-3 text-green-500" />
-                      {stats?.drivers.active ?? 0} active
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3 text-yellow-500" />
-                      {stats?.drivers.pending ?? 0} pending
-                    </span>
+                  <div className="flex flex-col gap-1 mt-2">
+                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Wifi className="h-3 w-3 text-green-500" />
+                        {stats?.drivers.online ?? 0} online
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3 text-green-500" />
+                        {stats?.drivers.active ?? 0} active
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-yellow-500" />
+                        {stats?.drivers.pending ?? 0} pending
+                      </span>
+                    </div>
+                    {(stats?.drivers.avgRating ?? 0) > 0 && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">Avg:</span>
+                        <StarRating rating={stats?.drivers.avgRating ?? 0} size="xs" />
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -109,7 +134,7 @@ export default function AdminPage() {
                   <div className="text-2xl font-bold text-blue-500" data-testid="text-active-rides">
                     {stats?.rides.active ?? 0}
                   </div>
-                  <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3 text-yellow-500" />
                       {stats?.rides.requested ?? 0} requested
@@ -117,6 +142,10 @@ export default function AdminPage() {
                     <span className="flex items-center gap-1">
                       <CheckCircle className="h-3 w-3 text-blue-500" />
                       {stats?.rides.accepted ?? 0} accepted
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Activity className="h-3 w-3 text-purple-500" />
+                      {stats?.rides.inProgress ?? 0} in progress
                     </span>
                   </div>
                 </CardContent>

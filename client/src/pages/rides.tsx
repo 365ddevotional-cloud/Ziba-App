@@ -5,12 +5,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/header";
 
+type RideStatus = "REQUESTED" | "ACCEPTED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+
 interface Ride {
   id: string;
   pickupLocation: string;
   dropoffLocation: string;
   fareEstimate: number | null;
-  status: "REQUESTED" | "ACCEPTED" | "COMPLETED" | "CANCELLED";
+  status: RideStatus;
   userId: string;
   driverId: string | null;
   createdAt: string;
@@ -22,11 +24,20 @@ interface Ride {
   } | null;
 }
 
-const statusColors = {
+const statusColors: Record<RideStatus, string> = {
   REQUESTED: "bg-yellow-600",
   ACCEPTED: "bg-blue-600",
+  IN_PROGRESS: "bg-purple-600",
   COMPLETED: "bg-green-600",
   CANCELLED: "bg-red-600",
+};
+
+const statusLabels: Record<RideStatus, string> = {
+  REQUESTED: "Requested",
+  ACCEPTED: "Accepted",
+  IN_PROGRESS: "In Progress",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
 };
 
 export default function RidesPage() {
@@ -109,7 +120,7 @@ export default function RidesPage() {
                       </TableCell>
                       <TableCell>
                         <Badge className={statusColors[ride.status]}>
-                          {ride.status}
+                          {statusLabels[ride.status]}
                         </Badge>
                       </TableCell>
                       <TableCell>

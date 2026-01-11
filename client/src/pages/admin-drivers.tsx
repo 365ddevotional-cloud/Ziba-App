@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, Car, Phone, Calendar, CheckCircle, Clock, XCircle, ArrowLeft, Bike, Truck, Mail, DollarSign, Wifi, WifiOff } from "lucide-react";
+import { Loader2, Car, Phone, Calendar, CheckCircle, Clock, XCircle, ArrowLeft, Bike, Truck, Mail, Wifi, WifiOff, Power } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,9 @@ import { Header } from "@/components/header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { StarRating } from "@/components/star-rating";
+
+type DriverStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "OFFLINE";
 
 interface Driver {
   id: string;
@@ -17,8 +20,11 @@ interface Driver {
   phone: string;
   vehicleType: "CAR" | "BIKE" | "VAN";
   vehiclePlate: string;
-  status: "PENDING" | "ACTIVE" | "SUSPENDED" | "OFFLINE";
+  status: DriverStatus;
+  isOnline: boolean;
   currentRate: number;
+  averageRating: number;
+  totalRatings: number;
   avgStartTime: string | null;
   avgEndTime: string | null;
   createdAt: string;
@@ -27,7 +33,7 @@ interface Driver {
   };
 }
 
-const statusConfig = {
+const statusConfig: Record<DriverStatus, { color: string; icon: typeof CheckCircle; label: string }> = {
   PENDING: { color: "bg-yellow-600", icon: Clock, label: "Pending" },
   ACTIVE: { color: "bg-green-600", icon: CheckCircle, label: "Active" },
   SUSPENDED: { color: "bg-red-600", icon: XCircle, label: "Suspended" },
@@ -54,6 +60,7 @@ export default function AdminDriversPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/drivers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/drivers/available"] });
       toast({
         title: "Status updated",
         description: "Driver status has been updated successfully.",
@@ -68,8 +75,43 @@ export default function AdminDriversPage() {
     },
   });
 
+  const toggleOnlineMutation = useMutation({
+    mutationFn: async ({ id, goOnline }: { id: string; goOnline: boolean }) => {
+      const endpoint = goOnline ? `/api/drivers/${id}/online` : `/api/drivers/${id}/offline`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/drivers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/drivers/available"] });
+      toast({
+        title: "Online status updated",
+        description: "Driver online status has been updated.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update online status.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleStatusChange = (driverId: string, newStatus: string) => {
     updateStatusMutation.mutate({ id: driverId, status: newStatus });
+  };
+
+  const handleToggleOnline = (driverId: string, currentlyOnline: boolean) => {
+    toggleOnlineMutation.mutate({ id: driverId, goOnline: !currentlyOnline });
   };
 
   return (
@@ -109,11 +151,9 @@ export default function AdminDriversPage() {
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Vehicle</TableHead>
-                      <TableHead>Plate</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Rate</TableHead>
-                      <TableHead>Avg Start</TableHead>
-                      <TableHead>Avg End</TableHead>
+                      <TableHead>Online</TableHead>
+                      <TableHead>Rating</TableHead>
                       <TableHead>Rides</TableHead>
                       <TableHead>Joined</TableHead>
                     </TableRow>
@@ -127,7 +167,7 @@ export default function AdminDriversPage() {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Mail className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm">{driver.email}</span>
+                              <span className="text-sm max-w-32 truncate">{driver.email}</span>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -139,10 +179,9 @@ export default function AdminDriversPage() {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <VehicleIcon className="h-4 w-4 text-muted-foreground" />
-                              {driver.vehicleType}
+                              <span className="font-mono text-xs">{driver.vehiclePlate}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="font-mono">{driver.vehiclePlate}</TableCell>
                           <TableCell>
                             <Select
                               value={driver.status}
@@ -181,16 +220,31 @@ export default function AdminDriversPage() {
                             </Select>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1">
-                              <DollarSign className="h-3 w-3 text-muted-foreground" />
-                              <span className="font-mono">{driver.currentRate.toFixed(2)}x</span>
-                            </div>
+                            {driver.status === "ACTIVE" ? (
+                              <Button
+                                size="icon"
+                                variant={driver.isOnline ? "default" : "outline"}
+                                onClick={() => handleToggleOnline(driver.id, driver.isOnline)}
+                                disabled={toggleOnlineMutation.isPending}
+                                title={driver.isOnline ? "Go Offline" : "Go Online"}
+                                data-testid={`button-online-${driver.id}`}
+                              >
+                                {driver.isOnline ? (
+                                  <Wifi className="h-4 w-4" />
+                                ) : (
+                                  <Power className="h-4 w-4" />
+                                )}
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell>
-                            <span className="font-mono text-sm">{driver.avgStartTime || "-"}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-mono text-sm">{driver.avgEndTime || "-"}</span>
+                            {driver.totalRatings > 0 ? (
+                              <StarRating rating={driver.averageRating} size="xs" />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">No ratings</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">{driver._count.rides}</Badge>
