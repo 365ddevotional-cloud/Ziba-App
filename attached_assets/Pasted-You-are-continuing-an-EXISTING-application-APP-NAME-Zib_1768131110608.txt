@@ -1,0 +1,112 @@
+You are continuing an EXISTING application.
+
+APP NAME:
+Ziba
+
+APP TYPE:
+Ride-hailing / logistics platform (Uber-like)
+
+STAGE:
+Stage 2 – Database Models & Public Previews ONLY
+
+IMPORTANT:
+- DO NOT create a new app
+- DO NOT require login
+- DO NOT protect routes
+- DO NOT use admin authentication yet
+- EVERYTHING must be viewable in Preview without credentials
+
+TECH STACK (KEEP SAME):
+- Frontend: React + Vite
+- Backend: Node.js + Express
+- Database: PostgreSQL
+- ORM: Prisma
+- Styling: Tailwind CSS
+- Colors: Dark blue, white, soft gray
+
+--------------------------------
+DATABASE MODELS (PRISMA ONLY)
+--------------------------------
+
+Create these models with proper relations:
+
+1. User
+- id
+- fullName
+- email
+- phone
+- createdAt
+
+2. Driver
+- id
+- fullName
+- phone
+- vehicleType
+- vehiclePlate
+- isActive
+- createdAt
+
+3. Ride
+- id
+- pickupLocation
+- dropoffLocation
+- status (REQUESTED, ACCEPTED, COMPLETED, CANCELLED)
+- userId
+- driverId (nullable)
+- createdAt
+
+4. Admin
+- id
+- email
+- phone
+- createdAt
+- NOTE: NO PASSWORD FIELD YET
+
+Apply Prisma migrations cleanly.
+
+--------------------------------
+PUBLIC ROUTES (NO AUTH)
+--------------------------------
+
+ALL routes must load without login:
+
+/                → Landing page (already exists)
+/users           → List all users
+/drivers         → List all drivers
+/rides           → List all rides
+/admin           → Admin overview page (READ-ONLY)
+/admin/users     → View users
+/admin/drivers   → View drivers
+/admin/rides     → View rides
+
+--------------------------------
+UI REQUIREMENTS
+--------------------------------
+
+- Simple tables for users, drivers, rides
+- Clean, readable layout
+- Dark professional styling
+- No buttons that require login
+- NO 404 errors on any route
+
+--------------------------------
+ABSOLUTE RULES
+--------------------------------
+
+- Do NOT add authentication
+- Do NOT add passwords
+- Do NOT redirect users
+- Do NOT add payments, maps, or ride matching
+- Focus ONLY on structure + visibility
+
+--------------------------------
+SUCCESS CRITERIA
+--------------------------------
+
+When finished, I should be able to:
+- Open Preview
+- Navigate to /users, /drivers, /rides
+- See empty or sample data
+- See admin pages WITHOUT logging in
+
+Build clean. Build minimal. Build stable.
