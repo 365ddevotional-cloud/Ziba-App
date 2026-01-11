@@ -263,6 +263,54 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/directors/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { contractEnd } = req.body;
+      const currentUser = getCurrentUser(req);
+
+      // Only admin can update contractEnd
+      if (contractEnd !== undefined) {
+        if (currentUser.role !== "admin") {
+          return res.status(403).json({ message: "Only admins can update contract end date" });
+        }
+
+        // Validate contractEnd is a valid date
+        const contractEndDate = new Date(contractEnd);
+        if (isNaN(contractEndDate.getTime())) {
+          return res.status(400).json({ message: "Invalid contract end date" });
+        }
+
+        // Validate contractEnd is in the future
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (contractEndDate < today) {
+          return res.status(400).json({ message: "Contract end date must be in the future" });
+        }
+
+        // Get the director to check contractStart
+        const director = await prisma.director.findUnique({ where: { id } });
+        if (!director) {
+          return res.status(404).json({ message: "Director not found" });
+        }
+
+        // Validate contractEnd is after contractStart
+        if (director.contractStart && contractEndDate <= director.contractStart) {
+          return res.status(400).json({ message: "Contract end date must be after contract start date" });
+        }
+      }
+
+      const updatedDirector = await prisma.director.update({
+        where: { id },
+        data: { contractEnd: contractEnd ? new Date(contractEnd) : undefined },
+      });
+      res.json(updatedDirector);
+    } catch (error) {
+      console.error("Error updating director:", error);
+      res.status(500).json({ message: "Failed to update director" });
+    }
+  });
+
   // ==================== ADMINS ====================
   
   app.get("/api/admins", async (req, res) => {
