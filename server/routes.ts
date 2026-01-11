@@ -56,7 +56,7 @@ export async function registerRoutes(
   app.patch("/api/users/:id", async (req, res) => {
     try {
       const currentUser = getCurrentUser(req);
-      if (currentUser.role !== "admin") {
+      if (!currentUser || currentUser.role !== "admin") {
         return res.status(403).json({ message: "Only admins can update user status" });
       }
 
