@@ -232,3 +232,21 @@ model PlatformConfig {
   commissionRate   Float    @default(0.15)
   updatedAt        DateTime @updatedAt
 }
+
+// ==================== FARE CONFIG ====================
+
+model FareConfig {
+  id                  String   @id @default(uuid())
+  countryCode         String   @unique
+  countryName         String
+  currency            String
+  currencySymbol      String
+  baseFare            Float    @default(500)
+  pricePerKm          Float    @default(120)
+  pricePerMinute      Float    @default(30)
+  minimumFare         Float    @default(300)
+  driverCommission    Float    @default(0.85)
+  platformCommission  Float    @default(0.15)
+  updatedAt           DateTime @updatedAt
+  updatedBy           String?
+}

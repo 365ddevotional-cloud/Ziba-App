@@ -1,0 +1,180 @@
+STAGE 15 — Dynamic Fare Control System (Admin-Only)
+
+GOAL:
+Add a central Fare Control system to the Admin Dashboard, Uber-style but optimized so Ziba is cheaper for riders and better for drivers, and works across all countries (Nigeria, Ghana, Liberia, South Africa, USA, Mexico, UK, France, future).
+
+📌 WHAT THIS STAGE MUST DO (NO EXTRAS)
+1️⃣ Add a NEW Admin Dashboard Button
+
+Add a new card/button on the Admin Dashboard:
+
+Label:
+
+Manage Ride Fares
+
+Icon:
+
+Currency / calculator / pricing icon
+
+Route:
+
+/admin/fares
+
+Only visible to Admin.
+
+2️⃣ Create Admin – Fare Management Page
+
+Create a new page:
+
+Title:
+
+Admin – Fare Settings
+
+This page controls how rides are priced.
+
+3️⃣ Fare Configuration Model (Backend + DB-safe)
+
+Create a FareConfig system (do NOT break existing rides).
+
+Each country can have its own rules.
+
+Fields per country:
+
+Country
+
+Currency (₦, $, £, €, ₵, etc)
+
+Base Fare
+
+Price per KM/Mile
+
+Price per Minute
+
+Minimum Fare
+
+Driver Commission %
+
+Platform Commission %
+
+Last Updated
+
+Updated By (Admin)
+
+⚠️ Must be editable only by Admin
+⚠️ Changes apply only to new rides, not completed ones
+
+4️⃣ Uber-Style but Cheaper Logic (IMPORTANT)
+
+Implement pricing logic:
+
+fare =
+baseFare
++ (distance × pricePerKmOrMile)
++ (durationMinutes × pricePerMinute)
+
+
+Then:
+
+Rider pays fare
+
+Driver earns fare – platformCommission
+
+Platform keeps platformCommission
+
+Defaults (Nigeria example):
+
+Base Fare: ₦500
+
+Price per KM/Mile: ₦120
+
+Price per Minute: ₦30
+
+Platform Commission: 10–15% (cheaper than Uber)
+
+Driver keeps majority
+
+5️⃣ Country-Aware Currency Enforcement
+
+Currency shown MUST match selected country
+
+Nigeria → ₦
+
+Ghana → ₵
+
+USA → $
+
+UK → £
+
+France → €
+
+Mexico → $
+
+South Africa → R
+
+Liberia → $
+
+NO hard-coded $ anywhere.
+
+6️⃣ Admin Controls on Fare Page
+
+Admin can:
+
+Switch Country (dropdown)
+
+Edit all fare values
+
+Save changes
+
+See a live preview:
+
+“Estimated 10 KM/Mile / 20 min ride = ₦X”
+
+7️⃣ Security Rules (MANDATORY)
+
+Only Admin can access /admin/fares
+
+API must reject non-admin updates (403)
+
+Directors, Drivers, Users → read-only pricing
+
+8️⃣ UI Expectations
+
+Same dark theme
+
+Inline editable fields
+
+Save button per country
+
+Success toast on update
+
+Error toast on failure
+
+9️⃣ Do NOT
+
+❌ Remove auth
+❌ Break existing rides
+❌ Hardcode currency
+❌ Touch wallet logic
+❌ Reset database
+
+✅ FINAL CHECK BEFORE MARKING COMPLETE
+
+Admin Dashboard shows Manage Ride Fares
+
+/admin/fares loads
+
+Country dropdown works
+
+Currency switches correctly
+
+New rides use updated pricing
+
+Old rides unchanged
+
+Admin-only access enforced
+
+📌 EXECUTION INSTRUCTION
+
+Implement Stage 15 fully, end-to-end.
+Do not stop halfway.
+Mark complete only when all checks pass.
