@@ -1813,9 +1813,14 @@ export async function registerRoutes(
 
   // ==================== FARE CONFIG ====================
 
-  // Get all fare configs
+  // Get all fare configs (admin only)
   app.get("/api/fare-configs", async (req, res) => {
     try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can access fare configs" });
+      }
+
       const fareConfigs = await prisma.fareConfig.findMany({
         orderBy: { countryName: "asc" },
       });
@@ -1826,9 +1831,14 @@ export async function registerRoutes(
     }
   });
 
-  // Get fare config by country code
+  // Get fare config by country code (admin only)
   app.get("/api/fare-configs/:countryCode", async (req, res) => {
     try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can access fare configs" });
+      }
+
       const { countryCode } = req.params;
       const fareConfig = await prisma.fareConfig.findUnique({
         where: { countryCode },

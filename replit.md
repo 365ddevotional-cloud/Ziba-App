@@ -319,3 +319,17 @@ All accounts require password setup on first login.
 - All admin pages (dashboard, payments, incentives, wallets, analytics) use dynamic currency formatting
 - Currency selection persists across page refreshes via localStorage
 - Fallback to symbol prefix if Intl.NumberFormat fails
+
+## Stage 15 Notes - Dynamic Fare Control System
+- Added FareConfig model in Prisma schema with country-specific pricing fields
+- New API endpoints for fare config CRUD at /api/fare-configs (admin-only)
+- Added "Manage Ride Fares" card on Admin Dashboard linking to /admin/fares
+- New Admin Fare Settings page with:
+  - Country selector dropdown to switch between configured countries
+  - Inline editable fields for base fare, price per KM, price per minute, minimum fare
+  - Driver/platform commission split configuration
+  - Live fare preview showing sample 10km/20min ride cost breakdown
+- Pricing formula: fare = baseFare + (distance × pricePerKm) + (duration × pricePerMinute)
+- Platform keeps platformCommission %, driver keeps driverCommission %
+- All fare config endpoints are admin-only protected (403 for non-admins)
+- Changes apply only to new rides, existing rides unchanged
