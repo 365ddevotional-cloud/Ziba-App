@@ -168,3 +168,67 @@ model UserRating {
   user      User     @relation(fields: [userId], references: [id])
   ride      Ride     @relation(fields: [rideId], references: [id])
 }
+
+// ==================== WALLETS & TRANSACTIONS ====================
+
+enum OwnerType {
+  USER
+  DRIVER
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+  COMMISSION
+  PAYOUT
+}
+
+model Wallet {
+  id           String        @id @default(uuid())
+  ownerId      String
+  ownerType    OwnerType
+  balance      Float         @default(0)
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+
+  @@unique([ownerId, ownerType])
+}
+
+model Transaction {
+  id        String          @id @default(uuid())
+  walletId  String
+  type      TransactionType
+  amount    Float
+  reference String?
+  createdAt DateTime        @default(now())
+  wallet    Wallet          @relation(fields: [walletId], references: [id])
+}
+
+// ==================== NOTIFICATIONS ====================
+
+enum NotificationType {
+  RIDE_REQUESTED
+  RIDE_ASSIGNED
+  RIDE_COMPLETED
+  WALLET_UPDATED
+  STATUS_CHANGE
+  SYSTEM
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  role      String
+  message   String
+  type      NotificationType
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+}
+
+// ==================== PLATFORM CONFIG ====================
+
+model PlatformConfig {
+  id               String   @id @default(uuid())
+  commissionRate   Float    @default(0.15)
+  updatedAt        DateTime @updatedAt
+}
