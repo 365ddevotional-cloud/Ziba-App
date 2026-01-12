@@ -4,12 +4,22 @@ import { prisma } from "./prisma";
 
 export type UserRole = "user" | "director" | "admin";
 
+interface SessionUser {
+  id: string;
+  email: string;
+  role: string;
+  isTestAccount?: boolean;
+}
+
 declare module "express-session" {
   interface SessionData {
     userId?: string;
     userRole?: UserRole;
     userEmail?: string;
     needsPasswordSetup?: boolean;
+    user?: SessionUser;
+    originalAdmin?: SessionUser;
+    isImpersonating?: boolean;
   }
 }
 

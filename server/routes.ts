@@ -901,11 +901,10 @@ export async function registerRoutes(
     if (!user.id) {
       return res.status(401).json({ message: "Not authenticated" });
     }
-    const session = req.session as any;
     res.json({
       ...user,
-      isImpersonating: session.isImpersonating || false,
-      originalAdmin: session.originalAdmin ? { email: session.originalAdmin.email } : null,
+      isImpersonating: req.session.isImpersonating || false,
+      originalAdmin: req.session.originalAdmin ? { email: req.session.originalAdmin.email } : null,
     });
   });
 
@@ -2302,13 +2301,12 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Test account not found" });
       }
 
-      const session = req.session as any;
-      session.originalAdmin = {
+      req.session.originalAdmin = {
         id: currentUser.id,
         email: currentUser.email,
         role: "admin",
       };
-      session.isImpersonating = true;
+      req.session.isImpersonating = true;
 
       req.session.user = {
         id: testAccount.id,
@@ -2322,7 +2320,7 @@ export async function registerRoutes(
         redirectTo: testAccount.role === "ADMIN" ? "/admin" 
           : testAccount.role === "DIRECTOR" ? "/directors"
           : testAccount.role === "DRIVER" ? "/drivers"
-          : "/users",
+          : "/",
         user: {
           id: testAccount.id,
           email: testAccount.email,
@@ -2349,19 +2347,17 @@ export async function registerRoutes(
   // Return to admin from impersonation
   app.post("/api/test-accounts/return-to-admin", async (req, res) => {
     try {
-      const session = req.session as any;
-      
-      if (!session.originalAdmin) {
+      if (!req.session.originalAdmin) {
         return res.status(400).json({ message: "No admin session to return to" });
       }
 
-      req.session.user = session.originalAdmin;
-      delete session.originalAdmin;
-      delete session.isImpersonating;
+      req.session.user = req.session.originalAdmin;
+      delete req.session.originalAdmin;
+      delete req.session.isImpersonating;
 
       res.json({ 
         success: true,
-        user: session.originalAdmin
+        user: req.session.user
       });
     } catch (error) {
       console.error("Error returning to admin:", error);
