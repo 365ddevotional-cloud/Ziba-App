@@ -1,7 +1,9 @@
 # Ziba - Ride-Hailing Platform
 
+## Stage 16 Complete - Production Hardened
+
 ## Overview
-Ziba is a ride-hailing and logistics platform, similar to Uber, designed to connect users with drivers for transportation services. The project is currently in an advanced stage of development, featuring a dynamic fare control system and an advanced authentication system with role-based access control. Ziba aims to provide a robust, scalable, and user-friendly platform for ride-hailing operations across multiple countries, with a focus on efficient logistics, fair pricing, and comprehensive administrative oversight. The platform supports various user roles including users, drivers, directors, and administrators, each with tailored functionalities and access levels.
+Ziba is a ride-hailing and logistics platform, similar to Uber, designed to connect users with drivers for transportation services. The project is now production-ready, featuring a dynamic fare control system, advanced authentication with role-based access control, and comprehensive production hardening. Ziba aims to provide a robust, scalable, and user-friendly platform for ride-hailing operations across multiple countries, with a focus on efficient logistics, fair pricing, and comprehensive administrative oversight. The platform supports various user roles including users, drivers, directors, and administrators, each with tailored functionalities and access levels.
 
 ## User Preferences
 I want to ensure all changes are thoroughly reviewed. Please ask for confirmation before implementing any significant changes or new features. I prefer clear, concise explanations and detailed documentation for any new modules or complex logic introduced.
@@ -12,6 +14,12 @@ The Ziba platform is built with a modern web development stack:
 - **Backend**: Implemented with Node.js and Express, providing a robust API layer.
 - **Database**: PostgreSQL is used as the primary data store, with Prisma ORM facilitating seamless database interactions and schema management.
 - **Authentication**: Features `bcrypt` for secure password hashing and `express-session` with a PostgreSQL store for session management. Currently configured for **ADMIN-ONLY** login at `/admin/login`. Founder admin account: `founder@ziba.app` (auto-created on server start if no admins exist). All admin routes are protected by AdminGuard requiring ADMIN role. User, Driver, and Director logins are disabled pending future implementation. Test account impersonation system allows admin to login as any test account for development testing.
+- **Production Hardening (Stage 16)**: 
+    - Admin bootstrap permanently disabled - no backdoors, no magic passwords, no auto-reset logic
+    - Authentication relies solely on stored database credentials
+    - Compute costs optimized by removing all refetchInterval polling
+    - Debug routes and test account login blocked in production via NODE_ENV checks
+    - Play Store preparation checklist created (PLAY_STORE_CHECKLIST.md)
 - **Core Features**:
     - **User and Driver Management**: Comprehensive CRUD operations for users and drivers, including status management, online/offline toggling for drivers, and rating systems.
     - **Ride Management**: End-to-end ride lifecycle management from request to completion, including driver assignment, ride status tracking, and automatic wallet transactions upon ride completion.
