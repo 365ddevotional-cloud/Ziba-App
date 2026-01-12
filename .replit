@@ -45,3 +45,4 @@ integrations = ["javascript_database:1.0.0"]
 
 [userenv.development]
 ALLOW_TEST_LOGIN = "true"
+ADMIN_DEFAULT_PASSWORD = "ZibaFounder2024!"
