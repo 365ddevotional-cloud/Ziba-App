@@ -21,6 +21,7 @@ import AdminIncentivesPage from "@/pages/admin-incentives";
 import AdminWalletsPage from "@/pages/admin-wallets";
 import AdminAnalyticsPage from "@/pages/admin-analytics";
 import AdminFaresPage from "@/pages/admin-fares";
+import AdminTestLoginsPage from "@/pages/admin-test-logins";
 import { UserLoginPage, DirectorLoginPage, AdminLoginPage } from "@/pages/login";
 import NotFound from "@/pages/not-found";
 
@@ -45,6 +46,7 @@ function Router() {
       <Route path="/admin/wallets" component={AdminWalletsPage} />
       <Route path="/admin/analytics" component={AdminAnalyticsPage} />
       <Route path="/admin/fares" component={AdminFaresPage} />
+      <Route path="/admin/test-logins" component={AdminTestLoginsPage} />
       <Route component={NotFound} />
     </Switch>
   );

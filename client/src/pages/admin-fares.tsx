@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, Calculator, ArrowLeft, Save, Globe, DollarSign, Car, Clock, Percent } from "lucide-react";
+import { Loader2, Calculator, ArrowLeft, Save, Globe, DollarSign, Car, Clock, Percent, Zap, CloudRain, TrafficCone, Ruler } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -30,6 +31,14 @@ interface FareConfig {
   minimumFare: number;
   driverCommission: number;
   platformCommission: number;
+  distanceUnit: "KM" | "MILE";
+  surgeEnabled: boolean;
+  surgeMultiplier: number;
+  maxSurgeCap: number;
+  peakHoursStart: string | null;
+  peakHoursEnd: string | null;
+  weatherMultiplier: number;
+  trafficMultiplier: number;
   updatedAt: string;
   updatedBy: string | null;
 }
@@ -89,6 +98,14 @@ export default function AdminFaresPage() {
     minimumFare: defaults.minimumFare || 300,
     driverCommission: 0.85,
     platformCommission: 0.15,
+    distanceUnit: "KM" as "KM" | "MILE",
+    surgeEnabled: false,
+    surgeMultiplier: 1.0,
+    maxSurgeCap: 1.3,
+    peakHoursStart: "",
+    peakHoursEnd: "",
+    weatherMultiplier: 1.0,
+    trafficMultiplier: 1.0,
   });
 
   useEffect(() => {
@@ -100,6 +117,14 @@ export default function AdminFaresPage() {
         minimumFare: existingConfig.minimumFare,
         driverCommission: existingConfig.driverCommission,
         platformCommission: existingConfig.platformCommission,
+        distanceUnit: existingConfig.distanceUnit || "KM",
+        surgeEnabled: existingConfig.surgeEnabled || false,
+        surgeMultiplier: existingConfig.surgeMultiplier || 1.0,
+        maxSurgeCap: existingConfig.maxSurgeCap || 1.3,
+        peakHoursStart: existingConfig.peakHoursStart || "",
+        peakHoursEnd: existingConfig.peakHoursEnd || "",
+        weatherMultiplier: existingConfig.weatherMultiplier || 1.0,
+        trafficMultiplier: existingConfig.trafficMultiplier || 1.0,
       });
     } else {
       const defaults = defaultFareConfigs[selectedCountryCode] || defaultFareConfigs.NG;
@@ -110,6 +135,14 @@ export default function AdminFaresPage() {
         minimumFare: defaults.minimumFare || 300,
         driverCommission: 0.85,
         platformCommission: 0.15,
+        distanceUnit: "KM",
+        surgeEnabled: false,
+        surgeMultiplier: 1.0,
+        maxSurgeCap: 1.3,
+        peakHoursStart: "",
+        peakHoursEnd: "",
+        weatherMultiplier: 1.0,
+        trafficMultiplier: 1.0,
       });
     }
   }, [selectedCountryCode, existingConfig]);
@@ -158,15 +191,33 @@ export default function AdminFaresPage() {
     }
   };
 
-  const calculateFarePreview = (distanceKm: number, durationMinutes: number) => {
-    const rawFare = formData.baseFare + (distanceKm * formData.pricePerKm) + (durationMinutes * formData.pricePerMinute);
+  const calculateFarePreview = (distance: number, durationMinutes: number) => {
+    const baseFare = formData.baseFare + (distance * formData.pricePerKm) + (durationMinutes * formData.pricePerMinute);
+    
+    let surgeMultiplier = 1.0;
+    if (formData.surgeEnabled) {
+      surgeMultiplier = Math.min(formData.surgeMultiplier, formData.maxSurgeCap);
+    }
+    
+    const totalMultiplier = surgeMultiplier * formData.weatherMultiplier * formData.trafficMultiplier;
+    const rawFare = baseFare * totalMultiplier;
     const fare = Math.max(rawFare, formData.minimumFare);
     const driverEarnings = fare * formData.driverCommission;
     const platformEarnings = fare * formData.platformCommission;
-    return { fare, driverEarnings, platformEarnings };
+    
+    return { 
+      fare, 
+      driverEarnings, 
+      platformEarnings, 
+      baseFare,
+      totalMultiplier,
+      hasMultipliers: totalMultiplier > 1
+    };
   };
 
-  const preview = calculateFarePreview(10, 20);
+  const sampleDistance = formData.distanceUnit === "MILE" ? 6 : 10;
+  const sampleDistanceLabel = formData.distanceUnit === "MILE" ? "6 Miles" : "10 KM";
+  const preview = calculateFarePreview(sampleDistance, 20);
 
   return (
     <div className="min-h-screen bg-background">
@@ -246,7 +297,7 @@ export default function AdminFaresPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="pricePerKm">Price per KM ({selectedCountry.symbol})</Label>
+                      <Label htmlFor="pricePerKm">Price per {formData.distanceUnit === "MILE" ? "Mile" : "KM"} ({selectedCountry.symbol})</Label>
                       <Input
                         id="pricePerKm"
                         type="number"
@@ -255,7 +306,7 @@ export default function AdminFaresPage() {
                         onChange={(e) => setFormData(prev => ({ ...prev, pricePerKm: parseFloat(e.target.value) || 0 }))}
                         data-testid="input-price-per-km"
                       />
-                      <p className="text-xs text-muted-foreground">Rate per kilometer traveled</p>
+                      <p className="text-xs text-muted-foreground">Rate per {formData.distanceUnit === "MILE" ? "mile" : "kilometer"} traveled</p>
                     </div>
 
                     <div className="space-y-2">
@@ -344,6 +395,157 @@ export default function AdminFaresPage() {
                 </CardContent>
               </Card>
 
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Ruler className="h-5 w-5 text-primary" />
+                    <CardTitle>Distance Unit</CardTitle>
+                  </div>
+                  <CardDescription>Choose measurement unit for this country</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4">
+                    <Select 
+                      value={formData.distanceUnit} 
+                      onValueChange={(v) => setFormData(prev => ({ ...prev, distanceUnit: v as "KM" | "MILE" }))}
+                    >
+                      <SelectTrigger className="w-[180px]" data-testid="select-distance-unit">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="KM">Kilometers (KM)</SelectItem>
+                        <SelectItem value="MILE">Miles</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-muted-foreground">
+                      {formData.distanceUnit === "MILE" ? "Used in US, UK, Liberia" : "Used in most countries"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-amber-500" />
+                    <CardTitle>Smart Surge Pricing</CardTitle>
+                  </div>
+                  <CardDescription>Dynamic pricing during high demand (Uber-style but fairer)</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Enable Surge Pricing</Label>
+                      <p className="text-xs text-muted-foreground">Apply multiplier during peak demand</p>
+                    </div>
+                    <Switch
+                      checked={formData.surgeEnabled}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, surgeEnabled: checked }))}
+                      data-testid="switch-surge-enabled"
+                    />
+                  </div>
+                  
+                  {formData.surgeEnabled && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                      <div className="space-y-2">
+                        <Label htmlFor="surgeMultiplier">Current Surge Multiplier</Label>
+                        <Input
+                          id="surgeMultiplier"
+                          type="number"
+                          step="0.1"
+                          min="1"
+                          max="3"
+                          value={formData.surgeMultiplier}
+                          onChange={(e) => setFormData(prev => ({ ...prev, surgeMultiplier: parseFloat(e.target.value) || 1 }))}
+                          data-testid="input-surge-multiplier"
+                        />
+                        <p className="text-xs text-muted-foreground">e.g., 1.2 = 20% increase</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxSurgeCap">Maximum Surge Cap</Label>
+                        <Input
+                          id="maxSurgeCap"
+                          type="number"
+                          step="0.1"
+                          min="1"
+                          max="3"
+                          value={formData.maxSurgeCap}
+                          onChange={(e) => setFormData(prev => ({ ...prev, maxSurgeCap: parseFloat(e.target.value) || 1.3 }))}
+                          data-testid="input-max-surge-cap"
+                        />
+                        <p className="text-xs text-muted-foreground">Never exceed this multiplier</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                    <div className="space-y-2">
+                      <Label htmlFor="peakHoursStart">Peak Hours Start (optional)</Label>
+                      <Input
+                        id="peakHoursStart"
+                        type="time"
+                        value={formData.peakHoursStart}
+                        onChange={(e) => setFormData(prev => ({ ...prev, peakHoursStart: e.target.value }))}
+                        data-testid="input-peak-hours-start"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="peakHoursEnd">Peak Hours End (optional)</Label>
+                      <Input
+                        id="peakHoursEnd"
+                        type="time"
+                        value={formData.peakHoursEnd}
+                        onChange={(e) => setFormData(prev => ({ ...prev, peakHoursEnd: e.target.value }))}
+                        data-testid="input-peak-hours-end"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <CloudRain className="h-5 w-5 text-blue-500" />
+                    <TrafficCone className="h-5 w-5 text-orange-500" />
+                    <CardTitle>Environmental Multipliers</CardTitle>
+                  </div>
+                  <CardDescription>Manual controls for weather and traffic conditions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="weatherMultiplier">Weather Multiplier</Label>
+                      <Input
+                        id="weatherMultiplier"
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        max="2"
+                        value={formData.weatherMultiplier}
+                        onChange={(e) => setFormData(prev => ({ ...prev, weatherMultiplier: parseFloat(e.target.value) || 1 }))}
+                        data-testid="input-weather-multiplier"
+                      />
+                      <p className="text-xs text-muted-foreground">Apply during bad weather (1.0 = normal)</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="trafficMultiplier">Traffic Multiplier</Label>
+                      <Input
+                        id="trafficMultiplier"
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        max="2"
+                        value={formData.trafficMultiplier}
+                        onChange={(e) => setFormData(prev => ({ ...prev, trafficMultiplier: parseFloat(e.target.value) || 1 }))}
+                        data-testid="input-traffic-multiplier"
+                      />
+                      <p className="text-xs text-muted-foreground">Apply during heavy traffic (1.0 = normal)</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Button 
                 onClick={handleSave} 
                 disabled={saveMutation.isPending}
@@ -372,8 +574,14 @@ export default function AdminFaresPage() {
                   <div className="p-4 rounded-lg bg-muted/50 space-y-3">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="h-4 w-4" />
-                      <span>10 KM / 20 minutes</span>
+                      <span>{sampleDistanceLabel} / 20 minutes</span>
                     </div>
+                    {preview.hasMultipliers && (
+                      <div className="flex items-center gap-2 text-xs text-amber-500">
+                        <Zap className="h-3 w-3" />
+                        <span>Multiplier active: {preview.totalMultiplier.toFixed(2)}×</span>
+                      </div>
+                    )}
                     <div className="pt-2 border-t space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Rider Pays</span>
@@ -399,11 +607,16 @@ export default function AdminFaresPage() {
                   <div className="text-xs text-muted-foreground space-y-1">
                     <p className="font-medium">Fare Formula:</p>
                     <p className="font-mono text-xs bg-muted p-2 rounded">
-                      base + (km × rate) + (min × rate)
+                      (base + ({formData.distanceUnit.toLowerCase()} × rate) + (min × rate)) × multipliers
                     </p>
                     <p className="mt-2">
-                      = {formatLocalCurrency(formData.baseFare)} + (10 × {formatLocalCurrency(formData.pricePerKm)}) + (20 × {formatLocalCurrency(formData.pricePerMinute)})
+                      = ({formatLocalCurrency(formData.baseFare)} + ({sampleDistance} × {formatLocalCurrency(formData.pricePerKm)}) + (20 × {formatLocalCurrency(formData.pricePerMinute)})){preview.hasMultipliers && ` × ${preview.totalMultiplier.toFixed(2)}`}
                     </p>
+                    {preview.hasMultipliers && (
+                      <p className="text-xs text-amber-500 mt-1">
+                        Base fare: {formatLocalCurrency(preview.baseFare)} → After multipliers: {formatLocalCurrency(preview.fare)}
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>

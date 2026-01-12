@@ -1871,7 +1871,15 @@ export async function registerRoutes(
         pricePerMinute, 
         minimumFare,
         driverCommission,
-        platformCommission 
+        platformCommission,
+        distanceUnit,
+        surgeEnabled,
+        surgeMultiplier,
+        maxSurgeCap,
+        peakHoursStart,
+        peakHoursEnd,
+        weatherMultiplier,
+        trafficMultiplier
       } = req.body;
 
       if (!countryCode || !countryName || !currency || !currencySymbol) {
@@ -1891,6 +1899,14 @@ export async function registerRoutes(
           minimumFare: minimumFare || 300,
           driverCommission: driverCommission || 0.85,
           platformCommission: platformCommission || 0.15,
+          distanceUnit: distanceUnit || "KM",
+          surgeEnabled: surgeEnabled || false,
+          surgeMultiplier: surgeMultiplier || 1.0,
+          maxSurgeCap: maxSurgeCap || 1.3,
+          peakHoursStart: peakHoursStart || null,
+          peakHoursEnd: peakHoursEnd || null,
+          weatherMultiplier: weatherMultiplier || 1.0,
+          trafficMultiplier: trafficMultiplier || 1.0,
           updatedBy: currentUser.email,
         },
         update: {
@@ -1903,6 +1919,14 @@ export async function registerRoutes(
           minimumFare,
           driverCommission,
           platformCommission,
+          distanceUnit,
+          surgeEnabled,
+          surgeMultiplier,
+          maxSurgeCap,
+          peakHoursStart,
+          peakHoursEnd,
+          weatherMultiplier,
+          trafficMultiplier,
           updatedBy: currentUser.email,
         },
       });
@@ -1929,7 +1953,15 @@ export async function registerRoutes(
         pricePerMinute, 
         minimumFare,
         driverCommission,
-        platformCommission 
+        platformCommission,
+        distanceUnit,
+        surgeEnabled,
+        surgeMultiplier,
+        maxSurgeCap,
+        peakHoursStart,
+        peakHoursEnd,
+        weatherMultiplier,
+        trafficMultiplier
       } = req.body;
 
       const fareConfig = await prisma.fareConfig.update({
@@ -1941,6 +1973,14 @@ export async function registerRoutes(
           minimumFare,
           driverCommission,
           platformCommission,
+          distanceUnit,
+          surgeEnabled,
+          surgeMultiplier,
+          maxSurgeCap,
+          peakHoursStart,
+          peakHoursEnd,
+          weatherMultiplier,
+          trafficMultiplier,
           updatedBy: currentUser.email,
         },
       });
@@ -2064,6 +2104,228 @@ export async function registerRoutes(
       console.error("Error fetching analytics:", error);
       res.status(500).json({ message: "Failed to fetch analytics" });
     }
+  });
+
+  // ==================== TEST ACCOUNTS (ADMIN ONLY - DEV MODE) ====================
+
+  // Get all test accounts
+  app.get("/api/test-accounts", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can access test accounts" });
+      }
+
+      if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({ message: "Test accounts disabled in production" });
+      }
+
+      const testAccounts = await prisma.testAccount.findMany({
+        orderBy: { createdAt: "desc" },
+      });
+      res.json(testAccounts);
+    } catch (error) {
+      console.error("Error fetching test accounts:", error);
+      res.status(500).json({ message: "Failed to fetch test accounts" });
+    }
+  });
+
+  // Create test account
+  app.post("/api/test-accounts", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can create test accounts" });
+      }
+
+      if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({ message: "Test accounts disabled in production" });
+      }
+
+      const { role, countryCode, region, city, status, fullName } = req.body;
+
+      if (!role || !countryCode || !fullName) {
+        return res.status(400).json({ message: "Role, country code, and full name are required" });
+      }
+
+      const rolePrefix = role.toLowerCase();
+      const locationSlug = (city || region || "test").toLowerCase().replace(/\s+/g, "_");
+      const randomSuffix = Math.random().toString(36).substring(2, 6);
+      const email = `${rolePrefix}_test_${locationSlug}_${randomSuffix}@ziba.test`;
+      const plainPassword = `Test${randomSuffix}!${Date.now().toString(36)}`;
+      const passwordHash = await hashPassword(plainPassword);
+
+      const testAccount = await prisma.testAccount.create({
+        data: {
+          email,
+          passwordHash,
+          role,
+          countryCode,
+          region,
+          city,
+          status: status || "ACTIVE",
+          fullName,
+          isTestAccount: true,
+          createdBy: currentUser.email,
+        },
+      });
+
+      res.json({ ...testAccount, temporaryPassword: plainPassword });
+    } catch (error) {
+      console.error("Error creating test account:", error);
+      res.status(500).json({ message: "Failed to create test account" });
+    }
+  });
+
+  // Update test account status
+  app.patch("/api/test-accounts/:id", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can update test accounts" });
+      }
+
+      if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({ message: "Test accounts disabled in production" });
+      }
+
+      const { id } = req.params;
+      const { status, region, city } = req.body;
+
+      const testAccount = await prisma.testAccount.update({
+        where: { id },
+        data: { status, region, city },
+      });
+
+      res.json(testAccount);
+    } catch (error) {
+      console.error("Error updating test account:", error);
+      res.status(500).json({ message: "Failed to update test account" });
+    }
+  });
+
+  // Reset test account password
+  app.post("/api/test-accounts/:id/reset-password", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can reset test account passwords" });
+      }
+
+      if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({ message: "Test accounts disabled in production" });
+      }
+
+      const { id } = req.params;
+      const randomSuffix = Math.random().toString(36).substring(2, 6);
+      const plainPassword = `Reset${randomSuffix}!${Date.now().toString(36)}`;
+      const passwordHash = await hashPassword(plainPassword);
+
+      await prisma.testAccount.update({
+        where: { id },
+        data: { passwordHash },
+      });
+
+      res.json({ temporaryPassword: plainPassword });
+    } catch (error) {
+      console.error("Error resetting test account password:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
+  // Delete test account
+  app.delete("/api/test-accounts/:id", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can delete test accounts" });
+      }
+
+      if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({ message: "Test accounts disabled in production" });
+      }
+
+      const { id } = req.params;
+      await prisma.testAccount.delete({ where: { id } });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting test account:", error);
+      res.status(500).json({ message: "Failed to delete test account" });
+    }
+  });
+
+  // Delete all test accounts
+  app.delete("/api/test-accounts", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can delete test accounts" });
+      }
+
+      if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({ message: "Test accounts disabled in production" });
+      }
+
+      await prisma.testAccount.deleteMany({});
+      res.json({ success: true, message: "All test accounts deleted" });
+    } catch (error) {
+      console.error("Error deleting all test accounts:", error);
+      res.status(500).json({ message: "Failed to delete test accounts" });
+    }
+  });
+
+  // Login as test account (DEV MODE ONLY)
+  app.post("/api/test-accounts/:id/login-as", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can use login-as" });
+      }
+
+      if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({ message: "Login-as disabled in production" });
+      }
+
+      const { id } = req.params;
+      const testAccount = await prisma.testAccount.findUnique({ where: { id } });
+
+      if (!testAccount) {
+        return res.status(404).json({ message: "Test account not found" });
+      }
+
+      req.session.user = {
+        id: testAccount.id,
+        email: testAccount.email,
+        role: testAccount.role.toLowerCase(),
+        isTestAccount: true,
+      };
+
+      res.json({ 
+        success: true, 
+        redirectTo: testAccount.role === "ADMIN" ? "/admin" 
+          : testAccount.role === "DIRECTOR" ? "/director"
+          : testAccount.role === "DRIVER" ? "/driver"
+          : "/",
+        user: {
+          id: testAccount.id,
+          email: testAccount.email,
+          role: testAccount.role.toLowerCase(),
+          fullName: testAccount.fullName,
+          isTestAccount: true,
+        }
+      });
+    } catch (error) {
+      console.error("Error logging in as test account:", error);
+      res.status(500).json({ message: "Failed to login as test account" });
+    }
+  });
+
+  // Check dev mode status
+  app.get("/api/dev-mode", async (req, res) => {
+    res.json({ 
+      isDevMode: process.env.NODE_ENV !== "production",
+      testAccountsEnabled: process.env.NODE_ENV !== "production"
+    });
   });
 
   return httpServer;
