@@ -43,6 +43,8 @@ model User {
   passwordHash  String?
   averageRating Float        @default(0)
   totalRatings  Int          @default(0)
+  isTestAccount Boolean      @default(false)
+  testDisabled  Boolean      @default(false)
   createdAt     DateTime     @default(now())
   rides         Ride[]
   ratings       UserRating[]
@@ -62,6 +64,8 @@ model Driver {
   totalRatings  Int            @default(0)
   avgStartTime  String?
   avgEndTime    String?
+  isTestAccount Boolean        @default(false)
+  testDisabled  Boolean        @default(false)
   createdAt     DateTime       @default(now())
   rides         Ride[]
   incentives    Incentive[]
@@ -144,6 +148,8 @@ model Director {
   driversAssigned Int            @default(0)
   driversOnline   Int            @default(0)
   passwordHash    String?
+  isTestAccount   Boolean        @default(false)
+  testDisabled    Boolean        @default(false)
   createdAt       DateTime       @default(now())
 }
 

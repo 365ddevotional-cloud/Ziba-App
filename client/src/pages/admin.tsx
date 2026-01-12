@@ -373,19 +373,19 @@ export default function AdminPage() {
               </Card>
 
               <Card className="hover-elevate cursor-pointer border-dashed border-amber-500/50">
-                <Link href="/admin/test-logins">
+                <Link href="/admin/test-accounts">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <KeyRound className="h-5 w-5 text-amber-500" />
+                        <FlaskConical className="h-5 w-5 text-amber-500" />
                         <CardTitle className="flex items-center gap-2">
-                          Manage Test Logins
-                          <FlaskConical className="h-4 w-4 text-amber-500" />
+                          Manage Test Accounts
+                          <KeyRound className="h-4 w-4 text-amber-500" />
                         </CardTitle>
                       </div>
                       <ArrowRight className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <CardDescription>Create and manage fake login credentials for testing</CardDescription>
+                    <CardDescription>Create and manage test login credentials for Users, Drivers, and Directors</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>

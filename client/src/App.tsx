@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth";
 import { CountryProvider } from "@/lib/country";
+import { TestBanner } from "@/components/test-banner";
 import Landing from "@/pages/landing";
 import UsersPage from "@/pages/users";
 import DriversPage from "@/pages/drivers";
@@ -21,7 +22,7 @@ import AdminIncentivesPage from "@/pages/admin-incentives";
 import AdminWalletsPage from "@/pages/admin-wallets";
 import AdminAnalyticsPage from "@/pages/admin-analytics";
 import AdminFaresPage from "@/pages/admin-fares";
-import AdminTestLoginsPage from "@/pages/admin-test-logins";
+import AdminTestAccountsPage from "@/pages/admin-test-accounts";
 import { UserLoginPage, DirectorLoginPage, AdminLoginPage } from "@/pages/login";
 import NotFound from "@/pages/not-found";
 
@@ -46,7 +47,7 @@ function Router() {
       <Route path="/admin/wallets" component={AdminWalletsPage} />
       <Route path="/admin/analytics" component={AdminAnalyticsPage} />
       <Route path="/admin/fares" component={AdminFaresPage} />
-      <Route path="/admin/test-logins" component={AdminTestLoginsPage} />
+      <Route path="/admin/test-accounts" component={AdminTestAccountsPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -59,6 +60,7 @@ function App() {
         <AuthProvider>
           <CountryProvider>
             <TooltipProvider>
+              <TestBanner />
               <Toaster />
               <Router />
             </TooltipProvider>

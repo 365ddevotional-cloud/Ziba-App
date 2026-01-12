@@ -901,7 +901,12 @@ export async function registerRoutes(
     if (!user.id) {
       return res.status(401).json({ message: "Not authenticated" });
     }
-    res.json(user);
+    const session = req.session as any;
+    res.json({
+      ...user,
+      isImpersonating: session.isImpersonating || false,
+      originalAdmin: session.originalAdmin ? { email: session.originalAdmin.email } : null,
+    });
   });
 
   app.post("/api/auth/login", async (req, res) => {
@@ -2286,12 +2291,24 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Login-as disabled in production" });
       }
 
+      if (process.env.ALLOW_TEST_LOGIN !== "true") {
+        return res.status(403).json({ message: "Test login feature is disabled" });
+      }
+
       const { id } = req.params;
       const testAccount = await prisma.testAccount.findUnique({ where: { id } });
 
       if (!testAccount) {
         return res.status(404).json({ message: "Test account not found" });
       }
+
+      const session = req.session as any;
+      session.originalAdmin = {
+        id: currentUser.id,
+        email: currentUser.email,
+        role: "admin",
+      };
+      session.isImpersonating = true;
 
       req.session.user = {
         id: testAccount.id,
@@ -2303,9 +2320,9 @@ export async function registerRoutes(
       res.json({ 
         success: true, 
         redirectTo: testAccount.role === "ADMIN" ? "/admin" 
-          : testAccount.role === "DIRECTOR" ? "/director"
-          : testAccount.role === "DRIVER" ? "/driver"
-          : "/",
+          : testAccount.role === "DIRECTOR" ? "/directors"
+          : testAccount.role === "DRIVER" ? "/drivers"
+          : "/users",
         user: {
           id: testAccount.id,
           email: testAccount.email,
@@ -2322,10 +2339,34 @@ export async function registerRoutes(
 
   // Check dev mode status
   app.get("/api/dev-mode", async (req, res) => {
+    const allowTestLogin = process.env.ALLOW_TEST_LOGIN === "true";
     res.json({ 
       isDevMode: process.env.NODE_ENV !== "production",
-      testAccountsEnabled: process.env.NODE_ENV !== "production"
+      testAccountsEnabled: process.env.NODE_ENV !== "production" && allowTestLogin
     });
+  });
+
+  // Return to admin from impersonation
+  app.post("/api/test-accounts/return-to-admin", async (req, res) => {
+    try {
+      const session = req.session as any;
+      
+      if (!session.originalAdmin) {
+        return res.status(400).json({ message: "No admin session to return to" });
+      }
+
+      req.session.user = session.originalAdmin;
+      delete session.originalAdmin;
+      delete session.isImpersonating;
+
+      res.json({ 
+        success: true,
+        user: session.originalAdmin
+      });
+    } catch (error) {
+      console.error("Error returning to admin:", error);
+      res.status(500).json({ message: "Failed to return to admin" });
+    }
   });
 
   return httpServer;
