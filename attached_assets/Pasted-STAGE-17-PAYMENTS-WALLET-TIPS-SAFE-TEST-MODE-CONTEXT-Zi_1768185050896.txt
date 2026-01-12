@@ -1,0 +1,245 @@
+STAGE 17 — PAYMENTS, WALLET, TIPS + SAFE TEST MODE
+
+CONTEXT
+Ziba is a production-ready ride app.
+Admin login is stable.
+No bootstrap or reset logic exists.
+We must add payments and wallet without violating security or Play Store rules.
+
+🎯 GOALS
+
+Add Wallet system (Riders & Drivers)
+
+Add Tips (Uber-style)
+
+Add Payments (Sandbox-first)
+
+Allow Admin-created fake/test accounts to behave like real users
+
+Ensure ZERO security backdoors
+
+PART A — WALLET SYSTEM
+1. Wallet Model
+
+Create wallet tables for:
+
+Users
+
+Drivers
+
+Each wallet includes:
+
+Balance
+
+Currency
+
+Ledger (credits / debits)
+
+Transaction reference
+
+Timestamp
+
+Rules:
+
+Wallet balance updates only via transactions
+
+No direct balance edits except ADMIN adjustment with audit log
+
+2. Ride Payment Flow
+
+On ride completion:
+
+Rider is charged
+
+Platform commission is deducted
+
+Driver earnings credited to wallet
+
+Admin can view:
+
+Total platform revenue
+
+Driver payouts
+
+Wallet history
+
+PART B — TIPS SYSTEM
+3. Tips (Uber Style)
+
+After ride completion:
+
+Rider can tip driver
+
+Tip options:
+
+Preset percentages (5%, 10%, 15%, 20%)
+
+Custom amount
+
+Rules:
+
+Tips go 100% to driver
+
+Tips appear as separate wallet credit
+
+Driver sees tips
+
+Admin sees all tips
+
+PART C — PAYMENTS (SANDBOX FIRST)
+4. Payment Gateway Architecture
+
+Implement gateway abstraction, NOT hardcoded provider:
+
+Supported modes:
+
+SANDBOX (testing)
+
+LIVE (production later)
+
+Initial providers:
+
+Stripe (international)
+
+Paystack / Flutterwave (Africa-ready)
+
+Rules:
+
+No real charges in SANDBOX
+
+Payment intent simulation only
+
+All transactions still recorded as real ledger entries
+
+PART D — SAFE TEST MODE (IMPORTANT)
+5. Test Mode (NOT a Backdoor)
+
+Implement TEST_MODE flag controlled ONLY by Admin UI.
+
+When TEST_MODE = ON:
+
+Admin can create test users / drivers
+
+Test accounts behave exactly like real accounts:
+
+Login
+
+Wallet
+
+Payments
+
+Tips
+
+Ride flow
+
+Payment provider runs in SANDBOX
+
+No real money moves
+
+When TEST_MODE = OFF:
+
+Test accounts are disabled
+
+Live payments enforced
+
+Rules:
+
+TEST_MODE state visible ONLY to Admin
+
+Test accounts tagged internally (isTestAccount = true)
+
+Test accounts NEVER accessible in live mode
+
+6. Fake Credentials (Correct Way)
+
+Admin can:
+
+Create test users with any email/password
+
+Log in exactly like real users
+
+Experience full app flow
+
+Security:
+
+Passwords are hashed
+
+No hardcoded credentials
+
+No environment passwords
+
+No bypass routes
+
+This mimics real-world QA environments.
+
+PART E — ADMIN CONTROLS
+7. Admin Dashboard Additions
+
+Add sections:
+
+Wallets
+
+Transactions
+
+Tips
+
+Test Mode toggle (ON / OFF)
+
+Test Accounts manager
+
+Admin can:
+
+Switch test mode
+
+Create / disable test accounts
+
+View sandbox vs live transactions
+
+PART F — PLAY STORE SAFETY
+8. Compliance Rules
+
+Ensure:
+
+No fake payment methods in live mode
+
+No simulated money outside sandbox
+
+Clear separation:
+
+TEST_MODE
+
+LIVE_MODE
+
+No hidden admin bypass
+
+Add comment:
+
+// Stage 17 — Payments, Wallet, Tips with secure sandbox test mode
+
+FINAL CONFIRMATION REQUIRED
+
+Confirm all:
+
+Wallet works
+
+Tips work
+
+Payments simulate correctly
+
+Test accounts behave like real users
+
+Live mode has NO fake behavior
+
+App remains Play Store compliant
+
+🚫 HARD RULES
+
+NO secret test passwords
+
+NO auto-login
+
+NO hidden admin routes
+
+NO environment credential bypass
+
+✅ EXECUTE ALL STEPS NOW.

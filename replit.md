@@ -1,6 +1,6 @@
 # Ziba - Ride-Hailing Platform
 
-## Stage 16 Complete - Production Hardened
+## Stage 17 Complete - Payments, Wallet, Tips + Safe Test Mode
 
 ## Overview
 Ziba is a ride-hailing and logistics platform, similar to Uber, designed to connect users with drivers for transportation services. The project is now production-ready, featuring a dynamic fare control system, advanced authentication with role-based access control, and comprehensive production hardening. Ziba aims to provide a robust, scalable, and user-friendly platform for ride-hailing operations across multiple countries, with a focus on efficient logistics, fair pricing, and comprehensive administrative oversight. The platform supports various user roles including users, drivers, directors, and administrators, each with tailored functionalities and access levels.
@@ -20,6 +20,14 @@ The Ziba platform is built with a modern web development stack:
     - Compute costs optimized by removing all refetchInterval polling
     - Debug routes and test account login blocked in production via NODE_ENV checks
     - Play Store preparation checklist created (PLAY_STORE_CHECKLIST.md)
+- **Payments & Wallet (Stage 17)**:
+    - Tips system (Uber-style) with preset percentages (5%, 10%, 15%, 20%) or custom amounts
+    - Tips go 100% to driver with separate wallet credit
+    - Payment gateway abstraction supporting SANDBOX and LIVE modes
+    - Supported providers: Stripe (international), Paystack/Flutterwave (Africa-ready)
+    - TEST_MODE toggle in Admin UI - controls test account behavior
+    - Test accounts only work when Test Mode is ON
+    - No real money moves in SANDBOX mode
 - **Core Features**:
     - **User and Driver Management**: Comprehensive CRUD operations for users and drivers, including status management, online/offline toggling for drivers, and rating systems.
     - **Ride Management**: End-to-end ride lifecycle management from request to completion, including driver assignment, ride status tracking, and automatic wallet transactions upon ride completion.

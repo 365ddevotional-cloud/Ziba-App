@@ -48,6 +48,7 @@ model User {
   createdAt     DateTime     @default(now())
   rides         Ride[]
   ratings       UserRating[]
+  tips          Tip[]
 }
 
 model Driver {
@@ -70,6 +71,7 @@ model Driver {
   rides         Ride[]
   incentives    Incentive[]
   ratings       DriverRating[]
+  tips          Tip[]
 }
 
 model Ride {
@@ -103,12 +105,25 @@ enum PaymentStatus {
 }
 
 model Payment {
-  id        String        @id @default(uuid())
+  id            String        @id @default(uuid())
+  amount        Float
+  status        PaymentStatus @default(PENDING)
+  rideId        String        @unique
+  gatewayRef    String?
+  gatewayMode   String?       @default("SANDBOX")
+  createdAt     DateTime      @default(now())
+  ride          Ride          @relation(fields: [rideId], references: [id])
+}
+
+model Tip {
+  id        String   @id @default(uuid())
   amount    Float
-  status    PaymentStatus @default(PENDING)
-  rideId    String        @unique
-  createdAt DateTime      @default(now())
-  ride      Ride          @relation(fields: [rideId], references: [id])
+  rideId    String   @unique
+  userId    String
+  driverId  String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  driver    Driver   @relation(fields: [driverId], references: [id])
 }
 
 model Incentive {
@@ -187,6 +202,9 @@ enum TransactionType {
   DEBIT
   COMMISSION
   PAYOUT
+  TIP
+  RIDE_PAYMENT
+  ADMIN_ADJUSTMENT
 }
 
 model Wallet {
@@ -233,10 +251,25 @@ model Notification {
 
 // ==================== PLATFORM CONFIG ====================
 
+enum PaymentGatewayMode {
+  SANDBOX
+  LIVE
+}
+
+enum PaymentGateway {
+  STRIPE
+  PAYSTACK
+  FLUTTERWAVE
+}
+
 model PlatformConfig {
-  id               String   @id @default(uuid())
-  commissionRate   Float    @default(0.15)
-  updatedAt        DateTime @updatedAt
+  id                 String             @id @default(uuid())
+  commissionRate     Float              @default(0.15)
+  testModeEnabled    Boolean            @default(true)
+  paymentGateway     PaymentGateway     @default(STRIPE)
+  paymentGatewayMode PaymentGatewayMode @default(SANDBOX)
+  updatedAt          DateTime           @updatedAt
+  updatedBy          String?
 }
 
 // ==================== FARE CONFIG ====================

@@ -946,8 +946,7 @@ export async function registerRoutes(
         user: { 
           id: account.id, 
           email: account.email, 
-          role: "admin",
-          fullName: account.fullName
+          role: "admin"
         }
       });
     } catch (error) {
@@ -1640,6 +1639,127 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== TIPS ====================
+  // Stage 17 — Tips system
+
+  // Get all tips (admin only)
+  app.get("/api/tips", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const tips = await prisma.tip.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          user: { select: { fullName: true, email: true } },
+          driver: { select: { fullName: true, email: true } },
+        },
+      });
+
+      res.json(tips);
+    } catch (error) {
+      console.error("Error fetching tips:", error);
+      res.status(500).json({ message: "Failed to fetch tips" });
+    }
+  });
+
+  // Create tip after ride completion
+  app.post("/api/tips", async (req, res) => {
+    try {
+      const { rideId, amount } = req.body;
+
+      if (!rideId || !amount || amount <= 0) {
+        return res.status(400).json({ message: "Valid ride ID and amount required" });
+      }
+
+      // Check ride exists and is completed
+      const ride = await prisma.ride.findUnique({
+        where: { id: rideId },
+        include: { user: true, driver: true },
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.status !== "COMPLETED") {
+        return res.status(400).json({ message: "Can only tip after ride is completed" });
+      }
+
+      if (!ride.driverId) {
+        return res.status(400).json({ message: "No driver assigned to this ride" });
+      }
+
+      // Check if tip already exists for this ride
+      const existingTip = await prisma.tip.findUnique({
+        where: { rideId },
+      });
+
+      if (existingTip) {
+        return res.status(400).json({ message: "Tip already given for this ride" });
+      }
+
+      // Create tip and credit driver wallet atomically
+      const result = await prisma.$transaction(async (tx) => {
+        // Create tip record
+        const tip = await tx.tip.create({
+          data: {
+            rideId,
+            userId: ride.userId,
+            driverId: ride.driverId!,
+            amount,
+          },
+        });
+
+        // Get or create driver wallet
+        let driverWallet = await tx.wallet.findUnique({
+          where: { ownerId_ownerType: { ownerId: ride.driverId!, ownerType: "DRIVER" } },
+        });
+
+        if (!driverWallet) {
+          driverWallet = await tx.wallet.create({
+            data: { ownerId: ride.driverId!, ownerType: "DRIVER", balance: 0 },
+          });
+        }
+
+        // Credit tip to driver wallet (100% goes to driver)
+        await tx.transaction.create({
+          data: {
+            walletId: driverWallet.id,
+            type: "TIP",
+            amount,
+            reference: `Tip from ride ${rideId}`,
+          },
+        });
+
+        await tx.wallet.update({
+          where: { id: driverWallet.id },
+          data: { balance: { increment: amount } },
+        });
+
+        // Notify driver
+        await tx.notification.create({
+          data: {
+            userId: ride.driverId!,
+            role: "driver",
+            message: `You received a tip of ₦${amount.toLocaleString()}!`,
+            type: "WALLET_UPDATED",
+          },
+        });
+
+        return tip;
+      });
+
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error creating tip:", error);
+      res.status(500).json({ message: "Failed to create tip" });
+    }
+  });
+
   // Get/update platform config (admin only)
   app.get("/api/config", async (req, res) => {
     try {
@@ -1658,21 +1778,66 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      const { commissionRate } = req.body;
-      if (commissionRate === undefined || commissionRate < 0 || commissionRate > 1) {
-        return res.status(400).json({ message: "Commission rate must be between 0 and 1" });
+      const { commissionRate, testModeEnabled, paymentGateway, paymentGatewayMode } = req.body;
+      
+      const updateData: any = {};
+      
+      if (commissionRate !== undefined) {
+        if (commissionRate < 0 || commissionRate > 1) {
+          return res.status(400).json({ message: "Commission rate must be between 0 and 1" });
+        }
+        updateData.commissionRate = commissionRate;
+      }
+
+      if (testModeEnabled !== undefined) {
+        updateData.testModeEnabled = testModeEnabled;
+      }
+
+      if (paymentGateway !== undefined) {
+        if (!["STRIPE", "PAYSTACK", "FLUTTERWAVE"].includes(paymentGateway)) {
+          return res.status(400).json({ message: "Invalid payment gateway" });
+        }
+        updateData.paymentGateway = paymentGateway;
+      }
+
+      if (paymentGatewayMode !== undefined) {
+        if (!["SANDBOX", "LIVE"].includes(paymentGatewayMode)) {
+          return res.status(400).json({ message: "Invalid payment gateway mode" });
+        }
+        updateData.paymentGatewayMode = paymentGatewayMode;
       }
 
       const config = await getPlatformConfig();
       const updated = await prisma.platformConfig.update({
         where: { id: config.id },
-        data: { commissionRate },
+        data: updateData,
       });
 
       res.json(updated);
     } catch (error) {
       console.error("Error updating config:", error);
       res.status(500).json({ message: "Failed to update config" });
+    }
+  });
+
+  // Toggle test mode (admin only)
+  app.post("/api/config/toggle-test-mode", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const config = await getPlatformConfig();
+      const updated = await prisma.platformConfig.update({
+        where: { id: config.id },
+        data: { testModeEnabled: !config.testModeEnabled },
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error toggling test mode:", error);
+      res.status(500).json({ message: "Failed to toggle test mode" });
     }
   });
 
@@ -2223,7 +2388,8 @@ export async function registerRoutes(
     }
   });
 
-  // Login as test account (DEV MODE ONLY)
+  // Login as test account (DEV MODE ONLY + TEST_MODE ENABLED)
+  // Stage 17 — Safe test mode with platform config check
   app.post("/api/test-accounts/:id/login-as", async (req, res) => {
     try {
       const currentUser = getCurrentUser(req);
@@ -2237,6 +2403,12 @@ export async function registerRoutes(
 
       if (process.env.ALLOW_TEST_LOGIN !== "true") {
         return res.status(403).json({ message: "Test login feature is disabled" });
+      }
+
+      // Check platform config for test mode
+      const config = await getPlatformConfig();
+      if (!config.testModeEnabled) {
+        return res.status(403).json({ message: "Test mode is disabled. Enable it in Platform Settings." });
       }
 
       const { id } = req.params;
@@ -2280,12 +2452,16 @@ export async function registerRoutes(
     }
   });
 
-  // Check dev mode status
+  // Check dev mode status (includes platform config test mode)
+  // Stage 17 — Safe test mode status
   app.get("/api/dev-mode", async (req, res) => {
     const allowTestLogin = process.env.ALLOW_TEST_LOGIN === "true";
+    const config = await getPlatformConfig();
     res.json({ 
       isDevMode: process.env.NODE_ENV !== "production",
-      testAccountsEnabled: process.env.NODE_ENV !== "production" && allowTestLogin
+      testAccountsEnabled: process.env.NODE_ENV !== "production" && allowTestLogin && config.testModeEnabled,
+      testModeEnabled: config.testModeEnabled,
+      paymentGatewayMode: config.paymentGatewayMode
     });
   });
 

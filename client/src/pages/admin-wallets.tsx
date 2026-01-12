@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, Wallet, ArrowLeft, User, Car, ArrowUpRight, ArrowDownRight, DollarSign, Percent, TrendingUp, Download } from "lucide-react";
+import { Loader2, Wallet, ArrowLeft, User, Car, ArrowUpRight, ArrowDownRight, DollarSign, Percent, TrendingUp, Download, Heart, FlaskConical, CreditCard, ToggleLeft, ToggleRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,7 @@ import { AdminGuard } from "@/components/admin-guard";
 
 interface Transaction {
   id: string;
-  type: "CREDIT" | "DEBIT" | "COMMISSION" | "PAYOUT";
+  type: "CREDIT" | "DEBIT" | "COMMISSION" | "PAYOUT" | "TIP" | "RIDE_PAYMENT" | "ADMIN_ADJUSTMENT";
   amount: number;
   reference: string | null;
   createdAt: string;
@@ -34,6 +34,20 @@ interface WalletData {
 interface PlatformConfig {
   id: string;
   commissionRate: number;
+  testModeEnabled: boolean;
+  paymentGateway: "STRIPE" | "PAYSTACK" | "FLUTTERWAVE";
+  paymentGatewayMode: "SANDBOX" | "LIVE";
+}
+
+interface Tip {
+  id: string;
+  amount: number;
+  rideId: string;
+  userId: string;
+  driverId: string;
+  createdAt: string;
+  user: { fullName: string; email: string };
+  driver: { fullName: string; email: string };
 }
 
 function adminApiRequest(method: string, url: string, body?: any) {
@@ -70,6 +84,24 @@ export default function AdminWalletsPage() {
 
   const { data: config } = useQuery<PlatformConfig>({
     queryKey: ["/api/config"],
+  });
+
+  const { data: tips } = useQuery<Tip[]>({
+    queryKey: ["/api/tips"],
+    queryFn: () => adminApiRequest("GET", "/api/tips"),
+  });
+
+  const toggleTestModeMutation = useMutation({
+    mutationFn: async () => {
+      return adminApiRequest("POST", "/api/config/toggle-test-mode");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/config"] });
+      toast({ title: "Test mode toggled" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const payoutMutation = useMutation({
@@ -130,6 +162,7 @@ export default function AdminWalletsPage() {
   const getTransactionIcon = (type: string) => {
     switch (type) {
       case "CREDIT":
+      case "RIDE_PAYMENT":
         return <ArrowDownRight className="h-4 w-4 text-green-500" />;
       case "DEBIT":
         return <ArrowUpRight className="h-4 w-4 text-red-500" />;
@@ -137,6 +170,10 @@ export default function AdminWalletsPage() {
         return <Percent className="h-4 w-4 text-yellow-500" />;
       case "PAYOUT":
         return <Download className="h-4 w-4 text-blue-500" />;
+      case "TIP":
+        return <DollarSign className="h-4 w-4 text-green-400" />;
+      case "ADMIN_ADJUSTMENT":
+        return <DollarSign className="h-4 w-4 text-purple-500" />;
       default:
         return <DollarSign className="h-4 w-4" />;
     }
@@ -361,6 +398,129 @@ export default function AdminWalletsPage() {
                 <p>No wallets found</p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Tips Section */}
+        <Card className="mt-8">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Heart className="h-6 w-6 text-primary" />
+              <div>
+                <CardTitle>Tips</CardTitle>
+                <CardDescription>All tips given by riders to drivers</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {tips && tips.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Rider</TableHead>
+                      <TableHead>Driver</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tips.map((tip) => (
+                      <TableRow key={tip.id} data-testid={`row-tip-${tip.id}`}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{tip.user?.fullName}</div>
+                            <div className="text-xs text-muted-foreground">{tip.user?.email}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{tip.driver?.fullName}</div>
+                            <div className="text-xs text-muted-foreground">{tip.driver?.email}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-bold text-green-500">{formatCurrency(tip.amount)}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-muted-foreground text-sm">
+                            {new Date(tip.createdAt).toLocaleDateString()}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Heart className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p>No tips yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Test Mode & Payment Gateway Settings */}
+        <Card className="mt-8">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <FlaskConical className="h-6 w-6 text-primary" />
+              <div>
+                <CardTitle>Platform Settings</CardTitle>
+                <CardDescription>Test mode and payment gateway configuration</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 className="font-medium">Test Mode</h4>
+                    <p className="text-xs text-muted-foreground">Enable sandbox testing environment</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => toggleTestModeMutation.mutate()}
+                    disabled={toggleTestModeMutation.isPending}
+                    data-testid="button-toggle-test-mode"
+                  >
+                    {config?.testModeEnabled ? (
+                      <>
+                        <ToggleRight className="h-4 w-4 mr-2 text-green-500" />
+                        <span className="text-green-500">ON</span>
+                      </>
+                    ) : (
+                      <>
+                        <ToggleLeft className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <span className="text-muted-foreground">OFF</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <Badge variant={config?.testModeEnabled ? "default" : "secondary"}>
+                  {config?.testModeEnabled ? "Test Mode Active" : "Live Mode"}
+                </Badge>
+              </div>
+
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center gap-2 mb-4">
+                  <CreditCard className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <h4 className="font-medium">Payment Gateway</h4>
+                    <p className="text-xs text-muted-foreground">Current payment provider</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Badge variant="outline">{config?.paymentGateway || "STRIPE"}</Badge>
+                  <Badge variant={config?.paymentGatewayMode === "LIVE" ? "destructive" : "secondary"}>
+                    {config?.paymentGatewayMode || "SANDBOX"}
+                  </Badge>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </main>
