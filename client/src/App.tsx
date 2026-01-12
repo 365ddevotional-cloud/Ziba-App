@@ -25,6 +25,21 @@ import AdminFaresPage from "@/pages/admin-fares";
 import AdminTestAccountsPage from "@/pages/admin-test-accounts";
 import AdminLoginPage from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
+import WhySafeAndSecure from "@/pages/info/why-safe-and-secure";
+import WhyAlwaysAvailable from "@/pages/info/why-always-available";
+import WhyCityWideCoverage from "@/pages/info/why-city-wide-coverage";
+import HowSignUp from "@/pages/info/how-sign-up";
+import HowRequestRide from "@/pages/info/how-request-ride";
+import HowPayAndGo from "@/pages/info/how-pay-and-go";
+import CompanyAbout from "@/pages/info/company-about";
+import CompanyCareers from "@/pages/info/company-careers";
+import CompanyPress from "@/pages/info/company-press";
+import SupportHelpCenter from "@/pages/info/support-help-center";
+import SupportSafety from "@/pages/info/support-safety";
+import SupportContact from "@/pages/info/support-contact";
+import LegalTerms from "@/pages/info/legal-terms";
+import LegalPrivacy from "@/pages/info/legal-privacy";
+import LegalCookies from "@/pages/info/legal-cookies";
 
 function Router() {
   return (
@@ -46,6 +61,21 @@ function Router() {
       <Route path="/admin/analytics" component={AdminAnalyticsPage} />
       <Route path="/admin/fares" component={AdminFaresPage} />
       <Route path="/admin/test-accounts" component={AdminTestAccountsPage} />
+      <Route path="/why/safe-and-secure" component={WhySafeAndSecure} />
+      <Route path="/why/always-available" component={WhyAlwaysAvailable} />
+      <Route path="/why/city-wide-coverage" component={WhyCityWideCoverage} />
+      <Route path="/how/sign-up" component={HowSignUp} />
+      <Route path="/how/request-ride" component={HowRequestRide} />
+      <Route path="/how/pay-and-go" component={HowPayAndGo} />
+      <Route path="/company/about" component={CompanyAbout} />
+      <Route path="/company/careers" component={CompanyCareers} />
+      <Route path="/company/press" component={CompanyPress} />
+      <Route path="/support/help-center" component={SupportHelpCenter} />
+      <Route path="/support/safety" component={SupportSafety} />
+      <Route path="/support/contact" component={SupportContact} />
+      <Route path="/legal/terms" component={LegalTerms} />
+      <Route path="/legal/privacy" component={LegalPrivacy} />
+      <Route path="/legal/cookies" component={LegalCookies} />
       <Route component={NotFound} />
     </Switch>
   );

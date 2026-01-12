@@ -9,16 +9,19 @@ const features = [
     icon: Shield,
     title: "Safe & Secure",
     description: "Every ride is tracked and verified for your safety and peace of mind.",
+    href: "/why/safe-and-secure",
   },
   {
     icon: Clock,
     title: "Always Available",
     description: "24/7 service whenever you need to get somewhere, day or night.",
+    href: "/why/always-available",
   },
   {
     icon: MapPin,
     title: "City-Wide Coverage",
     description: "Comprehensive coverage across the entire metropolitan area.",
+    href: "/why/city-wide-coverage",
   },
 ];
 
@@ -28,18 +31,21 @@ const howItWorks = [
     icon: Smartphone,
     title: "Sign Up",
     description: "Create your account in seconds with just your email.",
+    href: "/how/sign-up",
   },
   {
     step: 2,
     icon: MapPin,
     title: "Request a Ride",
     description: "Enter your destination and we'll match you with a driver.",
+    href: "/how/request-ride",
   },
   {
     step: 3,
     icon: CreditCard,
     title: "Pay & Go",
     description: "Cashless payment for a seamless, hassle-free experience.",
+    href: "/how/pay-and-go",
   },
 ];
 
@@ -140,15 +146,17 @@ export default function Landing() {
 
           <div className="grid md:grid-cols-3 gap-6">
             {features.map((feature, index) => (
-              <Card key={index} className="hover-elevate">
-                <CardContent className="p-6 space-y-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <feature.icon className="w-6 h-6 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-foreground">{feature.title}</h3>
-                  <p className="text-muted-foreground">{feature.description}</p>
-                </CardContent>
-              </Card>
+              <Link key={index} href={feature.href}>
+                <Card className="hover-elevate cursor-pointer h-full" data-testid={`card-feature-${index}`}>
+                  <CardContent className="p-6 space-y-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <feature.icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-foreground">{feature.title}</h3>
+                    <p className="text-muted-foreground">{feature.description}</p>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>
         </div>
@@ -168,16 +176,18 @@ export default function Landing() {
           <div className="grid md:grid-cols-3 gap-8 relative">
             <div className="hidden md:block absolute top-16 left-1/4 right-1/4 h-0.5 bg-border"></div>
             {howItWorks.map((item, index) => (
-              <div key={index} className="relative text-center space-y-4">
-                <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground font-bold text-lg flex items-center justify-center mx-auto relative z-10">
-                  {item.step}
+              <Link key={index} href={item.href}>
+                <div className="relative text-center space-y-4 cursor-pointer hover-elevate p-4 rounded-xl" data-testid={`card-how-${index}`}>
+                  <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground font-bold text-lg flex items-center justify-center mx-auto relative z-10">
+                    {item.step}
+                  </div>
+                  <div className="w-16 h-16 rounded-2xl bg-card border border-card-border flex items-center justify-center mx-auto">
+                    <item.icon className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-foreground">{item.title}</h3>
+                  <p className="text-muted-foreground">{item.description}</p>
                 </div>
-                <div className="w-16 h-16 rounded-2xl bg-card border border-card-border flex items-center justify-center mx-auto">
-                  <item.icon className="w-8 h-8 text-primary" />
-                </div>
-                <h3 className="text-xl font-semibold text-foreground">{item.title}</h3>
-                <p className="text-muted-foreground">{item.description}</p>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -234,27 +244,27 @@ export default function Landing() {
             <div className="space-y-4">
               <h4 className="font-semibold text-foreground">Company</h4>
               <ul className="space-y-2 text-muted-foreground text-sm">
-                <li><a href="#" className="hover:text-foreground transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Press</a></li>
+                <li><Link href="/company/about" className="hover:text-foreground transition-colors" data-testid="link-about">About Us</Link></li>
+                <li><Link href="/company/careers" className="hover:text-foreground transition-colors" data-testid="link-careers">Careers</Link></li>
+                <li><Link href="/company/press" className="hover:text-foreground transition-colors" data-testid="link-press">Press</Link></li>
               </ul>
             </div>
 
             <div className="space-y-4">
               <h4 className="font-semibold text-foreground">Support</h4>
               <ul className="space-y-2 text-muted-foreground text-sm">
-                <li><a href="#" className="hover:text-foreground transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Safety</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Contact</a></li>
+                <li><Link href="/support/help-center" className="hover:text-foreground transition-colors" data-testid="link-help">Help Center</Link></li>
+                <li><Link href="/support/safety" className="hover:text-foreground transition-colors" data-testid="link-safety">Safety</Link></li>
+                <li><Link href="/support/contact" className="hover:text-foreground transition-colors" data-testid="link-contact">Contact</Link></li>
               </ul>
             </div>
 
             <div className="space-y-4">
               <h4 className="font-semibold text-foreground">Legal</h4>
               <ul className="space-y-2 text-muted-foreground text-sm">
-                <li><a href="#" className="hover:text-foreground transition-colors">Terms</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Privacy</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Cookies</a></li>
+                <li><Link href="/legal/terms" className="hover:text-foreground transition-colors" data-testid="link-terms">Terms</Link></li>
+                <li><Link href="/legal/privacy" className="hover:text-foreground transition-colors" data-testid="link-privacy">Privacy</Link></li>
+                <li><Link href="/legal/cookies" className="hover:text-foreground transition-colors" data-testid="link-cookies">Cookies</Link></li>
               </ul>
             </div>
           </div>
