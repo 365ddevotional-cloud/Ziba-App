@@ -1,335 +1,37 @@
 # Ziba - Ride-Hailing Platform
 
 ## Overview
-Ziba is a ride-hailing/logistics platform (Uber-like) currently in Stage 15 - Dynamic Fare Control System. The platform is in preview mode with public routes (no login enforcement) but maintains full authentication system, login pages, and role-based access control for future deployment.
+Ziba is a ride-hailing and logistics platform, similar to Uber, designed to connect users with drivers for transportation services. The project is currently in an advanced stage of development, featuring a dynamic fare control system and an advanced authentication system with role-based access control. Ziba aims to provide a robust, scalable, and user-friendly platform for ride-hailing operations across multiple countries, with a focus on efficient logistics, fair pricing, and comprehensive administrative oversight. The platform supports various user roles including users, drivers, directors, and administrators, each with tailored functionalities and access levels.
 
-## Tech Stack
-- **Frontend**: React + Vite + TypeScript
-- **Backend**: Node.js + Express
-- **Database**: PostgreSQL with Prisma ORM
-- **Auth**: bcrypt password hashing + express-session with PostgreSQL store
-- **Styling**: Tailwind CSS with Shadcn UI components
+## User Preferences
+I want to ensure all changes are thoroughly reviewed. Please ask for confirmation before implementing any significant changes or new features. I prefer clear, concise explanations and detailed documentation for any new modules or complex logic introduced.
 
-## Project Structure
-```
-client/
-├── src/
-│   ├── components/     # Reusable UI components
-│   │   ├── ui/         # Shadcn components
-│   │   ├── header.tsx  # Navigation header with auth & notifications
-│   │   ├── protected-route.tsx  # Route protection
-│   │   ├── theme-provider.tsx   # Dark/light theme
-│   │   └── theme-toggle.tsx     # Theme toggle button
-│   ├── lib/
-│   │   ├── auth.tsx     # Auth context and hooks
-│   │   ├── queryClient.ts
-│   │   └── utils.ts
-│   ├── pages/           # Route pages
-│   │   ├── landing.tsx  # Home page (/)
-│   │   ├── login.tsx    # Login pages for all roles
-│   │   ├── users.tsx    # Users list (/users)
-│   │   ├── drivers.tsx  # Drivers list (/drivers)
-│   │   ├── directors.tsx # Directors list (/directors - read-only)
-│   │   ├── rides.tsx    # Rides list (/rides)
-│   │   ├── admin.tsx    # Admin dashboard (/admin)
-│   │   ├── admin-users.tsx     # Admin users management
-│   │   ├── admin-drivers.tsx   # Admin drivers management
-│   │   ├── admin-directors.tsx # Admin directors management
-│   │   ├── admin-rides.tsx     # Admin rides management
-│   │   ├── admin-payments.tsx  # Admin payments management
-│   │   ├── admin-incentives.tsx # Admin incentives management
-│   │   ├── admin-wallets.tsx   # Admin wallets & payouts
-│   │   ├── admin-analytics.tsx # Platform analytics & director performance
-│   │   └── not-found.tsx
-│   ├── App.tsx         # Main app with routes
-│   └── index.css       # Global styles
-server/
-├── auth.ts             # Auth utilities (hash, verify, middleware)
-├── prisma.ts           # Prisma client instance
-├── routes.ts           # API endpoints
-└── index.ts            # Server entry with session config
-prisma/
-├── schema.prisma       # Database schema
-└── seed.ts             # Seed data
-```
+## System Architecture
+The Ziba platform is built with a modern web development stack:
+- **Frontend**: Developed using React, Vite, and TypeScript, providing a responsive and interactive user interface. Styling is handled with Tailwind CSS, augmented by Shadcn UI components for a polished design. The UI/UX emphasizes a professional, Uber-like aesthetic with a dark blue primary color, Inter font family, and mobile-first responsive design. Dark mode is the default, with a toggle for light mode.
+- **Backend**: Implemented with Node.js and Express, providing a robust API layer.
+- **Database**: PostgreSQL is used as the primary data store, with Prisma ORM facilitating seamless database interactions and schema management.
+- **Authentication**: Features `bcrypt` for secure password hashing and `express-session` with a PostgreSQL store for session management, ensuring secure, role-based access control for all user types (users, drivers, directors, admins). First-time logins require a password setup.
+- **Core Features**:
+    - **User and Driver Management**: Comprehensive CRUD operations for users and drivers, including status management, online/offline toggling for drivers, and rating systems.
+    - **Ride Management**: End-to-end ride lifecycle management from request to completion, including driver assignment, ride status tracking, and automatic wallet transactions upon ride completion.
+    - **Dynamic Fare Control System**: Implemented with a `FareConfig` model allowing country-specific pricing (base fare, per KM, per minute), commission splits, and advanced smart pricing features like surge pricing, weather, and traffic multipliers with configurable caps.
+    - **Wallet and Payment System**: Integrated wallet system for users and drivers, handling ride payments, commissions, and driver payouts. User wallets start with a default balance, and ride completion automatically debits user wallets and credits driver wallets minus commission.
+    - **Notifications**: Real-time notification system for ride events and wallet updates, with unread counts and mark-as-read functionalities.
+    - **Admin Dashboard**: A comprehensive administrative interface for managing users, drivers, directors, rides, payments, incentives, wallets, platform configurations, and analytics. It includes platform statistics and director performance metrics.
+    - **Multi-country Currency Support**: Global support with dynamic currency formatting using `Intl.NumberFormat` and a country selector, with settings persisting locally.
+    - **Test Login Manager**: An admin-only tool for generating and managing test accounts with "Login As" functionality for development and testing environments. This feature is production-guarded.
 
-## Routes & Access Control
-
-### Public Routes (Preview Mode - All routes accessible)
-| Path | Description |
-|------|-------------|
-| `/` | Landing page with hero, features, how it works |
-| `/login` | User login page |
-| `/director/login` | Director login page |
-| `/admin/login` | Admin login page |
-| `/users` | Users list with status indicators |
-| `/drivers` | Drivers list (read-only) |
-| `/directors` | Directors list (read-only) |
-| `/rides` | Rides list with fare and status |
-| `/admin` | Admin dashboard with real-time stats |
-| `/admin/users` | Admin users management |
-| `/admin/drivers` | Admin drivers management (status editable) |
-| `/admin/directors` | Admin directors management (status, contract dates editable) |
-| `/admin/rides` | Admin rides management |
-| `/admin/payments` | Admin payments management |
-| `/admin/incentives` | Admin driver incentives |
-| `/admin/wallets` | Admin wallet management & payouts |
-| `/admin/analytics` | Platform analytics & director performance |
-
-## API Endpoints
-
-### Authentication
-- `GET /api/auth/me` - Get current authenticated user
-- `POST /api/auth/login` - Login with email, password, role
-- `POST /api/auth/setup-password` - First-time password setup
-- `POST /api/auth/logout` - Logout current session
-
-### Users
-- `GET /api/users` - List all users with ride counts
-- `POST /api/users` - Create a user (fullName, email required)
-- `PATCH /api/users/:id` - Update user status/details
-
-### Drivers
-- `GET /api/drivers` - List all drivers with ride counts, ratings, online status
-- `GET /api/drivers/active` - List only active drivers
-- `GET /api/drivers/available` - List drivers available for assignment (ACTIVE, isOnline, not on ride)
-- `POST /api/drivers` - Create a driver (fullName, email, phone, vehiclePlate required)
-- `PATCH /api/drivers/:id` - Update driver status/details
-- `POST /api/drivers/:id/online` - Set driver online (ACTIVE drivers only)
-- `POST /api/drivers/:id/offline` - Set driver offline (not during active ride)
-
-### Directors
-- `GET /api/directors` - List all directors
-- `POST /api/directors` - Create a director
-- `PATCH /api/directors/:id` - Update director (contractEnd - admin only)
-
-### Admin Directors (Admin Only)
-- `PATCH /api/admin/directors/:id/status` - Update director status (ACTIVE, PENDING, SUSPENDED, TERMINATED)
-- `PATCH /api/admin/directors/:id/contract` - Update director contract dates (contractStart, contractEnd)
-
-### Rides
-- `GET /api/rides` - List all rides with user/driver info
-- `POST /api/rides` - Create a ride (requires userId)
-- `PATCH /api/rides/:id` - Update ride details (pickup, dropoff, fare only)
-- `POST /api/rides/:id/assign` - Assign driver (REQUESTED → ACCEPTED)
-- `POST /api/rides/:id/start` - Start ride (ACCEPTED → IN_PROGRESS)
-- `POST /api/rides/:id/complete` - Complete ride (IN_PROGRESS → COMPLETED) - auto-processes wallet transactions
-- `POST /api/rides/:id/cancel` - Cancel ride (REQUESTED/ACCEPTED → CANCELLED)
-
-### Ratings
-- `POST /api/ratings/driver` - Rate driver after completed ride (rideId, rating 1-5)
-- `POST /api/ratings/user` - Rate user after completed ride (rideId, rating 1-5)
-
-### Wallets (Admin Only)
-- `GET /api/wallets` - List all wallets with transactions
-- `POST /api/wallets/:id/payout` - Process driver payout (amount required)
-
-### Notifications
-- `GET /api/notifications` - Get notifications (filtered by user/role or all for admin)
-- `GET /api/notifications/unread-count` - Get unread notification count
-- `PATCH /api/notifications/:id/read` - Mark notification as read
-- `POST /api/notifications/read-all` - Mark all notifications as read
-
-### Analytics (Admin Only)
-- `GET /api/analytics` - Platform analytics with director performance metrics
-
-### Configuration (Admin Only)
-- `GET /api/config` - Get platform configuration (commission rate)
-- `PATCH /api/config` - Update platform configuration
-
-### Admin
-- `GET /api/admins` - List all admins
-- `GET /api/admin/stats` - Comprehensive platform statistics
-
-## Database Schema (Prisma)
-
-### User
-- id (UUID)
-- fullName (string)
-- email (unique)
-- phone (optional)
-- city (optional)
-- status (ACTIVE | SUSPENDED)
-- passwordHash (optional - set on first login)
-- averageRating (float, default 0)
-- totalRatings (int, default 0)
-- createdAt
-- rides (relation)
-- userRatings (relation)
-- wallet (relation)
-- notifications (relation)
-
-### Driver
-- id (UUID)
-- fullName (string)
-- email (unique)
-- phone (string)
-- vehicleType (CAR | BIKE | VAN)
-- vehiclePlate (string)
-- status (PENDING | ACTIVE | SUSPENDED | OFFLINE)
-- isOnline (boolean, default false)
-- currentRate (float, default 1.0)
-- averageRating (float, default 0)
-- totalRatings (int, default 0)
-- avgStartTime (optional)
-- avgEndTime (optional)
-- createdAt
-- rides (relation)
-- incentives (relation)
-- driverRatings (relation)
-- wallet (relation)
-
-### Director
-- id (UUID)
-- fullName (string)
-- email (unique)
-- phone (optional)
-- role (OPERATIONS | FINANCE | COMPLIANCE | GROWTH | REGIONAL_MANAGER)
-- region (string)
-- status (ACTIVE | PENDING | SUSPENDED | TERMINATED)
-- contractStart (DateTime, optional)
-- contractEnd (DateTime, optional)
-- driversAssigned (int, default 0)
-- driversOnline (int, default 0)
-- passwordHash (optional - set on first login)
-- createdAt
-
-### Admin
-- id (UUID)
-- email (unique)
-- phone (optional)
-- passwordHash (optional - set on first login)
-- createdAt
-
-### Ride
-- id (UUID)
-- pickupLocation (string)
-- dropoffLocation (string)
-- fareEstimate (float, optional)
-- status (REQUESTED | ACCEPTED | IN_PROGRESS | COMPLETED | CANCELLED)
-- userId (required relation to User)
-- driverId (optional relation to Driver)
-- createdAt
-
-### Payment
-- id (UUID)
-- amount (float)
-- status (PENDING | PAID | FAILED)
-- rideId (unique relation to Ride)
-- createdAt
-
-### Incentive
-- id (UUID)
-- amount (float)
-- reason (string)
-- driverId (relation to Driver)
-- createdAt
-
-### Wallet
-- id (UUID)
-- ownerId (string - userId or driverId)
-- ownerType (USER | DRIVER)
-- balance (float, default 0)
-- createdAt
-- transactions (relation)
-
-### Transaction
-- id (UUID)
-- walletId (relation to Wallet)
-- type (CREDIT | DEBIT | COMMISSION | PAYOUT)
-- amount (float)
-- reference (string, optional)
-- createdAt
-
-### Notification
-- id (UUID)
-- userId (string - any user/driver/director id)
-- role (string - user/driver/director/admin)
-- message (string)
-- type (RIDE_REQUESTED | RIDE_ASSIGNED | RIDE_COMPLETED | WALLET_UPDATED | STATUS_CHANGE)
-- read (boolean, default false)
-- createdAt
-
-### PlatformConfig
-- id (UUID)
-- commissionRate (float, default 0.15 = 15%)
-- createdAt
-- updatedAt
-
-## Business Rules
-1. A ride MUST be linked to a user
-2. Only ACTIVE drivers can be assigned to rides
-3. When a driver is assigned, ride status automatically changes to ACCEPTED
-4. Status changes reflect immediately in UI
-5. First-time login requires password setup (passwordHash is NULL)
-6. Sessions persist across browser refresh
-7. Only admins can update director status and contract dates (backend enforced)
-8. Ride completion automatically debits user wallet and credits driver wallet minus commission
-9. User wallets start with ₦5,000 initial balance
-10. Driver wallets start with ₦0 balance
-11. Commission rate is configurable via platform config (default 15%)
-12. Notifications are created automatically for ride events and wallet updates
-
-## Authentication Flow
-1. User enters email on login page
-2. If passwordHash is NULL, system prompts for password setup
-3. User sets password (min 6 characters)
-4. Password is hashed with bcrypt and stored
-5. User is logged in with session cookie
-6. Future logins require email + password
-
-## Wallet & Payment Flow
-1. When ride completes, payment is auto-created as PAID
-2. User wallet is debited the fare amount
-3. Driver wallet is credited fare minus commission
-4. Commission transaction is recorded separately
-5. Notifications sent to both user and driver
-6. Admin can process driver payouts from wallet page
-
-## Test Accounts (Seeded)
-- **Admin**: admin@ziba.com
-- **Directors**: operations@ziba.com, finance@ziba.com, compliance@ziba.com
-- **Users**: amara@example.com, chidi@example.com, fatima@example.com, ngozi@example.com
-- **Suspended User**: emeka@example.com
-
-All accounts require password setup on first login.
-
-## Design
-- Dark blue primary color
-- Professional Uber-like aesthetic
-- Dark mode default with light mode toggle
-- Inter font family
-- Responsive mobile-first design
-
-## Stage 13 Notes
-- Added Wallet model for users and drivers with transaction tracking
-- Added Notification model with real-time bell icon in header
-- Added PlatformConfig for commission rate management
-- Ride completion now auto-processes wallet transactions
-- Admin Wallets page for viewing balances and processing payouts
-- Admin Analytics page with director performance ratings (1-5 stars based on online driver %)
-- Notifications dropdown with mark-as-read functionality
-- Auto-refresh every 30 seconds for notifications and analytics
-
-## Stage 14 Notes - Multi-Country Currency Support
-- Added CountryProvider context with localStorage persistence (client/src/lib/country.tsx)
-- Added CountrySelector dropdown in admin dashboard header
-- Supports 8 countries: Nigeria, Ghana, Liberia, South Africa, UK, US, Mexico, France
-- Currency formatting uses Intl.NumberFormat for proper locale-based display
-- All admin pages (dashboard, payments, incentives, wallets, analytics) use dynamic currency formatting
-- Currency selection persists across page refreshes via localStorage
-- Fallback to symbol prefix if Intl.NumberFormat fails
-
-## Stage 15 Notes - Dynamic Fare Control System
-- Added FareConfig model in Prisma schema with country-specific pricing fields
-- New API endpoints for fare config CRUD at /api/fare-configs (admin-only)
-- Added "Manage Ride Fares" card on Admin Dashboard linking to /admin/fares
-- New Admin Fare Settings page with:
-  - Country selector dropdown to switch between configured countries
-  - Inline editable fields for base fare, price per KM, price per minute, minimum fare
-  - Driver/platform commission split configuration
-  - Live fare preview showing sample 10km/20min ride cost breakdown
-- Pricing formula: fare = baseFare + (distance × pricePerKm) + (duration × pricePerMinute)
-- Platform keeps platformCommission %, driver keeps driverCommission %
-- All fare config endpoints are admin-only protected (403 for non-admins)
-- Changes apply only to new rides, existing rides unchanged
+## External Dependencies
+- **PostgreSQL**: Relational database for all persistent data.
+- **Prisma ORM**: Database toolkit for Node.js and TypeScript.
+- **React**: Frontend JavaScript library for building user interfaces.
+- **Vite**: Frontend build tool.
+- **TypeScript**: Superset of JavaScript that adds static types.
+- **Node.js**: JavaScript runtime for the backend server.
+- **Express**: Web application framework for Node.js.
+- **Tailwind CSS**: Utility-first CSS framework for styling.
+- **Shadcn UI**: Reusable UI components.
+- **Bcrypt**: Library for hashing passwords.
+- **Express-session**: Middleware for managing user sessions.
+- **Intl.NumberFormat**: JavaScript API for locale-sensitive number formatting (used for currency display).
