@@ -1,0 +1,217 @@
+STAGE 16 — FINALIZATION PROMPT (ADMIN, COST, PLAY STORE)
+
+CONTEXT
+This is a production app (Ziba). Admin login is already working with a stable password. Admin bootstrap/reset logic has been removed.
+Now complete Stage 16 without breaking existing auth.
+
+GOALS
+
+Finish Stage 16 features
+
+Stop Replit costs from growing
+
+Prepare app for Google Play Store production
+
+PART A — ADMIN & TESTING FEATURES
+1. Tester & Role Management
+
+Add an Admin → Users / Testing Access panel.
+
+Admin can:
+
+Create users manually
+
+Assign roles:
+
+ADMIN
+
+DIRECTOR
+
+DRIVER
+
+TESTER
+
+Enable / disable tester accounts
+
+Reset user passwords manually (no automatic resets)
+
+Rules:
+
+TESTER accounts can log in
+
+TESTERS cannot access:
+
+Pricing
+
+Admin finance
+
+System settings
+
+ADMIN sees everything
+
+2. Ratings System (Finalize)
+
+Implement a full rating system:
+
+Users rate Drivers (1–5 stars)
+
+Drivers rate Users (1–5 stars)
+
+Directors rate Drivers (1–5 stars)
+
+Director rating logic (ADMIN-ONLY):
+
+⭐⭐⭐⭐⭐ = 100% availability
+
+⭐⭐⭐⭐ = 80%
+
+⭐⭐⭐ = 60%
+
+⭐⭐ = 40%
+
+⭐ = 20%
+
+This affects:
+
+Driver assignment priority
+
+Incentives logic
+
+Drivers do NOT see director rating math.
+Admin dashboard shows:
+
+All ratings
+
+Average rating per driver
+
+3. Fare & Pricing Control
+
+Admin Dashboard → Pricing panel:
+
+Controls:
+
+Base fare
+
+Price per distance (KM / Mile)
+
+Optional time-based fee
+
+Platform commission %
+
+Driver payout %
+
+Rules:
+
+Country-specific pricing support
+
+Admin can preview:
+
+Rider total cost
+
+Driver earnings
+
+PART B — COST OPTIMIZATION (CRITICAL)
+4. Reduce Replit Compute Cost
+
+Immediately enforce:
+
+Disable aggressive autoscaling
+
+Target runtime: 1 vCPU / 2GB RAM
+
+No background loops
+
+No polling every few seconds
+
+No dev logs in production
+
+Ensure:
+
+No setInterval loops running forever
+
+No auth or notification polling
+
+Event-driven requests only
+
+5. Strict DEV vs PROD Separation
+
+Rules:
+
+Preview / Dev uses Development DB ONLY
+
+Published app uses Production DB ONLY
+
+No preview traffic touches production DB
+
+Reduce production logging verbosity
+
+6. App Pause Safety
+
+Ensure app supports:
+
+Pause / Resume without data loss
+
+No compute burn while paused
+
+PART C — PLAY STORE PREPARATION
+7. Production Readiness
+
+Confirm:
+
+No hardcoded secrets
+
+No bootstrap or reset logic
+
+Hashed passwords only
+
+Stable admin login across restarts
+
+Debug routes disabled in production
+
+8. Play Store Checklist Output
+
+Generate a checklist covering:
+
+App versioning (versionCode / versionName)
+
+Permissions used
+
+Privacy Policy requirement
+
+Terms of Service requirement
+
+Internal testing steps
+
+Closed testing → Production steps
+
+Do NOT upload anything — just prepare.
+
+FINAL CONFIRMATION REQUIRED
+
+At completion, confirm ALL of the following:
+
+Admin login still works
+
+Password does NOT change on restart
+
+No hidden reset logic exists
+
+Replit compute usage is reduced
+
+App is Play Store ready
+
+Add comment where applicable:
+
+// Stage 16 complete — production hardened
+
+🚫 HARD RULES
+
+Do NOT reintroduce admin bootstrap
+
+Do NOT use environment passwords
+
+Do NOT break existing users
+
+Do NOT add test backdoors
+
+EXECUTE ALL STEPS NOW.

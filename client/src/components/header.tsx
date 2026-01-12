@@ -45,7 +45,6 @@ function NotificationBell() {
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
-    refetchInterval: 30000,
   });
 
   const { data: unreadData } = useQuery<{ count: number }>({
@@ -57,7 +56,6 @@ function NotificationBell() {
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
-    refetchInterval: 30000,
   });
 
   const markReadMutation = useMutation({

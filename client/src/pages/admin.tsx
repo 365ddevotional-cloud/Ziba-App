@@ -419,7 +419,6 @@ function ActivityFeed() {
       if (!res.ok) throw new Error("Failed to fetch activity");
       return res.json();
     },
-    refetchInterval: 30000,
   });
 
   const getIcon = (iconType: string) => {

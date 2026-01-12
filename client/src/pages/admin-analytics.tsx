@@ -60,7 +60,6 @@ export default function AdminAnalyticsPage() {
   const { data: analytics, isLoading } = useQuery<Analytics>({
     queryKey: ["/api/analytics"],
     queryFn: () => adminApiRequest("GET", "/api/analytics"),
-    refetchInterval: 30000,
   });
 
   if (isLoading) {
