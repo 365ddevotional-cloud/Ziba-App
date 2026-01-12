@@ -7,6 +7,7 @@ import { Header } from "@/components/header";
 import { StarRating } from "@/components/star-rating";
 import { CountrySelector } from "@/components/country-selector";
 import { useCountry } from "@/lib/country";
+import { AdminGuard } from "@/components/admin-guard";
 
 interface Stats {
   users: {
@@ -57,8 +58,9 @@ export default function AdminPage() {
   const { formatCurrency } = useCountry();
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <AdminGuard>
+      <div className="min-h-screen bg-background">
+        <Header />
       <main className="container mx-auto py-8 px-4">
         <div className="mb-8">
           <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
@@ -395,7 +397,8 @@ export default function AdminPage() {
           </>
         )}
       </main>
-    </div>
+      </div>
+    </AdminGuard>
   );
 }
 

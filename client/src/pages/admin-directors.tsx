@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Header } from "@/components/header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { AdminGuard } from "@/components/admin-guard";
 
 type DirectorRole = "OPERATIONS" | "FINANCE" | "COMPLIANCE" | "GROWTH" | "REGIONAL_MANAGER";
 
@@ -237,9 +238,10 @@ export default function AdminDirectorsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container mx-auto py-8 px-4">
+    <AdminGuard>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto py-8 px-4">
         <div className="mb-6">
           <Link href="/admin">
             <Button variant="ghost" size="sm" data-testid="button-back">
@@ -563,6 +565,7 @@ export default function AdminDirectorsPage() {
           </CardContent>
         </Card>
       </main>
-    </div>
+      </div>
+    </AdminGuard>
   );
 }

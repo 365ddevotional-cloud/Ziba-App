@@ -8,6 +8,7 @@ import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCountry } from "@/lib/country";
+import { AdminGuard } from "@/components/admin-guard";
 import {
   Select,
   SelectContent,
@@ -93,9 +94,10 @@ export default function AdminPaymentsPage() {
   const totalPending = payments?.filter(p => p.status === "PENDING").reduce((sum, p) => sum + p.amount, 0) || 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container mx-auto py-8 px-4">
+    <AdminGuard>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto py-8 px-4">
         <div className="mb-6">
           <Link href="/admin">
             <Button variant="ghost" size="sm" className="mb-4" data-testid="button-back">
@@ -208,6 +210,7 @@ export default function AdminPaymentsPage() {
           </div>
         )}
       </main>
-    </div>
+      </div>
+    </AdminGuard>
   );
 }

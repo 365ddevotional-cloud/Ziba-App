@@ -23,15 +23,13 @@ import AdminWalletsPage from "@/pages/admin-wallets";
 import AdminAnalyticsPage from "@/pages/admin-analytics";
 import AdminFaresPage from "@/pages/admin-fares";
 import AdminTestAccountsPage from "@/pages/admin-test-accounts";
-import { UserLoginPage, DirectorLoginPage, AdminLoginPage } from "@/pages/login";
+import AdminLoginPage from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Landing} />
-      <Route path="/login" component={UserLoginPage} />
-      <Route path="/director/login" component={DirectorLoginPage} />
       <Route path="/admin/login" component={AdminLoginPage} />
       <Route path="/users" component={UsersPage} />
       <Route path="/drivers" component={DriversPage} />

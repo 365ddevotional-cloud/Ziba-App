@@ -9,6 +9,7 @@ import { Header } from "@/components/header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StarRating } from "@/components/star-rating";
 import { useToast } from "@/hooks/use-toast";
+import { AdminGuard } from "@/components/admin-guard";
 
 type UserStatus = "ACTIVE" | "SUSPENDED";
 
@@ -83,9 +84,10 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container mx-auto py-8 px-4">
+    <AdminGuard>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto py-8 px-4">
         <div className="mb-6">
           <Link href="/admin">
             <Button variant="ghost" size="sm" data-testid="button-back">
@@ -226,6 +228,7 @@ export default function AdminUsersPage() {
           </CardContent>
         </Card>
       </main>
-    </div>
+      </div>
+    </AdminGuard>
   );
 }

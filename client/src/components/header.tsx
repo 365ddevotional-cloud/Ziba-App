@@ -247,34 +247,12 @@ export function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" data-testid="button-login-menu">
-                    <LogIn className="h-4 w-4 mr-1" />
-                    Log In
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href="/login" data-testid="link-user-login">
-                      <Users className="h-4 w-4 mr-2" />
-                      User Login
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/director/login" data-testid="link-director-login">
-                      <UserCog className="h-4 w-4 mr-2" />
-                      Director Login
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin/login" data-testid="link-admin-login">
-                      <Shield className="h-4 w-4 mr-2" />
-                      Admin Login
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Link href="/admin/login">
+                <Button variant="outline" size="sm" data-testid="button-admin-login">
+                  <Shield className="h-4 w-4 mr-1" />
+                  Admin Login
+                </Button>
+              </Link>
             )}
             <ThemeToggle />
           </div>

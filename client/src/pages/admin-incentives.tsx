@@ -10,6 +10,7 @@ import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useCountry } from "@/lib/country";
+import { AdminGuard } from "@/components/admin-guard";
 import {
   Dialog,
   DialogContent,
@@ -146,9 +147,10 @@ export default function AdminIncentivesPage() {
   }, {}) || {};
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container mx-auto py-8 px-4">
+    <AdminGuard>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto py-8 px-4">
         <div className="mb-6">
           <Link href="/admin">
             <Button variant="ghost" size="sm" className="mb-4" data-testid="button-back">
@@ -323,6 +325,7 @@ export default function AdminIncentivesPage() {
           </div>
         )}
       </main>
-    </div>
+      </div>
+    </AdminGuard>
   );
 }

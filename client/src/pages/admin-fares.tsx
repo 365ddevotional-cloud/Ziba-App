@@ -11,6 +11,7 @@ import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { countries, useCountry } from "@/lib/country";
+import { AdminGuard } from "@/components/admin-guard";
 import {
   Select,
   SelectContent,
@@ -220,9 +221,10 @@ export default function AdminFaresPage() {
   const preview = calculateFarePreview(sampleDistance, 20);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container mx-auto py-8 px-4">
+    <AdminGuard>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto py-8 px-4">
         <div className="mb-6">
           <Link href="/admin">
             <Button variant="ghost" size="sm" className="mb-4" data-testid="button-back">
@@ -647,6 +649,7 @@ export default function AdminFaresPage() {
           </div>
         )}
       </main>
-    </div>
+      </div>
+    </AdminGuard>
   );
 }

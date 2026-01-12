@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
 import { Progress } from "@/components/ui/progress";
 import { useCountry } from "@/lib/country";
+import { AdminGuard } from "@/components/admin-guard";
 
 interface DirectorMetric {
   id: string;
@@ -64,21 +65,24 @@ export default function AdminAnalyticsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="container mx-auto py-8 px-4">
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        </main>
-      </div>
+      <AdminGuard>
+        <div className="min-h-screen bg-background">
+          <Header />
+          <main className="container mx-auto py-8 px-4">
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          </main>
+        </div>
+      </AdminGuard>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container mx-auto py-8 px-4">
+    <AdminGuard>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto py-8 px-4">
         <div className="mb-6">
           <Link href="/admin">
             <Button variant="ghost" size="sm" data-testid="button-back">
@@ -274,6 +278,7 @@ export default function AdminAnalyticsPage() {
           </CardContent>
         </Card>
       </main>
-    </div>
+      </div>
+    </AdminGuard>
   );
 }

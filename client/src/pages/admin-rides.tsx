@@ -11,6 +11,7 @@ import { Header } from "@/components/header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
+import { AdminGuard } from "@/components/admin-guard";
 
 type RideStatus = "REQUESTED" | "ACCEPTED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 
@@ -232,9 +233,10 @@ export default function AdminRidesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container mx-auto py-8 px-4">
+    <AdminGuard>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto py-8 px-4">
         <div className="mb-6">
           <Link href="/admin">
             <Button variant="ghost" size="sm" data-testid="button-back">
@@ -402,6 +404,7 @@ export default function AdminRidesPage() {
           </CardContent>
         </Card>
       </main>
-    </div>
+      </div>
+    </AdminGuard>
   );
 }

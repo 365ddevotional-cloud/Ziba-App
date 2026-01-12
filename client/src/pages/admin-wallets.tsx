@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useState } from "react";
 import { useCountry } from "@/lib/country";
+import { AdminGuard } from "@/components/admin-guard";
 
 interface Transaction {
   id: string;
@@ -157,9 +158,10 @@ export default function AdminWalletsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container mx-auto py-8 px-4">
+    <AdminGuard>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto py-8 px-4">
         <div className="mb-6 flex items-center justify-between">
           <Link href="/admin">
             <Button variant="ghost" size="sm" data-testid="button-back">
@@ -362,6 +364,7 @@ export default function AdminWalletsPage() {
           </CardContent>
         </Card>
       </main>
-    </div>
+      </div>
+    </AdminGuard>
   );
 }

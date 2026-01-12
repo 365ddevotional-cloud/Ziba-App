@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
+import { AdminGuard } from "@/components/admin-guard";
 
 type DriverStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "OFFLINE";
 
@@ -115,9 +116,10 @@ export default function AdminDriversPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container mx-auto py-8 px-4">
+    <AdminGuard>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto py-8 px-4">
         <div className="mb-6">
           <Link href="/admin">
             <Button variant="ghost" size="sm" data-testid="button-back">
@@ -270,6 +272,7 @@ export default function AdminDriversPage() {
           </CardContent>
         </Card>
       </main>
-    </div>
+      </div>
+    </AdminGuard>
   );
 }

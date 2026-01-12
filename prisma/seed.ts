@@ -1,10 +1,26 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding database...');
 
+  // Create fixed Admin account
+  const adminPasswordHash = await bcrypt.hash('ZibaAdmin2024!', 10);
+  
+  await prisma.admin.upsert({
+    where: { email: 'admin@ziba.app' },
+    update: { passwordHash: adminPasswordHash },
+    create: {
+      email: 'admin@ziba.app',
+      passwordHash: adminPasswordHash,
+    },
+  });
+  console.log('Created admin account: admin@ziba.app');
+
+  await prisma.driverRating.deleteMany();
+  await prisma.userRating.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.incentive.deleteMany();
   await prisma.ride.deleteMany();
@@ -325,17 +341,12 @@ async function main() {
 
   console.log(`Created ${directors.length} directors`);
 
-  await prisma.admin.deleteMany();
-  const admins = await Promise.all([
-    prisma.admin.create({
-      data: {
-        email: 'admin@ziba.com',
-        phone: '+234 800 000 0001',
-      },
-    }),
-  ]);
-
-  console.log(`Created ${admins.length} admins`);
+  // Don't delete the main admin account - only delete any extras
+  await prisma.admin.deleteMany({
+    where: { email: { not: 'admin@ziba.app' } }
+  });
+  
+  console.log('Admin account preserved: admin@ziba.app');
 
   console.log('Seeding completed successfully!');
 }
