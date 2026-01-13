@@ -76,6 +76,12 @@ export default function RiderApp() {
           <RiderRegister />
         </RiderGuestGuard>
       </Route>
+      {/* Dynamic routes with params must come before static routes */}
+      <Route path="/rider/trip-summary/:id">
+        <RiderAuthGuard>
+          <RiderTripSummary />
+        </RiderAuthGuard>
+      </Route>
       <Route path="/rider/request">
         <RiderAuthGuard>
           <RiderRequest />
@@ -104,11 +110,6 @@ export default function RiderApp() {
       <Route path="/rider/trip-history">
         <RiderAuthGuard>
           <RiderHistory />
-        </RiderAuthGuard>
-      </Route>
-      <Route path="/rider/trip-summary/:id">
-        <RiderAuthGuard>
-          <RiderTripSummary />
         </RiderAuthGuard>
       </Route>
       <Route path="/rider/wallet">
