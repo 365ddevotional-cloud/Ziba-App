@@ -241,7 +241,7 @@ export default function RiderLiveRide() {
           </Card>
         )}
 
-        {activeRide.status === "REQUESTED" && (
+        {["REQUESTED", "ACCEPTED"].includes(activeRide.status) && (
           <Button
             variant="destructive"
             className="w-full"

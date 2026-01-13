@@ -2645,10 +2645,73 @@ export async function registerRoutes(
 
   // ==================== RIDER APP AUTHENTICATION ====================
 
-  // TEST_SIGNUP_MODE: When true, skip email verification and auto-approve accounts
-  // This is for development/testing only and will be replaced with real verification later
-  // Can be disabled via environment variable: TEST_SIGNUP_MODE=false
-  const TEST_SIGNUP_MODE = process.env.TEST_SIGNUP_MODE !== "false";
+  // TEST_MODE: When true, skip email verification and enable test driver matching
+  // This is for development/testing only and will be replaced with real logic later
+  // Can be disabled via environment variable: TEST_MODE=false
+  const TEST_MODE = process.env.TEST_MODE !== "false";
+
+  // Create test drivers if none exist (only in TEST_MODE)
+  async function ensureTestDriversExist() {
+    if (!TEST_MODE) return;
+
+    const testDriverCount = await prisma.driver.count({
+      where: { isTestAccount: true, status: "ACTIVE" }
+    });
+
+    if (testDriverCount >= 3) return;
+
+    const testDrivers = [
+      { fullName: "Michael Okonkwo", email: "driver1@test.ziba.app", phone: "+2348012345001", vehicleType: "CAR" as const, vehiclePlate: "LAG-123-AB", averageRating: 4.8 },
+      { fullName: "Amina Bello", email: "driver2@test.ziba.app", phone: "+2348012345002", vehicleType: "CAR" as const, vehiclePlate: "LAG-456-CD", averageRating: 4.9 },
+      { fullName: "Chidi Nnamdi", email: "driver3@test.ziba.app", phone: "+2348012345003", vehicleType: "CAR" as const, vehiclePlate: "LAG-789-EF", averageRating: 4.7 },
+      { fullName: "Fatima Yusuf", email: "driver4@test.ziba.app", phone: "+2348012345004", vehicleType: "BIKE" as const, vehiclePlate: "LAG-111-GH", averageRating: 4.6 },
+      { fullName: "Emeka Obi", email: "driver5@test.ziba.app", phone: "+2348012345005", vehicleType: "VAN" as const, vehiclePlate: "LAG-222-IJ", averageRating: 4.5 },
+    ];
+
+    for (const driver of testDrivers) {
+      const existing = await prisma.driver.findUnique({ where: { email: driver.email } });
+      if (!existing) {
+        await prisma.driver.create({
+          data: {
+            ...driver,
+            status: "ACTIVE",
+            isOnline: true,
+            isTestAccount: true,
+            totalRatings: Math.floor(Math.random() * 100) + 50
+          }
+        });
+        
+        // Create wallet for test driver
+        const newDriver = await prisma.driver.findUnique({ where: { email: driver.email } });
+        if (newDriver) {
+          await prisma.wallet.create({
+            data: {
+              ownerId: newDriver.id,
+              ownerType: "DRIVER",
+              balance: 0
+            }
+          });
+        }
+      }
+    }
+    console.log("[TEST_MODE] Test drivers ensured");
+  }
+
+  // Initialize test drivers on server start
+  ensureTestDriversExist().catch(console.error);
+
+  // Find an available test driver for matching
+  async function findAvailableTestDriver(): Promise<any> {
+    const driver = await prisma.driver.findFirst({
+      where: {
+        isTestAccount: true,
+        status: "ACTIVE",
+        isOnline: true
+      },
+      orderBy: { averageRating: "desc" }
+    });
+    return driver;
+  }
 
   // Rider registration
   app.post("/api/rider/register", async (req, res) => {
@@ -2670,7 +2733,7 @@ export async function registerRoutes(
 
       const passwordHash = await hashPassword(password);
       
-      // In TEST_SIGNUP_MODE, mark as test account (email auto-verified)
+      // In TEST_MODE, mark as test account (email auto-verified)
       const user = await prisma.user.create({
         data: {
           fullName,
@@ -2679,7 +2742,7 @@ export async function registerRoutes(
           phone: phone || null,
           city: city || null,
           status: "ACTIVE",
-          isTestAccount: TEST_SIGNUP_MODE
+          isTestAccount: TEST_MODE
         }
       });
 
@@ -2936,7 +2999,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "You already have an active ride" });
       }
 
-      const ride = await prisma.ride.create({
+      let ride = await prisma.ride.create({
         data: {
           userId: req.session.userId,
           pickupLocation,
@@ -2947,9 +3010,50 @@ export async function registerRoutes(
         include: {
           user: {
             select: { id: true, fullName: true, email: true }
+          },
+          driver: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              vehicleType: true,
+              vehiclePlate: true,
+              averageRating: true
+            }
           }
         }
       });
+
+      // TEST_MODE: Auto-assign a test driver after a short delay simulation
+      if (TEST_MODE) {
+        const testDriver = await findAvailableTestDriver();
+        if (testDriver) {
+          // Update ride with assigned driver and transition to ACCEPTED
+          ride = await prisma.ride.update({
+            where: { id: ride.id },
+            data: {
+              driverId: testDriver.id,
+              status: "ACCEPTED"
+            },
+            include: {
+              user: {
+                select: { id: true, fullName: true, email: true }
+              },
+              driver: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  phone: true,
+                  vehicleType: true,
+                  vehiclePlate: true,
+                  averageRating: true
+                }
+              }
+            }
+          });
+          console.log(`[TEST_MODE] Auto-assigned driver ${testDriver.fullName} to ride ${ride.id}`);
+        }
+      }
 
       res.status(201).json(ride);
     } catch (error) {
@@ -2975,8 +3079,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "REQUESTED") {
-        return res.status(400).json({ message: "Can only cancel rides that are still being requested" });
+      if (!["REQUESTED", "ACCEPTED"].includes(ride.status)) {
+        return res.status(400).json({ message: "Can only cancel rides that haven't started yet" });
       }
 
       const updatedRide = await prisma.ride.update({
