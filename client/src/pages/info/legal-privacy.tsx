@@ -26,6 +26,12 @@ export default function LegalPrivacy() {
             </div>
           </div>
 
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-6">
+            <p className="text-yellow-600 dark:text-yellow-400 text-sm font-medium">
+              Draft for testing - This document is a placeholder and will be replaced with a legally reviewed privacy policy before production launch.
+            </p>
+          </div>
+
           <div className="bg-card border border-card-border rounded-xl p-6 mb-8">
             <p className="text-muted-foreground text-sm">
               This Privacy Policy explains how Ziba collects, uses, discloses, and safeguards your information when you use our platform and services.

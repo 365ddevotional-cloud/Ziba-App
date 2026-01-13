@@ -27,6 +27,12 @@ export default function LegalCookies() {
             </div>
           </div>
 
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-6">
+            <p className="text-yellow-600 dark:text-yellow-400 text-sm font-medium">
+              Draft for testing - This document is a placeholder and will be replaced with a legally reviewed cookie policy before production launch.
+            </p>
+          </div>
+
           <div className="bg-card border border-card-border rounded-xl p-6 mb-8">
             <p className="text-muted-foreground text-sm">
               This Cookie Policy explains how Ziba uses cookies and similar technologies to recognize you when you visit our platform.

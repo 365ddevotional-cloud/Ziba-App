@@ -26,6 +26,12 @@ export default function LegalTerms() {
             </div>
           </div>
 
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-6">
+            <p className="text-yellow-600 dark:text-yellow-400 text-sm font-medium">
+              Draft for testing - This document is a placeholder and will be replaced with legally reviewed terms before production launch.
+            </p>
+          </div>
+
           <div className="bg-card border border-card-border rounded-xl p-6 mb-8">
             <p className="text-muted-foreground text-sm">
               Please read these Terms of Service carefully before using the Ziba platform. By accessing or using our services, you agree to be bound by these terms.
