@@ -1,21 +1,16 @@
-import { useState } from "react";
 import { Link } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { RiderBottomNav } from "@/components/rider-bottom-nav";
 import {
-  Car,
   Wallet as WalletIcon,
   ChevronLeft,
   Loader2,
   Plus,
-  Minus,
   ArrowUpRight,
   ArrowDownLeft,
-  History,
-  HeadphonesIcon,
   CreditCard,
   DollarSign,
 } from "lucide-react";
@@ -39,6 +34,7 @@ export default function RiderWallet() {
 
   const { data: wallet, isLoading } = useQuery<WalletData>({
     queryKey: ["/api/rider/wallet"],
+    staleTime: 1000 * 60,
   });
 
   const formatDate = (dateStr: string) => {
@@ -83,7 +79,7 @@ export default function RiderWallet() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="p-4 flex items-center gap-3 border-b border-border">
-        <Link href="/rider">
+        <Link href="/rider/home">
           <Button size="icon" variant="ghost" data-testid="button-back">
             <ChevronLeft className="w-5 h-5" />
           </Button>
@@ -182,34 +178,7 @@ export default function RiderWallet() {
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-card">
-        <div className="flex items-center justify-around p-2">
-          <Link href="/rider">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-home">
-              <Car className="w-5 h-5 mb-1" />
-              <span className="text-xs">Home</span>
-            </Button>
-          </Link>
-          <Link href="/rider/history">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-history">
-              <History className="w-5 h-5 mb-1" />
-              <span className="text-xs">Rides</span>
-            </Button>
-          </Link>
-          <Link href="/rider/wallet">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-wallet">
-              <WalletIcon className="w-5 h-5 mb-1 text-primary" />
-              <span className="text-xs text-primary">Wallet</span>
-            </Button>
-          </Link>
-          <Link href="/rider/support">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-support">
-              <HeadphonesIcon className="w-5 h-5 mb-1" />
-              <span className="text-xs">Support</span>
-            </Button>
-          </Link>
-        </div>
-      </nav>
+      <RiderBottomNav activeTab="wallet" />
     </div>
   );
 }

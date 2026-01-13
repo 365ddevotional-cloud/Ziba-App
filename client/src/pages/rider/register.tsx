@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useRiderAuth } from "@/lib/rider-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { Car, Loader2, Mail, Lock, User, Phone, MapPin } from "lucide-react";
 export default function RiderRegister() {
   const { register } = useRiderAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -56,6 +57,7 @@ export default function RiderRegister() {
         title: "Welcome to Ziba!",
         description: "Your account has been created",
       });
+      navigate("/rider/home");
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -204,6 +206,12 @@ export default function RiderRegister() {
                 Sign in
               </Link>
             </div>
+            <p className="mt-4 text-xs text-center text-muted-foreground">
+              By signing up, you agree to our{" "}
+              <Link href="/legal/terms" className="underline">Terms of Service</Link>
+              {" "}and{" "}
+              <Link href="/legal/privacy" className="underline">Privacy Policy</Link>
+            </p>
           </CardContent>
         </Card>
       </div>

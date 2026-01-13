@@ -3,15 +3,18 @@ import { useRiderAuth } from "@/lib/rider-auth";
 import RiderHome from "./home";
 import RiderLogin from "./login";
 import RiderRegister from "./register";
+import RiderRequest from "./request";
+import RiderConfirm from "./confirm";
 import RiderLiveRide from "./live-ride";
 import RiderHistory from "./history";
 import RiderWallet from "./wallet";
 import RiderProfile from "./profile";
 import RiderSupport from "./support";
+import RiderAccessDenied from "./access-denied";
 import { Loader2 } from "lucide-react";
 
 function RiderAuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useRiderAuth();
+  const { isAuthenticated, isLoading, isRider, user } = useRiderAuth();
 
   if (isLoading) {
     return (
@@ -25,11 +28,15 @@ function RiderAuthGuard({ children }: { children: React.ReactNode }) {
     return <Redirect to="/rider/login" />;
   }
 
+  if (!isRider) {
+    return <RiderAccessDenied />;
+  }
+
   return <>{children}</>;
 }
 
 function RiderGuestGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useRiderAuth();
+  const { isAuthenticated, isLoading, isRider } = useRiderAuth();
 
   if (isLoading) {
     return (
@@ -39,8 +46,12 @@ function RiderGuestGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (isAuthenticated) {
-    return <Redirect to="/rider" />;
+  if (isAuthenticated && isRider) {
+    return <Redirect to="/rider/home" />;
+  }
+
+  if (isAuthenticated && !isRider) {
+    return <RiderAccessDenied />;
   }
 
   return <>{children}</>;
@@ -54,17 +65,42 @@ export default function RiderApp() {
           <RiderLogin />
         </RiderGuestGuard>
       </Route>
+      <Route path="/rider/signup">
+        <RiderGuestGuard>
+          <RiderRegister />
+        </RiderGuestGuard>
+      </Route>
       <Route path="/rider/register">
         <RiderGuestGuard>
           <RiderRegister />
         </RiderGuestGuard>
+      </Route>
+      <Route path="/rider/request">
+        <RiderAuthGuard>
+          <RiderRequest />
+        </RiderAuthGuard>
+      </Route>
+      <Route path="/rider/confirm">
+        <RiderAuthGuard>
+          <RiderConfirm />
+        </RiderAuthGuard>
       </Route>
       <Route path="/rider/live">
         <RiderAuthGuard>
           <RiderLiveRide />
         </RiderAuthGuard>
       </Route>
+      <Route path="/rider/active-ride">
+        <RiderAuthGuard>
+          <RiderLiveRide />
+        </RiderAuthGuard>
+      </Route>
       <Route path="/rider/history">
+        <RiderAuthGuard>
+          <RiderHistory />
+        </RiderAuthGuard>
+      </Route>
+      <Route path="/rider/trip-history">
         <RiderAuthGuard>
           <RiderHistory />
         </RiderAuthGuard>
@@ -82,6 +118,11 @@ export default function RiderApp() {
       <Route path="/rider/support">
         <RiderAuthGuard>
           <RiderSupport />
+        </RiderAuthGuard>
+      </Route>
+      <Route path="/rider/home">
+        <RiderAuthGuard>
+          <RiderHome />
         </RiderAuthGuard>
       </Route>
       <Route path="/rider">

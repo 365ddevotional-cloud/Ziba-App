@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { RiderBottomNav } from "@/components/rider-bottom-nav";
 import {
   User,
   Mail,
@@ -18,10 +19,6 @@ import {
   Edit2,
   Save,
   X,
-  Car,
-  History,
-  Wallet,
-  HeadphonesIcon,
 } from "lucide-react";
 
 export default function RiderProfile() {
@@ -90,7 +87,7 @@ export default function RiderProfile() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="p-4 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-3">
-          <Link href="/rider">
+          <Link href="/rider/home">
             <Button size="icon" variant="ghost" data-testid="button-back">
               <ChevronLeft className="w-5 h-5" />
             </Button>
@@ -251,34 +248,7 @@ export default function RiderProfile() {
         </Button>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-card z-50">
-        <div className="flex items-center justify-around p-2">
-          <Link href="/rider">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-home">
-              <Car className="w-5 h-5 mb-1" />
-              <span className="text-xs">Home</span>
-            </Button>
-          </Link>
-          <Link href="/rider/history">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-history">
-              <History className="w-5 h-5 mb-1" />
-              <span className="text-xs">Rides</span>
-            </Button>
-          </Link>
-          <Link href="/rider/wallet">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-wallet">
-              <Wallet className="w-5 h-5 mb-1" />
-              <span className="text-xs">Wallet</span>
-            </Button>
-          </Link>
-          <Link href="/rider/support">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-support">
-              <HeadphonesIcon className="w-5 h-5 mb-1" />
-              <span className="text-xs">Support</span>
-            </Button>
-          </Link>
-        </div>
-      </nav>
+      <RiderBottomNav activeTab="profile" />
     </div>
   );
 }

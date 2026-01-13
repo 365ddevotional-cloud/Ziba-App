@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useRiderAuth } from "@/lib/rider-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -11,13 +11,22 @@ import { Car, Loader2, Mail, Lock } from "lucide-react";
 export default function RiderLogin() {
   const { login } = useRiderAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError("");
+
+    if (!email || !password) {
+      setError("Please enter email and password");
+      setIsLoading(false);
+      return;
+    }
 
     try {
       await login(email, password);
@@ -25,10 +34,13 @@ export default function RiderLogin() {
         title: "Welcome back!",
         description: "Login successful",
       });
+      navigate("/rider/home");
     } catch (error: any) {
+      const errorMessage = error.message || "Invalid email or password. Please try again.";
+      setError(errorMessage);
       toast({
         title: "Login failed",
-        description: error.message || "Invalid credentials",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -51,6 +63,11 @@ export default function RiderLogin() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <p className="text-sm text-destructive" data-testid="text-error">{error}</p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
@@ -101,7 +118,7 @@ export default function RiderLogin() {
             </form>
             <div className="mt-6 text-center text-sm text-muted-foreground">
               Don't have an account?{" "}
-              <Link href="/rider/register" className="text-primary hover:underline" data-testid="link-register">
+              <Link href="/rider/signup" className="text-primary hover:underline" data-testid="link-register">
                 Sign up
               </Link>
             </div>

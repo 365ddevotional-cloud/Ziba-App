@@ -2,8 +2,8 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { RiderBottomNav } from "@/components/rider-bottom-nav";
 import {
-  Car,
   ChevronLeft,
   ChevronRight,
   MessageCircle,
@@ -13,10 +13,9 @@ import {
   AlertTriangle,
   Shield,
   CreditCard,
-  Wallet,
-  History,
-  HeadphonesIcon,
+  Car,
   ExternalLink,
+  HelpCircle,
 } from "lucide-react";
 
 const faqItems = [
@@ -76,7 +75,7 @@ export default function RiderSupport() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="p-4 flex items-center gap-3 border-b border-border">
-        <Link href="/rider">
+        <Link href="/rider/home">
           <Button size="icon" variant="ghost" data-testid="button-back">
             <ChevronLeft className="w-5 h-5" />
           </Button>
@@ -146,71 +145,38 @@ export default function RiderSupport() {
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-3">Resources</h2>
           <div className="space-y-2">
-            <Link href="/support/help-center">
-              <Card className="hover-elevate cursor-pointer">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <FileQuestion className="w-5 h-5 text-muted-foreground" />
-                    <span className="font-medium text-foreground">Help Center</span>
-                  </div>
-                  <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/support/safety">
-              <Card className="hover-elevate cursor-pointer">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Shield className="w-5 h-5 text-muted-foreground" />
-                    <span className="font-medium text-foreground">Safety Center</span>
-                  </div>
-                  <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/legal/terms">
-              <Card className="hover-elevate cursor-pointer">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <FileQuestion className="w-5 h-5 text-muted-foreground" />
-                    <span className="font-medium text-foreground">Terms of Service</span>
-                  </div>
-                  <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            </Link>
+            <Card className="hover-elevate cursor-pointer" onClick={() => handleContactAction("Help Center")}>
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <FileQuestion className="w-5 h-5 text-muted-foreground" />
+                  <span className="font-medium text-foreground">Help Center</span>
+                </div>
+                <ExternalLink className="w-4 h-4 text-muted-foreground" />
+              </CardContent>
+            </Card>
+            <Card className="hover-elevate cursor-pointer" onClick={() => handleContactAction("Safety Center")}>
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Shield className="w-5 h-5 text-muted-foreground" />
+                  <span className="font-medium text-foreground">Safety Center</span>
+                </div>
+                <ExternalLink className="w-4 h-4 text-muted-foreground" />
+              </CardContent>
+            </Card>
+            <Card className="hover-elevate cursor-pointer" onClick={() => handleContactAction("Terms of Service")}>
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <FileQuestion className="w-5 h-5 text-muted-foreground" />
+                  <span className="font-medium text-foreground">Terms of Service</span>
+                </div>
+                <ExternalLink className="w-4 h-4 text-muted-foreground" />
+              </CardContent>
+            </Card>
           </div>
         </section>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-card">
-        <div className="flex items-center justify-around p-2">
-          <Link href="/rider">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-home">
-              <Car className="w-5 h-5 mb-1" />
-              <span className="text-xs">Home</span>
-            </Button>
-          </Link>
-          <Link href="/rider/history">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-history">
-              <History className="w-5 h-5 mb-1" />
-              <span className="text-xs">Rides</span>
-            </Button>
-          </Link>
-          <Link href="/rider/wallet">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-wallet">
-              <Wallet className="w-5 h-5 mb-1" />
-              <span className="text-xs">Wallet</span>
-            </Button>
-          </Link>
-          <Link href="/rider/support">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-support">
-              <HeadphonesIcon className="w-5 h-5 mb-1 text-primary" />
-              <span className="text-xs text-primary">Support</span>
-            </Button>
-          </Link>
-        </div>
-      </nav>
+      <RiderBottomNav />
     </div>
   );
 }

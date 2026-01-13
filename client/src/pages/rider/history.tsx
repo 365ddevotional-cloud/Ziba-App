@@ -5,9 +5,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { RiderBottomNav } from "@/components/rider-bottom-nav";
 import {
   Car,
-  MapPin,
   Calendar,
   Star,
   ChevronLeft,
@@ -15,11 +15,6 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  ChevronRight,
-  Wallet,
-  History as HistoryIcon,
-  HeadphonesIcon,
-  Receipt,
 } from "lucide-react";
 import {
   Dialog,
@@ -58,6 +53,7 @@ export default function RiderHistory() {
 
   const { data: rides, isLoading } = useQuery<Ride[]>({
     queryKey: ["/api/rider/rides"],
+    staleTime: 1000 * 60,
   });
 
   const rateMutation = useMutation({
@@ -129,12 +125,12 @@ export default function RiderHistory() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="p-4 flex items-center gap-3 border-b border-border">
-        <Link href="/rider">
+        <Link href="/rider/home">
           <Button size="icon" variant="ghost" data-testid="button-back">
             <ChevronLeft className="w-5 h-5" />
           </Button>
         </Link>
-        <h1 className="font-semibold text-foreground">Ride History</h1>
+        <h1 className="font-semibold text-foreground">Trip History</h1>
       </header>
 
       <main className="flex-1 p-4 space-y-4 pb-20">
@@ -147,8 +143,8 @@ export default function RiderHistory() {
             <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
               <Car className="w-8 h-8 text-muted-foreground" />
             </div>
-            <p className="text-muted-foreground">No rides yet</p>
-            <Link href="/rider">
+            <p className="text-muted-foreground">No trips yet</p>
+            <Link href="/rider/home">
               <Button data-testid="button-first-ride">Request Your First Ride</Button>
             </Link>
           </div>
@@ -206,39 +202,12 @@ export default function RiderHistory() {
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-card">
-        <div className="flex items-center justify-around p-2">
-          <Link href="/rider">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-home">
-              <Car className="w-5 h-5 mb-1" />
-              <span className="text-xs">Home</span>
-            </Button>
-          </Link>
-          <Link href="/rider/history">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-history">
-              <HistoryIcon className="w-5 h-5 mb-1 text-primary" />
-              <span className="text-xs text-primary">Rides</span>
-            </Button>
-          </Link>
-          <Link href="/rider/wallet">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-wallet">
-              <Wallet className="w-5 h-5 mb-1" />
-              <span className="text-xs">Wallet</span>
-            </Button>
-          </Link>
-          <Link href="/rider/support">
-            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-support">
-              <HeadphonesIcon className="w-5 h-5 mb-1" />
-              <span className="text-xs">Support</span>
-            </Button>
-          </Link>
-        </div>
-      </nav>
+      <RiderBottomNav activeTab="trips" />
 
       <Dialog open={!!selectedRide} onOpenChange={() => setSelectedRide(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Ride Details</DialogTitle>
+            <DialogTitle>Trip Details</DialogTitle>
             <DialogDescription>
               {selectedRide && formatDate(selectedRide.createdAt)}
             </DialogDescription>

@@ -1,13 +1,12 @@
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRiderAuth } from "@/lib/rider-auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { RiderBottomNav } from "@/components/rider-bottom-nav";
 import {
   Car,
-  MapPin,
   Phone,
   Star,
   Clock,
@@ -15,8 +14,8 @@ import {
   X,
   ChevronLeft,
   Loader2,
-  CheckCircle,
   User,
+  RefreshCw,
 } from "lucide-react";
 
 interface Ride {
@@ -40,9 +39,9 @@ export default function RiderLiveRide() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
 
-  const { data: activeRide, isLoading } = useQuery<Ride | null>({
+  const { data: activeRide, isLoading, refetch, isFetching } = useQuery<Ride | null>({
     queryKey: ["/api/rider/active-ride"],
-    refetchInterval: 5000,
+    staleTime: 1000 * 60,
   });
 
   const cancelMutation = useMutation({
@@ -56,7 +55,7 @@ export default function RiderLiveRide() {
         title: "Ride cancelled",
         description: "Your ride has been cancelled",
       });
-      navigate("/rider");
+      navigate("/rider/home");
     },
     onError: (error: any) => {
       toast({
@@ -77,21 +76,34 @@ export default function RiderLiveRide() {
 
   if (!activeRide) {
     return (
-      <div className="min-h-screen bg-background p-4 flex flex-col items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6 text-center space-y-4">
-            <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
-              <Car className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <h2 className="text-xl font-semibold">No Active Ride</h2>
-            <p className="text-muted-foreground">You don't have any rides in progress</p>
-            <Link href="/rider">
-              <Button className="w-full" data-testid="button-request-new">
-                Request a Ride
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="p-4 flex items-center gap-3 border-b border-border">
+          <Link href="/rider/home">
+            <Button size="icon" variant="ghost" data-testid="button-back">
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+          </Link>
+          <h1 className="font-semibold text-foreground">Your Ride</h1>
+        </header>
+        
+        <main className="flex-1 p-4 flex flex-col items-center justify-center pb-20">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6 text-center space-y-4">
+              <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
+                <Car className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h2 className="text-xl font-semibold">No Active Ride</h2>
+              <p className="text-muted-foreground">You don't have any rides in progress</p>
+              <Link href="/rider/home">
+                <Button className="w-full" data-testid="button-request-new">
+                  Request a Ride
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </main>
+
+        <RiderBottomNav activeTab="home" />
       </div>
     );
   }
@@ -138,16 +150,27 @@ export default function RiderLiveRide() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="p-4 flex items-center gap-3 border-b border-border">
-        <Link href="/rider">
-          <Button size="icon" variant="ghost" data-testid="button-back">
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-        </Link>
-        <h1 className="font-semibold text-foreground">Your Ride</h1>
+      <header className="p-4 flex items-center justify-between border-b border-border">
+        <div className="flex items-center gap-3">
+          <Link href="/rider/home">
+            <Button size="icon" variant="ghost" data-testid="button-back">
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+          </Link>
+          <h1 className="font-semibold text-foreground">Your Ride</h1>
+        </div>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          data-testid="button-refresh"
+        >
+          <RefreshCw className={`w-5 h-5 ${isFetching ? "animate-spin" : ""}`} />
+        </Button>
       </header>
 
-      <main className="flex-1 p-4 space-y-4">
+      <main className="flex-1 p-4 space-y-4 pb-20">
         <Card>
           <CardContent className="p-6 text-center space-y-4">
             <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center ${
@@ -240,6 +263,8 @@ export default function RiderLiveRide() {
           </Button>
         )}
       </main>
+
+      <RiderBottomNav activeTab="home" />
     </div>
   );
 }

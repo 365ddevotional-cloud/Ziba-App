@@ -10,7 +10,7 @@ interface RiderUser {
   city: string | null;
   status: string;
   averageRating: number;
-  role: "rider";
+  role: string;
   isTestAccount?: boolean;
 }
 
@@ -18,6 +18,7 @@ interface RiderAuthContextType {
   user: RiderUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isRider: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
@@ -117,12 +118,15 @@ export function RiderAuthProvider({ children }: { children: ReactNode }) {
     await updateProfileMutation.mutateAsync(data);
   };
 
+  const isRider = !!user && user.role === "rider";
+
   return (
     <RiderAuthContext.Provider
       value={{
         user: user || null,
         isLoading: !isInitialized || isLoading,
         isAuthenticated: !!user,
+        isRider,
         login,
         register,
         logout,
