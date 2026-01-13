@@ -2645,6 +2645,11 @@ export async function registerRoutes(
 
   // ==================== RIDER APP AUTHENTICATION ====================
 
+  // TEST_SIGNUP_MODE: When true, skip email verification and auto-approve accounts
+  // This is for development/testing only and will be replaced with real verification later
+  // Can be disabled via environment variable: TEST_SIGNUP_MODE=false
+  const TEST_SIGNUP_MODE = process.env.TEST_SIGNUP_MODE !== "false";
+
   // Rider registration
   app.post("/api/rider/register", async (req, res) => {
     try {
@@ -2664,6 +2669,8 @@ export async function registerRoutes(
       }
 
       const passwordHash = await hashPassword(password);
+      
+      // In TEST_SIGNUP_MODE, mark as test account (email auto-verified)
       const user = await prisma.user.create({
         data: {
           fullName,
@@ -2671,7 +2678,8 @@ export async function registerRoutes(
           passwordHash,
           phone: phone || null,
           city: city || null,
-          status: "ACTIVE"
+          status: "ACTIVE",
+          isTestAccount: TEST_SIGNUP_MODE
         }
       });
 
@@ -2697,7 +2705,8 @@ export async function registerRoutes(
           email: user.email,
           phone: user.phone,
           city: user.city,
-          role: "rider"
+          role: "rider",
+          isTestAccount: user.isTestAccount
         }
       });
     } catch (error: any) {
