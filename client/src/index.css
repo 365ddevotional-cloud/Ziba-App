@@ -175,6 +175,71 @@
   }
 }
 
+/* Ziba Design System - Rider App Specific */
+@layer utilities {
+  /* Status Colors - Calm, Professional Palette */
+  .ziba-status-searching {
+    @apply text-amber-600 dark:text-amber-400;
+  }
+  .ziba-status-searching-bg {
+    @apply bg-amber-50 dark:bg-amber-900/20;
+  }
+  .ziba-status-enroute {
+    @apply text-blue-600 dark:text-blue-400;
+  }
+  .ziba-status-enroute-bg {
+    @apply bg-blue-50 dark:bg-blue-900/20;
+  }
+  .ziba-status-arrived {
+    @apply text-emerald-600 dark:text-emerald-400;
+  }
+  .ziba-status-arrived-bg {
+    @apply bg-emerald-50 dark:bg-emerald-900/20;
+  }
+  .ziba-status-progress {
+    @apply text-primary;
+  }
+  .ziba-status-progress-bg {
+    @apply bg-primary/10;
+  }
+  .ziba-status-complete {
+    @apply text-emerald-600 dark:text-emerald-400;
+  }
+  .ziba-status-complete-bg {
+    @apply bg-emerald-50 dark:bg-emerald-900/20;
+  }
+
+  /* Typography - Clean Hierarchy */
+  .ziba-headline {
+    @apply text-2xl font-semibold tracking-tight text-foreground;
+  }
+  .ziba-subheadline {
+    @apply text-base font-normal text-muted-foreground;
+  }
+  .ziba-caption {
+    @apply text-xs font-medium text-muted-foreground uppercase tracking-wide;
+  }
+  .ziba-body {
+    @apply text-sm text-foreground;
+  }
+  .ziba-body-muted {
+    @apply text-sm text-muted-foreground;
+  }
+
+  /* Rider App Card Styles */
+  .ziba-card {
+    @apply bg-card border border-border rounded-xl;
+  }
+  .ziba-card-elevated {
+    @apply bg-card border border-border rounded-xl shadow-sm;
+  }
+
+  /* Cancel Button - Subtle Danger */
+  .ziba-cancel-btn {
+    @apply text-destructive bg-transparent border border-destructive/30 hover:bg-destructive/5;
+  }
+}
+
 /**
  * Using the elevate system.
  * Automatic contrast adjustment.

@@ -1,0 +1,129 @@
+You are upgrading the Ziba Rider App UI to a mature, professional, production-ready design.
+
+GOAL:
+Establish a consistent Ziba Design System (colors + typography), then refactor the Rider Home UI and Ride Status screen to match modern ride-hailing standards (Uber-class polish).
+
+DO NOT add new features.
+DO NOT change backend logic.
+FOCUS ONLY on UI, UX, copy, and visual consistency.
+
+--------------------------------
+STEP 1: DEFINE ZIBA DESIGN SYSTEM
+--------------------------------
+
+Create a centralized design system file and enforce it across Rider screens.
+
+COLORS:
+- PrimaryColor: use Ziba brand primary color ONLY for:
+  - Primary CTA buttons
+  - Active ride status
+  - Progress indicators
+- BackgroundColor: light neutral (cards sit on this)
+- CardColor: white or near-white
+- TextPrimary: dark neutral (headings)
+- TextSecondary: muted gray (supporting text)
+- SuccessColor: soft green (ARRIVED, COMPLETED)
+- DangerColor: muted red (Cancel only)
+
+RULES:
+- Never use bright colors for body text
+- Never mix multiple accent colors on one screen
+- No red/orange for non-critical states
+
+TYPOGRAPHY:
+- Headline (large, semibold): status titles and screen headers
+- Body (regular): descriptions and instructions
+- Caption (small): metadata like ETA, vehicle info
+
+No decorative fonts.
+No excessive bolding.
+No inconsistent font sizes.
+
+--------------------------------
+STEP 2: FIX RIDE STATUS SCREEN (PRIORITY)
+--------------------------------
+
+Refactor the Ride Status screen UI ONLY.
+
+STRUCTURE:
+TOP:
+- Large headline text showing human-readable status:
+  Examples:
+    "Driver on the way"
+    "Driver has arrived"
+    "Trip in progress"
+    "Trip completed"
+
+- Subtext below headline:
+  Example: "Arriving in 3 minutes"
+
+MIDDLE:
+- Single clean card containing:
+  - Driver name
+  - Vehicle details
+  - Rating
+  - ETA
+
+BOTTOM:
+- One secondary action only:
+  - "Cancel Ride" (DangerColor, subtle)
+
+RULES:
+- NEVER display internal state names (e.g. DRIVER_EN_ROUTE)
+- NEVER show router, system, or developer error messages
+- Smooth transitions between states
+- Calm, reassuring language
+
+--------------------------------
+STEP 3: RIDER HOME UI FOUNDATION
+--------------------------------
+
+Refactor Rider Home screen to a clean, minimal layout.
+
+LAYOUT:
+TOP:
+- Headline: "Where are you going?"
+
+MIDDLE:
+- Pickup location card
+- Destination input card
+
+BOTTOM:
+- Single primary CTA button:
+  "Request Ride"
+
+RULES:
+- No clutter
+- No developer/test controls visible
+- No multiple CTAs
+- UI must feel simple, confident, and premium
+
+--------------------------------
+STEP 4: ERROR HANDLING (UI ONLY)
+--------------------------------
+
+Replace all visible technical errors with user-friendly messages.
+
+FOR EXAMPLE:
+Instead of:
+"Did you forget to add the page to the router?"
+
+Show:
+"We’re having trouble loading this screen. Please try again."
+
+Log technical details to console only.
+
+--------------------------------
+FINAL REQUIREMENTS
+--------------------------------
+
+- Apply the design system consistently
+- Do not break navigation
+- Do not introduce new routes
+- UI must feel calm, modern, and trustworthy
+- Output should be ready for Android and iOS
+
+When finished, confirm:
+- Ride Status screen is clean and readable
+- Rider Home UI looks professional
+- No technical text is visible to users

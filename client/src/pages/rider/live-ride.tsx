@@ -9,13 +9,11 @@ import {
   Car,
   Phone,
   Star,
-  Clock,
   Navigation,
   X,
   ChevronLeft,
   Loader2,
   User,
-  RefreshCw,
   MapPin,
   Play,
   CheckCircle,
@@ -69,9 +67,10 @@ export default function RiderLiveRide() {
       navigate("/rider/home");
     },
     onError: (error: any) => {
+      console.error("Cancel error:", error);
       toast({
-        title: "Cancel failed",
-        description: error.message || "Could not cancel ride",
+        title: "Unable to cancel",
+        description: "Please try again in a moment",
         variant: "destructive",
       });
     },
@@ -87,7 +86,8 @@ export default function RiderLiveRide() {
       toast({ title: "Driver arrived", description: "Driver is at your pickup location" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error("Test arrive error:", error);
+      toast({ title: "Action failed", description: "Please try again", variant: "destructive" });
     },
   });
 
@@ -98,10 +98,11 @@ export default function RiderLiveRide() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });
-      toast({ title: "Ride started", description: "You're on your way!" });
+      toast({ title: "Trip started", description: "Enjoy your ride!" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error("Test start error:", error);
+      toast({ title: "Action failed", description: "Please try again", variant: "destructive" });
     },
   });
 
@@ -114,18 +115,22 @@ export default function RiderLiveRide() {
       queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });
       queryClient.invalidateQueries({ queryKey: ["/api/rider/rides"] });
       queryClient.invalidateQueries({ queryKey: ["/api/rider/wallet"] });
-      toast({ title: "Ride completed", description: "Thanks for riding with us!" });
+      toast({ title: "Trip completed", description: "Thanks for riding with Ziba!" });
       navigate(`/rider/trip-summary/${data.id}`);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error("Test complete error:", error);
+      toast({ title: "Action failed", description: "Please try again", variant: "destructive" });
     },
   });
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="text-center space-y-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+          <p className="ziba-body-muted">Loading your ride...</p>
+        </div>
       </div>
     );
   }
@@ -142,21 +147,19 @@ export default function RiderLiveRide() {
           <h1 className="font-semibold text-foreground">Your Ride</h1>
         </header>
         
-        <main className="flex-1 p-4 flex flex-col items-center justify-center pb-20">
-          <Card className="w-full max-w-md">
-            <CardContent className="p-6 text-center space-y-4">
-              <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
-                <Car className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h2 className="text-xl font-semibold">No Active Ride</h2>
-              <p className="text-muted-foreground">You don't have any rides in progress</p>
-              <Link href="/rider/home">
-                <Button className="w-full" data-testid="button-request-new">
-                  Request a Ride
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+        <main className="flex-1 p-6 flex flex-col items-center justify-center pb-24">
+          <div className="text-center space-y-4 max-w-xs">
+            <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
+              <Car className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h2 className="ziba-headline">No active ride</h2>
+            <p className="ziba-subheadline">You don't have any rides in progress right now.</p>
+            <Link href="/rider/home">
+              <Button className="w-full mt-4" data-testid="button-request-new">
+                Request a Ride
+              </Button>
+            </Link>
+          </div>
         </main>
 
         <RiderBottomNav activeTab="home" />
@@ -168,55 +171,57 @@ export default function RiderLiveRide() {
     switch (status) {
       case "REQUESTED":
         return {
-          title: "Looking for driver...",
-          description: "We're finding you a driver nearby",
-          color: "text-yellow-500",
-          bgColor: "bg-yellow-500/10",
+          headline: "Finding your driver",
+          subtext: "This usually takes less than a minute",
+          colorClass: "ziba-status-searching",
+          bgClass: "ziba-status-searching-bg",
           icon: Loader2,
           animate: true,
         };
       case "ACCEPTED":
       case "DRIVER_EN_ROUTE":
         return {
-          title: "Driver on the way",
-          description: "Your driver is heading to pick you up",
-          color: "text-blue-500",
-          bgColor: "bg-blue-500/10",
+          headline: "Driver on the way",
+          subtext: "Your driver is heading to pick you up",
+          colorClass: "ziba-status-enroute",
+          bgClass: "ziba-status-enroute-bg",
           icon: Navigation,
           animate: false,
         };
       case "ARRIVED":
         return {
-          title: "Driver has arrived",
-          description: "Your driver is waiting at the pickup point",
-          color: "text-purple-500",
-          bgColor: "bg-purple-500/10",
+          headline: "Driver has arrived",
+          subtext: "Your driver is waiting at the pickup location",
+          colorClass: "ziba-status-arrived",
+          bgClass: "ziba-status-arrived-bg",
           icon: MapPin,
           animate: false,
         };
       case "IN_PROGRESS":
         return {
-          title: "Trip in progress",
-          description: "Enjoy your ride!",
-          color: "text-green-500",
-          bgColor: "bg-green-500/10",
+          headline: "Trip in progress",
+          subtext: "Sit back and enjoy your ride",
+          colorClass: "ziba-status-progress",
+          bgClass: "ziba-status-progress-bg",
           icon: Car,
           animate: false,
         };
       default:
         return {
-          title: "Status unknown",
-          description: "Please wait...",
-          color: "text-muted-foreground",
-          bgColor: "bg-muted",
-          icon: Clock,
-          animate: false,
+          headline: "Loading...",
+          subtext: "Please wait",
+          colorClass: "text-muted-foreground",
+          bgClass: "bg-muted",
+          icon: Loader2,
+          animate: true,
         };
     }
   };
 
   const statusInfo = getStatusInfo(activeRide.status);
   const StatusIcon = statusInfo.icon;
+
+  const canCancel = ["REQUESTED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED"].includes(activeRide.status);
 
   const getTestControlButton = () => {
     if (!isTestMode) return null;
@@ -239,7 +244,7 @@ export default function RiderLiveRide() {
             ) : (
               <MapPin className="w-4 h-4 mr-2" />
             )}
-            Driver Arrived
+            Simulate: Driver Arrived
           </Button>
         );
       case "ARRIVED":
@@ -256,7 +261,7 @@ export default function RiderLiveRide() {
             ) : (
               <Play className="w-4 h-4 mr-2" />
             )}
-            Start Ride
+            Simulate: Start Trip
           </Button>
         );
       case "IN_PROGRESS":
@@ -273,7 +278,7 @@ export default function RiderLiveRide() {
             ) : (
               <CheckCircle className="w-4 h-4 mr-2" />
             )}
-            Complete Ride
+            Simulate: Complete Trip
           </Button>
         );
       default:
@@ -283,15 +288,13 @@ export default function RiderLiveRide() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Minimal Header */}
       <header className="p-4 flex items-center justify-between border-b border-border">
-        <div className="flex items-center gap-3">
-          <Link href="/rider/home">
-            <Button size="icon" variant="ghost" data-testid="button-back">
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
-          </Link>
-          <h1 className="font-semibold text-foreground">Your Ride</h1>
-        </div>
+        <Link href="/rider/home">
+          <Button size="icon" variant="ghost" data-testid="button-back">
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+        </Link>
         <Button
           size="icon"
           variant="ghost"
@@ -299,66 +302,37 @@ export default function RiderLiveRide() {
           disabled={isFetching}
           data-testid="button-refresh"
         >
-          <RefreshCw className={`w-5 h-5 ${isFetching ? "animate-spin" : ""}`} />
+          <Loader2 className={`w-5 h-5 ${isFetching ? "animate-spin" : ""}`} />
         </Button>
       </header>
 
-      <main className="flex-1 p-4 space-y-4 pb-20">
-        <Card>
-          <CardContent className="p-6 text-center space-y-4">
-            <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center ${statusInfo.bgColor}`}>
-              <StatusIcon className={`w-10 h-10 ${statusInfo.color} ${statusInfo.animate ? "animate-spin" : ""}`} />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-foreground">{statusInfo.title}</h2>
-              <p className="text-muted-foreground">{statusInfo.description}</p>
-            </div>
-          </CardContent>
-        </Card>
+      <main className="flex-1 p-4 space-y-5 pb-24">
+        {/* Status Hero - Large, Clear, Human-Readable */}
+        <div className="text-center py-6 space-y-3">
+          <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center ${statusInfo.bgClass}`}>
+            <StatusIcon className={`w-10 h-10 ${statusInfo.colorClass} ${statusInfo.animate ? "animate-spin" : ""}`} />
+          </div>
+          <h1 className="ziba-headline">{statusInfo.headline}</h1>
+          <p className="ziba-subheadline">{statusInfo.subtext}</p>
+        </div>
 
-        <Card>
-          <CardContent className="p-4 space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-3 h-3 rounded-full bg-green-500 mt-1.5 shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">Pickup</p>
-                <p className="text-sm font-medium text-foreground">{activeRide.pickupLocation}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-3 h-3 rounded-full bg-red-500 mt-1.5 shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">Destination</p>
-                <p className="text-sm font-medium text-foreground">{activeRide.dropoffLocation}</p>
-              </div>
-            </div>
-            {activeRide.fareEstimate && (
-              <div className="pt-3 border-t border-border flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Estimated Fare</span>
-                <span className="font-semibold text-foreground">
-                  NGN {activeRide.fareEstimate.toLocaleString()}
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
+        {/* Driver Card - Clean, Single Card */}
         {activeRide.driver && (
-          <Card>
-            <CardContent className="p-4 space-y-4">
+          <Card className="ziba-card-elevated">
+            <CardContent className="p-4">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-muted rounded-full flex items-center justify-center">
+                <div className="w-14 h-14 bg-muted rounded-full flex items-center justify-center shrink-0">
                   <User className="w-7 h-7 text-muted-foreground" />
                 </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-foreground">{activeRide.driver.fullName}</p>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-foreground truncate">{activeRide.driver.fullName}</p>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                     <span>{activeRide.driver.averageRating.toFixed(1)}</span>
-                    <span className="mx-1">-</span>
+                    <span className="text-border">|</span>
                     <span>{activeRide.driver.vehicleType}</span>
                   </div>
-                  <p className="text-sm text-primary font-medium mt-1">{activeRide.driver.vehiclePlate}</p>
+                  <p className="text-sm font-medium text-primary mt-1">{activeRide.driver.vehiclePlate}</p>
                 </div>
                 <a href={`tel:${activeRide.driver.phone}`}>
                   <Button size="icon" variant="outline" data-testid="button-call-driver">
@@ -370,23 +344,52 @@ export default function RiderLiveRide() {
           </Card>
         )}
 
-        {/* Test Mode Controls */}
+        {/* Trip Details - Compact */}
+        <Card className="ziba-card">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="ziba-caption">Pickup</p>
+                <p className="ziba-body truncate">{activeRide.pickupLocation}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-2.5 h-2.5 rounded-full bg-primary mt-1.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="ziba-caption">Drop-off</p>
+                <p className="ziba-body truncate">{activeRide.dropoffLocation}</p>
+              </div>
+            </div>
+            {activeRide.fareEstimate && (
+              <div className="pt-3 border-t border-border flex items-center justify-between">
+                <span className="ziba-body-muted">Estimated fare</span>
+                <span className="font-semibold text-foreground">
+                  NGN {activeRide.fareEstimate.toLocaleString()}
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Test Mode Controls - Developer Only */}
         {isTestMode && (
-          <Card className="border-dashed border-orange-500/50 bg-orange-500/5">
+          <Card className="border-dashed border-orange-400/50 bg-orange-50 dark:bg-orange-900/10">
             <CardContent className="p-4 space-y-3">
-              <div className="flex items-center gap-2 text-orange-500 text-sm font-medium">
-                <Wrench className="w-4 h-4" />
-                Test Mode Controls
+              <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 text-xs font-medium uppercase tracking-wide">
+                <Wrench className="w-3.5 h-3.5" />
+                Test Mode
               </div>
               {getTestControlButton()}
             </CardContent>
           </Card>
         )}
 
-        {["REQUESTED", "ACCEPTED", "ARRIVED"].includes(activeRide.status) && (
+        {/* Cancel Button - Subtle, Secondary */}
+        {canCancel && (
           <Button
-            variant="destructive"
-            className="w-full"
+            variant="outline"
+            className="w-full ziba-cancel-btn"
             onClick={() => cancelMutation.mutate(activeRide.id)}
             disabled={cancelMutation.isPending}
             data-testid="button-cancel-ride"
