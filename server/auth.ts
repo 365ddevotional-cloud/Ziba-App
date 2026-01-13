@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 
-export type UserRole = "user" | "director" | "admin";
+export type UserRole = "user" | "rider" | "driver" | "director" | "admin";
 
 interface SessionUser {
   id: string;

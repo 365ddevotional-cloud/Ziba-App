@@ -1,13 +1,15 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useRoute } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth";
+import { RiderAuthProvider } from "@/lib/rider-auth";
 import { CountryProvider } from "@/lib/country";
 import { TestBanner } from "@/components/test-banner";
 import Landing from "@/pages/landing";
+import RiderApp from "@/pages/rider";
 import UsersPage from "@/pages/users";
 import DriversPage from "@/pages/drivers";
 import DirectorsPage from "@/pages/directors";
@@ -78,6 +80,7 @@ function Router() {
       <Route path="/legal/terms" component={LegalTerms} />
       <Route path="/legal/privacy" component={LegalPrivacy} />
       <Route path="/legal/cookies" component={LegalCookies} />
+      <Route path="/rider/:rest*" component={RiderApp} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -87,15 +90,17 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AuthProvider>
-          <CountryProvider>
-            <TooltipProvider>
-              <TestBanner />
-              <Toaster />
-              <Router />
-            </TooltipProvider>
-          </CountryProvider>
-        </AuthProvider>
+        <RiderAuthProvider>
+          <AuthProvider>
+            <CountryProvider>
+              <TooltipProvider>
+                <TestBanner />
+                <Toaster />
+                <Router />
+              </TooltipProvider>
+            </CountryProvider>
+          </AuthProvider>
+        </RiderAuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

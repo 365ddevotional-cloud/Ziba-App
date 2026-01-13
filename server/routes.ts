@@ -2643,5 +2643,612 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== RIDER APP AUTHENTICATION ====================
+
+  // Rider registration
+  app.post("/api/rider/register", async (req, res) => {
+    try {
+      const { fullName, email, password, phone, city } = req.body;
+      
+      if (!fullName || !email || !password) {
+        return res.status(400).json({ message: "Full name, email, and password are required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      const passwordHash = await hashPassword(password);
+      const user = await prisma.user.create({
+        data: {
+          fullName,
+          email,
+          passwordHash,
+          phone: phone || null,
+          city: city || null,
+          status: "ACTIVE"
+        }
+      });
+
+      // Create wallet for new user
+      await prisma.wallet.create({
+        data: {
+          ownerId: user.id,
+          ownerType: "USER",
+          balance: 0
+        }
+      });
+
+      // Set session
+      req.session.userId = user.id;
+      req.session.userRole = "rider" as UserRole;
+      req.session.userEmail = user.email;
+
+      res.status(201).json({
+        message: "Registration successful",
+        user: {
+          id: user.id,
+          fullName: user.fullName,
+          email: user.email,
+          phone: user.phone,
+          city: user.city,
+          role: "rider"
+        }
+      });
+    } catch (error: any) {
+      console.error("Rider registration error:", error);
+      if (error.code === "P2002") {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  // Rider login
+  app.post("/api/rider/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (!user.passwordHash) {
+        return res.status(401).json({ message: "Account not configured for login" });
+      }
+
+      if (user.status === "SUSPENDED") {
+        return res.status(403).json({ message: "Account suspended" });
+      }
+
+      const isValid = await verifyPassword(password, user.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Set session
+      req.session.userId = user.id;
+      req.session.userRole = "rider" as UserRole;
+      req.session.userEmail = user.email;
+
+      res.json({
+        message: "Login successful",
+        user: {
+          id: user.id,
+          fullName: user.fullName,
+          email: user.email,
+          phone: user.phone,
+          city: user.city,
+          role: "rider",
+          isTestAccount: user.isTestAccount
+        }
+      });
+    } catch (error) {
+      console.error("Rider login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Rider auth check
+  app.get("/api/rider/me", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: req.session.userId },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          phone: true,
+          city: true,
+          status: true,
+          averageRating: true,
+          isTestAccount: true
+        }
+      });
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        ...user,
+        role: "rider"
+      });
+    } catch (error) {
+      console.error("Error fetching rider:", error);
+      res.status(500).json({ message: "Failed to fetch rider data" });
+    }
+  });
+
+  // Rider logout
+  app.post("/api/rider/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  // Rider profile update
+  app.patch("/api/rider/profile", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { fullName, phone, city } = req.body;
+      
+      const user = await prisma.user.update({
+        where: { id: req.session.userId },
+        data: { fullName, phone, city },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          phone: true,
+          city: true,
+          status: true,
+          averageRating: true
+        }
+      });
+
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating rider profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // ==================== RIDER APP RIDES ====================
+
+  // Get rider's rides
+  app.get("/api/rider/rides", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const rides = await prisma.ride.findMany({
+        where: { userId: req.session.userId },
+        orderBy: { createdAt: "desc" },
+        include: {
+          driver: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              vehicleType: true,
+              vehiclePlate: true,
+              averageRating: true
+            }
+          },
+          payment: true
+        }
+      });
+
+      res.json(rides);
+    } catch (error) {
+      console.error("Error fetching rider rides:", error);
+      res.status(500).json({ message: "Failed to fetch rides" });
+    }
+  });
+
+  // Get active ride for rider
+  app.get("/api/rider/active-ride", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const activeRide = await prisma.ride.findFirst({
+        where: {
+          userId: req.session.userId,
+          status: { in: ["REQUESTED", "ACCEPTED", "IN_PROGRESS"] }
+        },
+        include: {
+          driver: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              vehicleType: true,
+              vehiclePlate: true,
+              averageRating: true
+            }
+          },
+          payment: true
+        }
+      });
+
+      res.json(activeRide);
+    } catch (error) {
+      console.error("Error fetching active ride:", error);
+      res.status(500).json({ message: "Failed to fetch active ride" });
+    }
+  });
+
+  // Request a new ride
+  app.post("/api/rider/request-ride", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { pickupLocation, dropoffLocation, fareEstimate } = req.body;
+
+      if (!pickupLocation || !dropoffLocation) {
+        return res.status(400).json({ message: "Pickup and dropoff locations are required" });
+      }
+
+      // Check for existing active ride
+      const existingRide = await prisma.ride.findFirst({
+        where: {
+          userId: req.session.userId,
+          status: { in: ["REQUESTED", "ACCEPTED", "IN_PROGRESS"] }
+        }
+      });
+
+      if (existingRide) {
+        return res.status(400).json({ message: "You already have an active ride" });
+      }
+
+      const ride = await prisma.ride.create({
+        data: {
+          userId: req.session.userId,
+          pickupLocation,
+          dropoffLocation,
+          fareEstimate: fareEstimate || null,
+          status: "REQUESTED"
+        },
+        include: {
+          user: {
+            select: { id: true, fullName: true, email: true }
+          }
+        }
+      });
+
+      res.status(201).json(ride);
+    } catch (error) {
+      console.error("Error requesting ride:", error);
+      res.status(500).json({ message: "Failed to request ride" });
+    }
+  });
+
+  // Cancel ride (rider can only cancel REQUESTED rides)
+  app.post("/api/rider/rides/:id/cancel", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { id } = req.params;
+
+      const ride = await prisma.ride.findFirst({
+        where: { id, userId: req.session.userId }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.status !== "REQUESTED") {
+        return res.status(400).json({ message: "Can only cancel rides that are still being requested" });
+      }
+
+      const updatedRide = await prisma.ride.update({
+        where: { id },
+        data: { status: "CANCELLED" }
+      });
+
+      res.json(updatedRide);
+    } catch (error) {
+      console.error("Error cancelling ride:", error);
+      res.status(500).json({ message: "Failed to cancel ride" });
+    }
+  });
+
+  // Rate driver after ride completion
+  app.post("/api/rider/rides/:id/rate", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { id } = req.params;
+      const { rating } = req.body;
+
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+
+      const ride = await prisma.ride.findFirst({
+        where: { id, userId: req.session.userId }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.status !== "COMPLETED") {
+        return res.status(400).json({ message: "Can only rate completed rides" });
+      }
+
+      if (!ride.driverId) {
+        return res.status(400).json({ message: "No driver assigned to this ride" });
+      }
+
+      // Check if already rated
+      const existingRating = await prisma.driverRating.findUnique({
+        where: { rideId: id }
+      });
+
+      if (existingRating) {
+        return res.status(400).json({ message: "You have already rated this ride" });
+      }
+
+      // Create rating
+      await prisma.driverRating.create({
+        data: {
+          rideId: id,
+          driverId: ride.driverId,
+          userId: req.session.userId,
+          rating
+        }
+      });
+
+      // Update driver average rating
+      const allRatings = await prisma.driverRating.findMany({
+        where: { driverId: ride.driverId }
+      });
+      const avgRating = allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length;
+
+      await prisma.driver.update({
+        where: { id: ride.driverId },
+        data: {
+          averageRating: avgRating,
+          totalRatings: allRatings.length
+        }
+      });
+
+      res.json({ message: "Rating submitted", rating });
+    } catch (error) {
+      console.error("Error rating driver:", error);
+      res.status(500).json({ message: "Failed to submit rating" });
+    }
+  });
+
+  // ==================== RIDER APP WALLET ====================
+
+  // Get rider wallet
+  app.get("/api/rider/wallet", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      let wallet = await prisma.wallet.findUnique({
+        where: {
+          ownerId_ownerType: {
+            ownerId: req.session.userId,
+            ownerType: "USER"
+          }
+        },
+        include: {
+          transactions: {
+            orderBy: { createdAt: "desc" },
+            take: 20
+          }
+        }
+      });
+
+      // Create wallet if doesn't exist
+      if (!wallet) {
+        wallet = await prisma.wallet.create({
+          data: {
+            ownerId: req.session.userId,
+            ownerType: "USER",
+            balance: 0
+          },
+          include: {
+            transactions: true
+          }
+        });
+      }
+
+      res.json(wallet);
+    } catch (error) {
+      console.error("Error fetching rider wallet:", error);
+      res.status(500).json({ message: "Failed to fetch wallet" });
+    }
+  });
+
+  // Add tip to driver
+  app.post("/api/rider/tips", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { rideId, amount } = req.body;
+
+      if (!rideId || !amount || amount <= 0) {
+        return res.status(400).json({ message: "Valid ride ID and tip amount required" });
+      }
+
+      const ride = await prisma.ride.findFirst({
+        where: { id: rideId, userId: req.session.userId, status: "COMPLETED" }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Completed ride not found" });
+      }
+
+      if (!ride.driverId) {
+        return res.status(400).json({ message: "No driver assigned to this ride" });
+      }
+
+      // Check if tip already exists
+      const existingTip = await prisma.tip.findUnique({
+        where: { rideId }
+      });
+
+      if (existingTip) {
+        return res.status(400).json({ message: "Tip already added for this ride" });
+      }
+
+      // Create tip
+      const tip = await prisma.tip.create({
+        data: {
+          rideId,
+          userId: req.session.userId,
+          driverId: ride.driverId,
+          amount
+        }
+      });
+
+      // Credit driver wallet (tips go 100% to driver)
+      const driverWallet = await prisma.wallet.findUnique({
+        where: {
+          ownerId_ownerType: {
+            ownerId: ride.driverId,
+            ownerType: "DRIVER"
+          }
+        }
+      });
+
+      if (driverWallet) {
+        await prisma.wallet.update({
+          where: { id: driverWallet.id },
+          data: { balance: { increment: amount } }
+        });
+
+        await prisma.transaction.create({
+          data: {
+            walletId: driverWallet.id,
+            type: "TIP",
+            amount,
+            reference: `Tip for ride ${rideId}`
+          }
+        });
+      }
+
+      res.json({ message: "Tip sent successfully", tip });
+    } catch (error) {
+      console.error("Error adding tip:", error);
+      res.status(500).json({ message: "Failed to send tip" });
+    }
+  });
+
+  // ==================== RIDER APP FARE ESTIMATE ====================
+
+  // Get fare estimate (no auth required for guest browsing)
+  app.post("/api/rider/fare-estimate", async (req, res) => {
+    try {
+      const { distance, duration, countryCode } = req.body;
+
+      if (!distance || distance <= 0) {
+        return res.status(400).json({ message: "Valid distance required" });
+      }
+
+      // Get fare config for country (default to NG if not specified)
+      let fareConfig = await prisma.fareConfig.findUnique({
+        where: { countryCode: countryCode || "NG" }
+      });
+
+      if (!fareConfig) {
+        // Use default values
+        fareConfig = {
+          id: "default",
+          countryCode: "NG",
+          countryName: "Nigeria",
+          currency: "NGN",
+          currencySymbol: "₦",
+          baseFare: 500,
+          pricePerKm: 120,
+          pricePerMinute: 30,
+          minimumFare: 300,
+          driverCommission: 0.85,
+          platformCommission: 0.15,
+          distanceUnit: "KM",
+          surgeEnabled: false,
+          surgeMultiplier: 1.0,
+          maxSurgeCap: 1.3,
+          peakHoursStart: null,
+          peakHoursEnd: null,
+          weatherMultiplier: 1.0,
+          trafficMultiplier: 1.0,
+          updatedAt: new Date(),
+          updatedBy: null
+        };
+      }
+
+      let fare = fareConfig.baseFare + (distance * fareConfig.pricePerKm);
+      
+      if (duration && duration > 0) {
+        fare += duration * fareConfig.pricePerMinute;
+      }
+
+      // Apply surge if enabled
+      if (fareConfig.surgeEnabled) {
+        const surgeMultiplier = Math.min(fareConfig.surgeMultiplier, fareConfig.maxSurgeCap);
+        fare *= surgeMultiplier;
+      }
+
+      // Apply minimum fare
+      fare = Math.max(fare, fareConfig.minimumFare);
+
+      res.json({
+        fare: Math.round(fare),
+        currency: fareConfig.currency,
+        currencySymbol: fareConfig.currencySymbol,
+        breakdown: {
+          baseFare: fareConfig.baseFare,
+          distanceCharge: distance * fareConfig.pricePerKm,
+          timeCharge: duration ? duration * fareConfig.pricePerMinute : 0,
+          surgeApplied: fareConfig.surgeEnabled,
+          surgeMultiplier: fareConfig.surgeEnabled ? fareConfig.surgeMultiplier : 1.0
+        }
+      });
+    } catch (error) {
+      console.error("Error calculating fare:", error);
+      res.status(500).json({ message: "Failed to calculate fare" });
+    }
+  });
+
   return httpServer;
 }

@@ -1,0 +1,120 @@
+CREATE ZIBA RIDER APP (ANDROID + iOS READY)
+PROJECT: Ziba Rider App (Standalone)
+
+GOAL:
+Create a standalone Rider-only application (Uber Rider style) using the existing Ziba backend and database. This app must be production-ready and suitable for Android and iOS builds.
+
+SCOPE:
+This app is ONLY for riders.
+NO drivers.
+NO admin.
+NO pricing controls.
+NO payouts.
+
+--------------------------------
+APP IDENTITY
+--------------------------------
+App Name: Ziba Rider
+Bundle IDs:
+- Android: com.ziba.rider
+- iOS: com.ziba.rider
+
+Theme:
+- Dark mode default
+- Rider-focused UI
+- Clean, minimal navigation
+
+--------------------------------
+ROLES & SECURITY
+--------------------------------
+Enforce:
+- role = "rider" ONLY
+- Block access to:
+  /admin/*
+  /drivers/*
+  /directors/*
+- Backend must reject any non-rider role
+
+Middleware rule:
+if (user.role !== "rider") return 403
+
+--------------------------------
+SCREENS (REQUIRED)
+--------------------------------
+1. Home / Request Ride
+   - Pickup location
+   - Destination
+   - Fare estimate
+   - Request ride button
+
+2. Live Ride
+   - Driver assigned
+   - Driver name, rating, car
+   - Live tracking
+   - Ride status updates
+
+3. Rides
+   - Ride history
+   - Receipts
+
+4. Wallet & Payments
+   - Wallet balance
+   - Card payments
+   - Tips
+   - Transaction history
+
+5. Profile
+   - Name
+   - Phone
+   - Email
+   - Logout
+
+6. Support
+   - Help Center
+   - Contact Support
+   - Report a trip issue
+
+--------------------------------
+PAYMENTS (TEST-READY)
+--------------------------------
+- Wallet system enabled
+- Tips enabled
+- Stripe & Paystack READY (test mode)
+- Allow admin-created test riders to use fake credentials
+- Test riders behave exactly like real riders
+- Flag internally: isTestAccount = true
+
+--------------------------------
+AUTHENTICATION
+--------------------------------
+- Email + password login
+- Passwords hashed (bcrypt)
+- No magic passwords
+- No bootstrap logic
+- No environment fallback credentials
+
+--------------------------------
+API USAGE
+--------------------------------
+Use existing backend endpoints.
+Do NOT duplicate backend logic.
+Frontend only consumes APIs.
+
+--------------------------------
+ANDROID & iOS PREP
+--------------------------------
+- Web app must be PWA-ready
+- Compatible with WebView
+- No desktop-only UI assumptions
+- Prepare for AAB (Android) and IPA (iOS)
+
+--------------------------------
+FINAL CHECKS
+--------------------------------
+- Rider app runs independently
+- Cannot access admin or driver routes
+- Payments work in test mode
+- Suitable for Play Store & App Store submission
+
+DELIVERABLE:
+A fully functional Ziba Rider standalone app sharing the existing backend.
