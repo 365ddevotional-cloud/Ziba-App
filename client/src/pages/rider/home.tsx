@@ -318,3 +318,36 @@ export default function RiderHome() {
     </div>
   );
 }
+
+export function RiderBottomNav({ activeTab = "home" }: { activeTab?: "home" | "history" | "wallet" | "support" }) {
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-card z-50">
+      <div className="flex items-center justify-around p-2">
+        <Link href="/rider">
+          <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-home">
+            <Car className={`w-5 h-5 mb-1 ${activeTab === "home" ? "text-primary" : ""}`} />
+            <span className={`text-xs ${activeTab === "home" ? "text-primary" : ""}`}>Home</span>
+          </Button>
+        </Link>
+        <Link href="/rider/history">
+          <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-history">
+            <History className={`w-5 h-5 mb-1 ${activeTab === "history" ? "text-primary" : ""}`} />
+            <span className={`text-xs ${activeTab === "history" ? "text-primary" : ""}`}>Rides</span>
+          </Button>
+        </Link>
+        <Link href="/rider/wallet">
+          <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-wallet">
+            <Wallet className={`w-5 h-5 mb-1 ${activeTab === "wallet" ? "text-primary" : ""}`} />
+            <span className={`text-xs ${activeTab === "wallet" ? "text-primary" : ""}`}>Wallet</span>
+          </Button>
+        </Link>
+        <Link href="/rider/support">
+          <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-support">
+            <HeadphonesIcon className={`w-5 h-5 mb-1 ${activeTab === "support" ? "text-primary" : ""}`} />
+            <span className={`text-xs ${activeTab === "support" ? "text-primary" : ""}`}>Support</span>
+          </Button>
+        </Link>
+      </div>
+    </nav>
+  );
+}

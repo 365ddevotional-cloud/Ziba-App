@@ -18,6 +18,10 @@ import {
   Edit2,
   Save,
   X,
+  Car,
+  History,
+  Wallet,
+  HeadphonesIcon,
 } from "lucide-react";
 
 export default function RiderProfile() {
@@ -128,7 +132,7 @@ export default function RiderProfile() {
         )}
       </header>
 
-      <main className="flex-1 p-4 space-y-4">
+      <main className="flex-1 p-4 space-y-4 pb-20">
         <div className="text-center py-4">
           <div className="w-24 h-24 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-4">
             <User className="w-12 h-12 text-primary" />
@@ -246,6 +250,35 @@ export default function RiderProfile() {
           )}
         </Button>
       </main>
+
+      <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-card z-50">
+        <div className="flex items-center justify-around p-2">
+          <Link href="/rider">
+            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-home">
+              <Car className="w-5 h-5 mb-1" />
+              <span className="text-xs">Home</span>
+            </Button>
+          </Link>
+          <Link href="/rider/history">
+            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-history">
+              <History className="w-5 h-5 mb-1" />
+              <span className="text-xs">Rides</span>
+            </Button>
+          </Link>
+          <Link href="/rider/wallet">
+            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-wallet">
+              <Wallet className="w-5 h-5 mb-1" />
+              <span className="text-xs">Wallet</span>
+            </Button>
+          </Link>
+          <Link href="/rider/support">
+            <Button variant="ghost" className="flex-col h-auto py-2 px-4" data-testid="nav-support">
+              <HeadphonesIcon className="w-5 h-5 mb-1" />
+              <span className="text-xs">Support</span>
+            </Button>
+          </Link>
+        </div>
+      </nav>
     </div>
   );
 }
