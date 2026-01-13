@@ -10,6 +10,7 @@ import RiderHistory from "./history";
 import RiderWallet from "./wallet";
 import RiderProfile from "./profile";
 import RiderSupport from "./support";
+import RiderTripSummary from "./trip-summary";
 import RiderAccessDenied from "./access-denied";
 import { Loader2 } from "lucide-react";
 
@@ -103,6 +104,11 @@ export default function RiderApp() {
       <Route path="/rider/trip-history">
         <RiderAuthGuard>
           <RiderHistory />
+        </RiderAuthGuard>
+      </Route>
+      <Route path="/rider/trip-summary/:id">
+        <RiderAuthGuard>
+          <RiderTripSummary />
         </RiderAuthGuard>
       </Route>
       <Route path="/rider/wallet">

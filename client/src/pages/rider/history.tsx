@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ interface Ride {
 export default function RiderHistory() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [selectedRide, setSelectedRide] = useState<Ride | null>(null);
   const [ratingValue, setRatingValue] = useState(5);
 
@@ -154,7 +155,13 @@ export default function RiderHistory() {
               <Card
                 key={ride.id}
                 className="hover-elevate cursor-pointer"
-                onClick={() => setSelectedRide(ride)}
+                onClick={() => {
+                  if (ride.status === "COMPLETED") {
+                    navigate(`/rider/trip-summary/${ride.id}`);
+                  } else {
+                    setSelectedRide(ride);
+                  }
+                }}
                 data-testid={`card-ride-${ride.id}`}
               >
                 <CardContent className="p-4">

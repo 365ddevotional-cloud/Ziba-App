@@ -16,6 +16,10 @@ import {
   Loader2,
   User,
   RefreshCw,
+  MapPin,
+  Play,
+  CheckCircle,
+  Wrench,
 } from "lucide-react";
 
 interface Ride {
@@ -44,6 +48,13 @@ export default function RiderLiveRide() {
     staleTime: 1000 * 60,
   });
 
+  const { data: testModeData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/test-mode"],
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const isTestMode = testModeData?.enabled ?? false;
+
   const cancelMutation = useMutation({
     mutationFn: async (rideId: string) => {
       const res = await apiRequest("POST", `/api/rider/rides/${rideId}/cancel`);
@@ -63,6 +74,51 @@ export default function RiderLiveRide() {
         description: error.message || "Could not cancel ride",
         variant: "destructive",
       });
+    },
+  });
+
+  const testArriveMutation = useMutation({
+    mutationFn: async (rideId: string) => {
+      const res = await apiRequest("POST", `/api/rider/rides/${rideId}/test-arrive`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });
+      toast({ title: "Driver arrived", description: "Driver is at your pickup location" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const testStartMutation = useMutation({
+    mutationFn: async (rideId: string) => {
+      const res = await apiRequest("POST", `/api/rider/rides/${rideId}/test-start`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });
+      toast({ title: "Ride started", description: "You're on your way!" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const testCompleteMutation = useMutation({
+    mutationFn: async (rideId: string) => {
+      const res = await apiRequest("POST", `/api/rider/rides/${rideId}/test-complete`);
+      return res.json();
+    },
+    onSuccess: (data: Ride) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rider/rides"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rider/wallet"] });
+      toast({ title: "Ride completed", description: "Thanks for riding with us!" });
+      navigate(`/rider/trip-summary/${data.id}`);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -115,6 +171,7 @@ export default function RiderLiveRide() {
           title: "Looking for driver...",
           description: "We're finding you a driver nearby",
           color: "text-yellow-500",
+          bgColor: "bg-yellow-500/10",
           icon: Loader2,
           animate: true,
         };
@@ -123,7 +180,17 @@ export default function RiderLiveRide() {
           title: "Driver on the way",
           description: "Your driver is heading to pick you up",
           color: "text-blue-500",
+          bgColor: "bg-blue-500/10",
           icon: Navigation,
+          animate: false,
+        };
+      case "ARRIVED":
+        return {
+          title: "Driver has arrived",
+          description: "Your driver is waiting at the pickup point",
+          color: "text-purple-500",
+          bgColor: "bg-purple-500/10",
+          icon: MapPin,
           animate: false,
         };
       case "IN_PROGRESS":
@@ -131,6 +198,7 @@ export default function RiderLiveRide() {
           title: "Trip in progress",
           description: "Enjoy your ride!",
           color: "text-green-500",
+          bgColor: "bg-green-500/10",
           icon: Car,
           animate: false,
         };
@@ -139,6 +207,7 @@ export default function RiderLiveRide() {
           title: "Status unknown",
           description: "Please wait...",
           color: "text-muted-foreground",
+          bgColor: "bg-muted",
           icon: Clock,
           animate: false,
         };
@@ -147,6 +216,68 @@ export default function RiderLiveRide() {
 
   const statusInfo = getStatusInfo(activeRide.status);
   const StatusIcon = statusInfo.icon;
+
+  const getTestControlButton = () => {
+    if (!isTestMode) return null;
+    
+    const isPending = testArriveMutation.isPending || testStartMutation.isPending || testCompleteMutation.isPending;
+
+    switch (activeRide.status) {
+      case "ACCEPTED":
+        return (
+          <Button
+            className="w-full"
+            variant="secondary"
+            onClick={() => testArriveMutation.mutate(activeRide.id)}
+            disabled={isPending}
+            data-testid="button-test-arrive"
+          >
+            {testArriveMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <MapPin className="w-4 h-4 mr-2" />
+            )}
+            Simulate: Driver Arrived
+          </Button>
+        );
+      case "ARRIVED":
+        return (
+          <Button
+            className="w-full"
+            variant="secondary"
+            onClick={() => testStartMutation.mutate(activeRide.id)}
+            disabled={isPending}
+            data-testid="button-test-start"
+          >
+            {testStartMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Play className="w-4 h-4 mr-2" />
+            )}
+            Simulate: Start Ride
+          </Button>
+        );
+      case "IN_PROGRESS":
+        return (
+          <Button
+            className="w-full"
+            variant="secondary"
+            onClick={() => testCompleteMutation.mutate(activeRide.id)}
+            disabled={isPending}
+            data-testid="button-test-complete"
+          >
+            {testCompleteMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <CheckCircle className="w-4 h-4 mr-2" />
+            )}
+            Simulate: Complete Ride
+          </Button>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -173,11 +304,7 @@ export default function RiderLiveRide() {
       <main className="flex-1 p-4 space-y-4 pb-20">
         <Card>
           <CardContent className="p-6 text-center space-y-4">
-            <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center ${
-              activeRide.status === "REQUESTED" ? "bg-yellow-500/10" :
-              activeRide.status === "ACCEPTED" ? "bg-blue-500/10" :
-              "bg-green-500/10"
-            }`}>
+            <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center ${statusInfo.bgColor}`}>
               <StatusIcon className={`w-10 h-10 ${statusInfo.color} ${statusInfo.animate ? "animate-spin" : ""}`} />
             </div>
             <div>
@@ -241,7 +368,20 @@ export default function RiderLiveRide() {
           </Card>
         )}
 
-        {["REQUESTED", "ACCEPTED"].includes(activeRide.status) && (
+        {/* Test Mode Controls */}
+        {isTestMode && (
+          <Card className="border-dashed border-orange-500/50 bg-orange-500/5">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2 text-orange-500 text-sm font-medium">
+                <Wrench className="w-4 h-4" />
+                Test Mode Controls
+              </div>
+              {getTestControlButton()}
+            </CardContent>
+          </Card>
+        )}
+
+        {["REQUESTED", "ACCEPTED", "ARRIVED"].includes(activeRide.status) && (
           <Button
             variant="destructive"
             className="w-full"

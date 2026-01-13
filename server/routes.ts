@@ -2908,6 +2908,43 @@ export async function registerRoutes(
 
   // ==================== RIDER APP RIDES ====================
 
+  // Get single ride by ID
+  app.get("/api/rider/rides/:id", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { id } = req.params;
+      const ride = await prisma.ride.findFirst({
+        where: { id, userId: req.session.userId },
+        include: {
+          driver: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              vehicleType: true,
+              vehiclePlate: true,
+              averageRating: true
+            }
+          },
+          payment: true,
+          driverRating: true
+        }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      res.json(ride);
+    } catch (error) {
+      console.error("Error fetching ride:", error);
+      res.status(500).json({ message: "Failed to fetch ride" });
+    }
+  });
+
   // Get rider's rides
   app.get("/api/rider/rides", async (req, res) => {
     if (!req.session.userId || req.session.userRole !== "rider") {
@@ -2950,7 +2987,7 @@ export async function registerRoutes(
       const activeRide = await prisma.ride.findFirst({
         where: {
           userId: req.session.userId,
-          status: { in: ["REQUESTED", "ACCEPTED", "IN_PROGRESS"] }
+          status: { in: ["REQUESTED", "ACCEPTED", "ARRIVED", "IN_PROGRESS"] }
         },
         include: {
           driver: {
@@ -2991,7 +3028,7 @@ export async function registerRoutes(
       const existingRide = await prisma.ride.findFirst({
         where: {
           userId: req.session.userId,
-          status: { in: ["REQUESTED", "ACCEPTED", "IN_PROGRESS"] }
+          status: { in: ["REQUESTED", "ACCEPTED", "ARRIVED", "IN_PROGRESS"] }
         }
       });
 
@@ -3079,7 +3116,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (!["REQUESTED", "ACCEPTED"].includes(ride.status)) {
+      if (!["REQUESTED", "ACCEPTED", "ARRIVED"].includes(ride.status)) {
         return res.status(400).json({ message: "Can only cancel rides that haven't started yet" });
       }
 
@@ -3093,6 +3130,204 @@ export async function registerRoutes(
       console.error("Error cancelling ride:", error);
       res.status(500).json({ message: "Failed to cancel ride" });
     }
+  });
+
+  // ==================== TEST MODE RIDE CONTROLS ====================
+  // These endpoints allow testing the full ride flow without a driver app
+  // Only available when TEST_MODE is enabled
+
+  // Test: Driver arrived at pickup
+  app.post("/api/rider/rides/:id/test-arrive", async (req, res) => {
+    if (!TEST_MODE) {
+      return res.status(403).json({ message: "Test mode is not enabled" });
+    }
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { id } = req.params;
+      const ride = await prisma.ride.findFirst({
+        where: { id, userId: req.session.userId }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.status !== "ACCEPTED") {
+        return res.status(400).json({ message: "Driver can only arrive when ride is accepted" });
+      }
+
+      const updatedRide = await prisma.ride.update({
+        where: { id },
+        data: { status: "ARRIVED" },
+        include: {
+          driver: {
+            select: { id: true, fullName: true, phone: true, vehicleType: true, vehiclePlate: true, averageRating: true }
+          }
+        }
+      });
+
+      console.log(`[TEST_MODE] Driver arrived for ride ${id}`);
+      res.json(updatedRide);
+    } catch (error) {
+      console.error("Error simulating driver arrival:", error);
+      res.status(500).json({ message: "Failed to simulate driver arrival" });
+    }
+  });
+
+  // Test: Start the ride (driver begins trip)
+  app.post("/api/rider/rides/:id/test-start", async (req, res) => {
+    if (!TEST_MODE) {
+      return res.status(403).json({ message: "Test mode is not enabled" });
+    }
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { id } = req.params;
+      const ride = await prisma.ride.findFirst({
+        where: { id, userId: req.session.userId }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.status !== "ARRIVED") {
+        return res.status(400).json({ message: "Can only start ride when driver has arrived" });
+      }
+
+      const updatedRide = await prisma.ride.update({
+        where: { id },
+        data: { status: "IN_PROGRESS" },
+        include: {
+          driver: {
+            select: { id: true, fullName: true, phone: true, vehicleType: true, vehiclePlate: true, averageRating: true }
+          }
+        }
+      });
+
+      console.log(`[TEST_MODE] Ride ${id} started`);
+      res.json(updatedRide);
+    } catch (error) {
+      console.error("Error simulating ride start:", error);
+      res.status(500).json({ message: "Failed to simulate ride start" });
+    }
+  });
+
+  // Test: Complete the ride
+  app.post("/api/rider/rides/:id/test-complete", async (req, res) => {
+    if (!TEST_MODE) {
+      return res.status(403).json({ message: "Test mode is not enabled" });
+    }
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { id } = req.params;
+      const ride = await prisma.ride.findFirst({
+        where: { id, userId: req.session.userId },
+        include: { driver: true }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.status !== "IN_PROGRESS") {
+        return res.status(400).json({ message: "Can only complete rides that are in progress" });
+      }
+
+      const finalFare = ride.fareEstimate || 1500; // Use estimate or default
+
+      // Use transaction for data integrity
+      // Note: In TEST_MODE, we skip balance checks since no real money moves
+      const updatedRide = await prisma.$transaction(async (tx) => {
+        // Complete the ride
+        const completedRide = await tx.ride.update({
+          where: { id },
+          data: { 
+            status: "COMPLETED",
+            fareEstimate: finalFare
+          },
+          include: {
+            driver: {
+              select: { id: true, fullName: true, phone: true, vehicleType: true, vehiclePlate: true, averageRating: true }
+            }
+          }
+        });
+
+        // Get user wallet and create transaction record
+        const userWallet = await tx.wallet.findUnique({
+          where: { ownerId_ownerType: { ownerId: req.session.userId, ownerType: "USER" } }
+        });
+
+        if (userWallet) {
+          await tx.transaction.create({
+            data: {
+              walletId: userWallet.id,
+              amount: finalFare,
+              type: "DEBIT",
+              reference: `RIDE-${id}`
+            }
+          });
+
+          await tx.wallet.update({
+            where: { id: userWallet.id },
+            data: { balance: { decrement: finalFare } }
+          });
+        }
+
+        // Credit driver wallet if driver exists
+        if (ride.driverId) {
+          const driverWallet = await tx.wallet.findUnique({
+            where: { ownerId_ownerType: { ownerId: ride.driverId, ownerType: "DRIVER" } }
+          });
+
+          if (driverWallet) {
+            const commission = finalFare * 0.10;
+            const driverAmount = finalFare - commission;
+
+            await tx.transaction.create({
+              data: {
+                walletId: driverWallet.id,
+                amount: driverAmount,
+                type: "CREDIT",
+                reference: `RIDE-${id}`
+              }
+            });
+
+            await tx.wallet.update({
+              where: { id: driverWallet.id },
+              data: { balance: { increment: driverAmount } }
+            });
+          }
+
+          // Mark test driver as available again
+          await tx.driver.update({
+            where: { id: ride.driverId },
+            data: { isOnline: true }
+          });
+        }
+
+        return completedRide;
+      });
+
+      console.log(`[TEST_MODE] Ride ${id} completed. Fare: ${finalFare}`);
+      res.json(updatedRide);
+    } catch (error) {
+      console.error("Error simulating ride completion:", error);
+      res.status(500).json({ message: "Failed to simulate ride completion" });
+    }
+  });
+
+  // Get test mode status
+  app.get("/api/test-mode", async (req, res) => {
+    res.json({ enabled: TEST_MODE });
   });
 
   // Rate driver after ride completion
