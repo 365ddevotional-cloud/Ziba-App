@@ -15,6 +15,7 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  Navigation,
 } from "lucide-react";
 import {
   Dialog,
@@ -100,6 +101,21 @@ export default function RiderHistory() {
           <span className="flex items-center gap-1 text-blue-500 text-xs font-medium">
             <Car className="w-3 h-3" />
             In Progress
+          </span>
+        );
+      case "DRIVER_EN_ROUTE":
+      case "ACCEPTED":
+        return (
+          <span className="flex items-center gap-1 text-blue-500 text-xs font-medium">
+            <Navigation className="w-3 h-3" />
+            Driver En Route
+          </span>
+        );
+      case "ARRIVED":
+        return (
+          <span className="flex items-center gap-1 text-purple-500 text-xs font-medium">
+            <Car className="w-3 h-3" />
+            Driver Arrived
           </span>
         );
       default:

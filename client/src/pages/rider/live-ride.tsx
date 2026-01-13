@@ -176,6 +176,7 @@ export default function RiderLiveRide() {
           animate: true,
         };
       case "ACCEPTED":
+      case "DRIVER_EN_ROUTE":
         return {
           title: "Driver on the way",
           description: "Your driver is heading to pick you up",
@@ -224,6 +225,7 @@ export default function RiderLiveRide() {
 
     switch (activeRide.status) {
       case "ACCEPTED":
+      case "DRIVER_EN_ROUTE":
         return (
           <Button
             className="w-full"
@@ -237,7 +239,7 @@ export default function RiderLiveRide() {
             ) : (
               <MapPin className="w-4 h-4 mr-2" />
             )}
-            Simulate: Driver Arrived
+            Driver Arrived
           </Button>
         );
       case "ARRIVED":
@@ -254,7 +256,7 @@ export default function RiderLiveRide() {
             ) : (
               <Play className="w-4 h-4 mr-2" />
             )}
-            Simulate: Start Ride
+            Start Ride
           </Button>
         );
       case "IN_PROGRESS":
@@ -271,7 +273,7 @@ export default function RiderLiveRide() {
             ) : (
               <CheckCircle className="w-4 h-4 mr-2" />
             )}
-            Simulate: Complete Ride
+            Complete Ride
           </Button>
         );
       default:

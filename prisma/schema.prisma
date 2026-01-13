@@ -28,6 +28,7 @@ enum VehicleType {
 enum RideStatus {
   REQUESTED
   ACCEPTED
+  DRIVER_EN_ROUTE
   ARRIVED
   IN_PROGRESS
   COMPLETED

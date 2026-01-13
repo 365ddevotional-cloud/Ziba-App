@@ -571,7 +571,7 @@ export async function registerRoutes(
         prisma.driver.count({ where: { status: "ACTIVE", isOnline: true } }),
         prisma.ride.count(),
         prisma.ride.count({ where: { status: "REQUESTED" } }),
-        prisma.ride.count({ where: { status: "ACCEPTED" } }),
+        prisma.ride.count({ where: { status: { in: ["ACCEPTED", "DRIVER_EN_ROUTE"] } } }),
         prisma.ride.count({ where: { status: "IN_PROGRESS" } }),
         prisma.ride.count({ where: { status: "COMPLETED" } }),
         prisma.ride.count({ where: { status: "CANCELLED" } }),
@@ -1032,7 +1032,7 @@ export async function registerRoutes(
         where: { id },
         data: { 
           driverId,
-          status: "ACCEPTED"
+          status: "DRIVER_EN_ROUTE"
         },
         include: { user: true, driver: true },
       });
@@ -1044,7 +1044,7 @@ export async function registerRoutes(
     }
   });
 
-  // Start ride (ACCEPTED → IN_PROGRESS)
+  // Start ride (DRIVER_EN_ROUTE/ARRIVED → IN_PROGRESS)
   app.post("/api/rides/:id/start", async (req, res) => {
     try {
       const { id } = req.params;
@@ -1058,8 +1058,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "ACCEPTED") {
-        return res.status(400).json({ message: `Cannot start ride. Status is ${ride.status}, expected ACCEPTED` });
+      if (ride.status !== "ACCEPTED" && ride.status !== "DRIVER_EN_ROUTE" && ride.status !== "ARRIVED") {
+        return res.status(400).json({ message: `Cannot start ride. Status is ${ride.status}, expected DRIVER_EN_ROUTE or ARRIVED` });
       }
 
       if (!ride.driverId) {
@@ -2987,7 +2987,7 @@ export async function registerRoutes(
       const activeRide = await prisma.ride.findFirst({
         where: {
           userId: req.session.userId,
-          status: { in: ["REQUESTED", "ACCEPTED", "ARRIVED", "IN_PROGRESS"] }
+          status: { in: ["REQUESTED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "IN_PROGRESS"] }
         },
         include: {
           driver: {
@@ -3028,7 +3028,7 @@ export async function registerRoutes(
       const existingRide = await prisma.ride.findFirst({
         where: {
           userId: req.session.userId,
-          status: { in: ["REQUESTED", "ACCEPTED", "ARRIVED", "IN_PROGRESS"] }
+          status: { in: ["REQUESTED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "IN_PROGRESS"] }
         }
       });
 
@@ -3065,12 +3065,12 @@ export async function registerRoutes(
       if (TEST_MODE) {
         const testDriver = await findAvailableTestDriver();
         if (testDriver) {
-          // Update ride with assigned driver and transition to ACCEPTED
+          // Update ride with assigned driver and transition to DRIVER_EN_ROUTE
           ride = await prisma.ride.update({
             where: { id: ride.id },
             data: {
               driverId: testDriver.id,
-              status: "ACCEPTED"
+              status: "DRIVER_EN_ROUTE"
             },
             include: {
               user: {
@@ -3116,7 +3116,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (!["REQUESTED", "ACCEPTED", "ARRIVED"].includes(ride.status)) {
+      if (!["REQUESTED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED"].includes(ride.status)) {
         return res.status(400).json({ message: "Can only cancel rides that haven't started yet" });
       }
 
@@ -3155,8 +3155,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "ACCEPTED") {
-        return res.status(400).json({ message: "Driver can only arrive when ride is accepted" });
+      if (ride.status !== "DRIVER_EN_ROUTE" && ride.status !== "ACCEPTED") {
+        return res.status(400).json({ message: "Driver can only arrive when en route to pickup" });
       }
 
       const updatedRide = await prisma.ride.update({
