@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog, Wifi, DollarSign, Gift, Wallet, BarChart3, Calculator, KeyRound, FlaskConical } from "lucide-react";
+import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog, Wifi, DollarSign, Gift, Wallet, BarChart3, Calculator, KeyRound, FlaskConical, Smartphone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
@@ -388,6 +388,23 @@ export default function AdminPage() {
                       <ArrowRight className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <CardDescription>Create and manage test login credentials for Users, Drivers, and Directors</CardDescription>
+                  </CardHeader>
+                </Link>
+              </Card>
+
+              <Card className="hover-elevate cursor-pointer border-dashed border-green-500/50">
+                <Link href="/admin/playstore-checklist">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Smartphone className="h-5 w-5 text-green-500" />
+                        <CardTitle className="flex items-center gap-2">
+                          Play Store Checklist
+                        </CardTitle>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <CardDescription>Verify app readiness for Google Play Store submission</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>

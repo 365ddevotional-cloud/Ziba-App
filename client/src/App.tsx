@@ -23,6 +23,7 @@ import AdminWalletsPage from "@/pages/admin-wallets";
 import AdminAnalyticsPage from "@/pages/admin-analytics";
 import AdminFaresPage from "@/pages/admin-fares";
 import AdminTestAccountsPage from "@/pages/admin-test-accounts";
+import AdminPlayStoreChecklistPage from "@/pages/admin-playstore-checklist";
 import AdminLoginPage from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
 import WhySafeAndSecure from "@/pages/info/why-safe-and-secure";
@@ -61,6 +62,7 @@ function Router() {
       <Route path="/admin/analytics" component={AdminAnalyticsPage} />
       <Route path="/admin/fares" component={AdminFaresPage} />
       <Route path="/admin/test-accounts" component={AdminTestAccountsPage} />
+      <Route path="/admin/playstore-checklist" component={AdminPlayStoreChecklistPage} />
       <Route path="/why/safe-and-secure" component={WhySafeAndSecure} />
       <Route path="/why/always-available" component={WhyAlwaysAvailable} />
       <Route path="/why/city-wide-coverage" component={WhyCityWideCoverage} />

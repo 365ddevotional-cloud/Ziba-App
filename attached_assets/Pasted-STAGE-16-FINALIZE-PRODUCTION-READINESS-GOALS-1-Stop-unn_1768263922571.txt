@@ -1,0 +1,71 @@
+STAGE 16 — FINALIZE PRODUCTION READINESS
+
+GOALS:
+1) Stop unnecessary Replit compute usage (reduce billing growth)
+2) Prepare the app for Google Play Store production submission
+
+────────────────────────
+PART 1: COST OPTIMIZATION
+────────────────────────
+
+ACTIONS:
+- Disable all dev-only processes in production
+- Ensure no background polling or auto-refresh runs when not needed
+- Remove all unused demo loops, fake counters, animations, or timers
+- Ensure APIs only fetch data on demand (not every render)
+- Disable verbose logging in production (console.log, debug logs)
+- Ensure autoscale is not triggered by idle traffic
+- Confirm Preview-only features do NOT run in Production
+
+IMPLEMENT:
+- Use NODE_ENV checks to restrict dev behavior
+- Wrap dev utilities behind development-only flags
+- Ensure server starts once and stays idle when unused
+
+SUCCESS:
+- App stays idle when no users are active
+- Replit compute usage stabilizes
+- No unnecessary background execution
+
+────────────────────────────
+PART 2: PLAY STORE READINESS
+────────────────────────────
+
+ACTIONS:
+1) Add Production Flags:
+- Disable fake statistics in production
+- Add clear “Test Mode” labels where needed
+
+2) App Metadata Prep:
+- App name: Ziba
+- App category: Transportation
+- Add app description placeholders (short + full)
+- Add privacy policy page route (/legal/privacy)
+- Add terms page route (/legal/terms)
+
+3) Security & Compliance:
+- Confirm authentication works correctly
+- No hardcoded credentials
+- Passwords hashed only
+- Admin access protected
+- No test backdoors
+
+4) UX & Stability:
+- No broken links
+- No placeholder crashes
+- Navigation works consistently
+- Pages load under normal conditions
+
+5) Play Store Checklist Page:
+Create /admin/playstore-checklist with:
+- Build status
+- Security check
+- Required pages checklist
+- Deployment readiness indicator
+
+SUCCESS CRITERIA:
+- App is production-stable
+- Billing growth is controlled
+- App meets Play Store requirements
+- No dev/test logic leaks into production
+- Ready for Android wrapper (AAB) build
