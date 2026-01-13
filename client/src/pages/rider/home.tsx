@@ -12,21 +12,35 @@ import {
   Wallet,
 } from "lucide-react";
 
+interface WalletData {
+  id: string;
+  balance: number;
+}
+
+interface RideData {
+  id: string;
+  status: string;
+  pickupLocation: string;
+  dropoffLocation: string;
+  fareEstimate: number | null;
+  createdAt: string;
+}
+
 export default function RiderHome() {
   const { user } = useRiderAuth();
   const [, navigate] = useLocation();
 
-  const { data: activeRide } = useQuery({
+  const { data: activeRide } = useQuery<RideData | null>({
     queryKey: ["/api/rider/active-ride"],
     staleTime: 1000 * 60,
   });
 
-  const { data: wallet } = useQuery({
+  const { data: wallet } = useQuery<WalletData>({
     queryKey: ["/api/rider/wallet"],
     staleTime: 1000 * 60,
   });
 
-  const { data: recentRides } = useQuery<any[]>({
+  const { data: recentRides } = useQuery<RideData[]>({
     queryKey: ["/api/rider/rides"],
     staleTime: 1000 * 60,
   });

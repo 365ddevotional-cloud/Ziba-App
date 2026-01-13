@@ -5,99 +5,138 @@
 
 Draw inspiration from Uber's clean professionalism and Lyft's approachable aesthetic. Focus on trust, clarity, and efficiency. This is a foundation-stage app, so maintain simplicity while establishing a scalable visual system.
 
+---
+
+## Ziba Design System
+
+### Colors
+- **PrimaryColor**: Use Ziba brand primary (dark blue) ONLY for:
+  - Primary CTA buttons
+  - Active ride status indicators
+  - Progress indicators
+  - Important links
+- **BackgroundColor**: Light neutral (cards sit on this)
+- **CardColor**: White or near-white with subtle border
+- **TextPrimary**: Dark neutral (headings) - `text-foreground`
+- **TextSecondary**: Muted gray (supporting text) - `text-muted-foreground`
+- **SuccessColor**: Soft emerald green (ARRIVED, COMPLETED states)
+- **DangerColor**: Muted red (Cancel only, never for status)
+
+### Color Rules
+- Never use bright colors for body text
+- Never mix multiple accent colors on one screen
+- No red/orange for non-critical states
+- Use semantic colors from the design system utilities
+
+### Status Colors (Ride States)
+- **Searching**: Amber/yellow tones (`ziba-status-searching`)
+- **Driver En Route**: Blue tones (`ziba-status-enroute`)
+- **Arrived**: Emerald/green tones (`ziba-status-arrived`)
+- **In Progress**: Primary color (`ziba-status-progress`)
+- **Completed**: Emerald/green tones (`ziba-status-complete`)
+
+---
+
 ## Typography
-- **Primary Font**: Inter or DM Sans via Google Fonts
-- **Headings**: Font weight 700, sizes: text-4xl (hero), text-3xl (page titles), text-xl (section headers)
-- **Body**: Font weight 400-500, text-base for content, text-sm for labels/captions
-- **CTA Buttons**: Font weight 600, text-base
+- **Primary Font**: Inter (system sans-serif fallback)
+- **Headline**: `ziba-headline` - text-2xl, font-semibold, tracking-tight
+- **Subheadline**: `ziba-subheadline` - text-base, font-normal, muted color
+- **Body**: `ziba-body` - text-sm, normal weight
+- **Body Muted**: `ziba-body-muted` - text-sm, muted color
+- **Caption**: `ziba-caption` - text-xs, uppercase, tracking-wide
+
+### Typography Rules
+- No decorative fonts
+- No excessive bolding
+- No inconsistent font sizes within the same view
+- Use consistent hierarchy across all screens
+
+---
 
 ## Layout System
-**Tailwind Spacing**: Use units of 4, 6, 8, 12, 16, 20, 24 for consistent rhythm
-- Section padding: py-20 desktop, py-12 mobile
-- Component gaps: gap-6 or gap-8
-- Container: max-w-6xl centered for content areas
+**Tailwind Spacing**: Use units of 4, 5, 6, 8, 12, 16, 20, 24 for consistent rhythm
+- Screen padding: `p-5` or `px-5`
+- Card padding: `p-4` to `p-6`
+- Bottom nav offset: `pb-24`
+- Component gaps: `space-y-5` or `gap-4`
+
+---
 
 ## Component Library
 
-### Navigation
-- Fixed header with logo left, auth buttons right
-- Height: h-16, subtle border-b
-- Mobile: Hamburger menu for auth links
-
-### Forms (Login/Register/Admin Setup)
-- Centered card layout: max-w-md, p-8
-- Input fields: h-12, rounded-lg, border with focus states
-- Labels above inputs (text-sm, font-medium)
-- Full-width primary buttons: h-12, rounded-lg
-- Error messages: text-sm, positioned below inputs
+### Cards
+- Standard: `ziba-card` - subtle border, rounded-xl
+- Elevated: `ziba-card-elevated` - with shadow-sm
 
 ### Buttons
-- Primary: Full background, hover lift effect (translate-y slightly)
+- Primary: Full background, h-12 for main CTAs
 - Secondary: Border style with transparent background
-- On images: Backdrop blur (backdrop-blur-md) with semi-transparent background
+- Cancel: `ziba-cancel-btn` - subtle destructive, outline style
+- Size="icon" for icon-only buttons
 
-### Admin Dashboard
-- Sidebar navigation (w-64) with menu items
-- Main content area with stats cards in 3-column grid (lg:grid-cols-3)
-- Stats cards: p-6, rounded-xl, border
+### Status Display
+- Large centered icon in colored circular background
+- Clear headline text (human-readable, not technical)
+- Supportive subtext below
 
-## Page-Specific Guidelines
+---
 
-### Landing Page (/)
-**Hero Section**: Full viewport height (min-h-screen)
-- Left-aligned headline and CTA (2-column grid on desktop)
-- Right side: Hero image showing urban mobility scene
-- Headline: "Your City, On Demand" style messaging
-- Two CTAs: "Get Started" (primary) + "Learn More" (secondary)
+## Rider App Screens
 
-**Features Section**: 3-column grid showcasing platform benefits
-- Icon + title + brief description per card
-- Icons: Simple line icons (Heroicons)
-- Cards: p-6, hover lift effect
+### Rider Home
+- Greeting header: "Hello, [FirstName]"
+- Primary CTA: "Where are you going?" card
+- Wallet balance card (compact)
+- Recent trips list (max 3)
+- Clean, minimal layout with generous whitespace
 
-**How It Works**: Numbered steps in horizontal flow
-- 3 steps with connecting lines
-- Icons representing: Register → Request → Ride
+### Ride Status (Live Ride)
+- Hero status display: large icon, headline, subtext
+- Human-readable status messages:
+  - "Finding your driver" (not REQUESTED)
+  - "Driver on the way" (not DRIVER_EN_ROUTE)
+  - "Driver has arrived" (not ARRIVED)
+  - "Trip in progress" (not IN_PROGRESS)
+- Driver card: photo placeholder, name, rating, vehicle
+- Trip details: pickup/dropoff with colored dots
+- Cancel button: subtle, secondary styling
 
-**Footer**: Multi-column layout
-- Company info, Quick links, Contact, Social icons
-- Newsletter signup form
+### Trip Summary
+- Completion confirmation with checkmark
+- Fare prominently displayed
+- Driver rating UI (5 stars)
+- Route summary
 
-### Login/Register Pages
-- Centered card on subtle gradient background
-- Logo at top of card
-- Form fields with clear spacing (space-y-4)
-- Link to alternate action below button ("Don't have an account?")
-- Minimal decorative element (subtle geometric shape or pattern in background)
+### Request Ride
+- Location inputs with colored indicators
+- Recent places list
+- Map placeholder
+- Single primary CTA
 
-### Admin Setup (/admin/setup)
-- Single-purpose page with welcome message
-- "Welcome, Administrator" headline
-- Clear instructions above password form
-- Password strength indicator below input
-- One-time setup messaging ("This is a one-time setup")
+---
 
-### Admin Dashboard
-- Horizontal stat cards showing key metrics (Total Users, Active Sessions, Platform Status)
-- Recent activity table with clean typography
-- Action buttons for key admin functions
-- Empty state messaging if no data yet
+## Error Handling (UI)
+- Never show technical error messages to users
+- Never display internal status names (e.g., DRIVER_EN_ROUTE)
+- Never show router or system error messages
+- Use calm, reassuring language
 
-## Images
+### User-Friendly Error Examples
+Instead of: "Did you forget to add the page to the router?"
+Show: "We're having trouble loading this screen. Please try again."
 
-### Hero Image (Landing Page)
-**Description**: Modern cityscape at dusk/evening with urban traffic or someone using a phone to request a ride. Professional photography style, high quality. Shows movement, connectivity, urban life.
-**Placement**: Right 50% of hero section on desktop, background overlay on mobile
-**Treatment**: Subtle gradient overlay for text readability
+Instead of: "Network error: ETIMEDOUT"
+Show: "Connection issue. Please check your internet and try again."
 
-### Background Elements
-**Login/Register**: Optional abstract geometric pattern in background (very subtle, low opacity)
-**Admin Pages**: Clean solid backgrounds, no imagery needed
+Log technical details to console only.
+
+---
 
 ## Visual Rhythm
 - Consistent 8px baseline grid
-- Generous whitespace between sections (py-20)
+- Generous whitespace between sections
 - Maintain breathing room around interactive elements
-- Card shadows: Subtle (shadow-sm default, shadow-md on hover)
+- Card borders: subtle, consistent
+- No mixing of bordered and shadow-only cards in same view
 
-**Key Principle**: Professional, trustworthy, and efficient. Every element should communicate reliability and ease of use.
+**Key Principle**: Professional, trustworthy, and efficient. Every element should communicate reliability and ease of use. The app should feel calm, modern, and premium.

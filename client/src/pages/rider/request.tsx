@@ -63,17 +63,18 @@ export default function RiderRequest() {
         <h1 className="font-semibold text-foreground">Request a Ride</h1>
       </header>
 
-      <main className="flex-1 p-4 space-y-4 pb-20">
-        <Card>
+      <main className="flex-1 p-5 space-y-5 pb-24">
+        {/* Location Inputs */}
+        <Card className="ziba-card-elevated">
           <CardContent className="p-4 space-y-4">
             <div className="space-y-3">
               <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-green-500" />
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-emerald-500" />
                 <Input
                   placeholder="Pickup location"
                   value={pickup}
                   onChange={(e) => setPickup(e.target.value)}
-                  className="pl-10 pr-12"
+                  className="pl-10 pr-12 h-12"
                   data-testid="input-pickup"
                 />
                 <Button
@@ -94,12 +95,12 @@ export default function RiderRequest() {
               </div>
               
               <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-red-500" />
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-primary" />
                 <Input
                   placeholder="Where to?"
                   value={destination}
                   onChange={(e) => setDestination(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-12"
                   data-testid="input-destination"
                 />
               </div>
@@ -107,21 +108,22 @@ export default function RiderRequest() {
           </CardContent>
         </Card>
 
-        <div className="bg-muted/30 rounded-lg p-4 flex items-center justify-center h-40">
+        {/* Map Placeholder */}
+        <div className="bg-muted/30 rounded-xl p-6 flex items-center justify-center h-32">
           <div className="text-center text-muted-foreground">
-            <MapPin className="w-8 h-8 mx-auto mb-2" />
-            <p className="text-sm">Map Preview</p>
-            <p className="text-xs">(Coming soon)</p>
+            <MapPin className="w-6 h-6 mx-auto mb-2 opacity-50" />
+            <p className="text-xs">Map coming soon</p>
           </div>
         </div>
 
+        {/* Recent Places */}
         <div>
-          <h2 className="text-sm font-medium text-muted-foreground mb-3">Recent Places</h2>
+          <h2 className="ziba-caption mb-3">Recent Places</h2>
           <div className="space-y-2">
             {recentLocations.map((loc, index) => (
               <Card
                 key={index}
-                className="hover-elevate cursor-pointer"
+                className="ziba-card hover-elevate cursor-pointer"
                 onClick={() => setDestination(loc.address)}
                 data-testid={`card-recent-${index}`}
               >
@@ -139,8 +141,9 @@ export default function RiderRequest() {
           </div>
         </div>
 
+        {/* Continue Button */}
         <Button
-          className="w-full"
+          className="w-full h-12"
           onClick={handleContinue}
           disabled={!pickup || !destination}
           data-testid="button-continue"
