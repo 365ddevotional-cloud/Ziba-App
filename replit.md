@@ -20,6 +20,7 @@ The Ziba platform is built with a modern web development stack:
     - Compute costs optimized by removing all refetchInterval polling
     - Debug routes and test account login blocked in production via NODE_ENV checks
     - Play Store preparation checklist created (PLAY_STORE_CHECKLIST.md)
+    - Play Store Checklist admin page at `/admin/playstore-checklist` with real-time readiness verification
 - **Payments & Wallet (Stage 17)**:
     - Tips system (Uber-style) with preset percentages (5%, 10%, 15%, 20%) or custom amounts
     - Tips go 100% to driver with separate wallet credit
