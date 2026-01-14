@@ -1,12 +1,12 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
 import { RiderBottomNav } from "@/components/rider-bottom-nav";
 import {
   Wallet as WalletIcon,
   ChevronLeft,
+  ChevronRight,
   Loader2,
   Plus,
   ArrowUpRight,
@@ -30,7 +30,7 @@ interface WalletData {
 }
 
 export default function RiderWallet() {
-  const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const { data: wallet, isLoading } = useQuery<WalletData>({
     queryKey: ["/api/rider/wallet"],
@@ -108,28 +108,37 @@ export default function RiderWallet() {
                   NGN {wallet.balance.toLocaleString()}
                 </p>
                 <div className="flex justify-center gap-3 mt-6">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => toast({ title: "Coming soon", description: "Add funds feature is under development" })}
-                    data-testid="button-add-funds"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Funds
-                  </Button>
+                  <Link href="/rider/wallet/add-funds">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="gap-2"
+                      data-testid="button-add-funds"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Funds
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
 
             <div className="grid grid-cols-2 gap-3">
-              <Card className="hover-elevate cursor-pointer" onClick={() => toast({ title: "Coming soon", description: "Card management is under development" })}>
+              <Card 
+                className="hover-elevate cursor-pointer" 
+                onClick={() => navigate("/rider/wallet/add-card")}
+                data-testid="card-add-card"
+              >
                 <CardContent className="p-4 text-center">
                   <CreditCard className="w-6 h-6 text-primary mx-auto mb-2" />
                   <p className="text-sm font-medium text-foreground">Add Card</p>
                 </CardContent>
               </Card>
-              <Card className="hover-elevate cursor-pointer" onClick={() => toast({ title: "Coming soon", description: "Payment methods is under development" })}>
+              <Card 
+                className="hover-elevate cursor-pointer" 
+                onClick={() => navigate("/rider/wallet/payment-methods")}
+                data-testid="card-payment-methods"
+              >
                 <CardContent className="p-4 text-center">
                   <WalletIcon className="w-6 h-6 text-primary mx-auto mb-2" />
                   <p className="text-sm font-medium text-foreground">Payment Methods</p>
@@ -148,7 +157,12 @@ export default function RiderWallet() {
               ) : (
                 <div className="space-y-2">
                   {wallet.transactions.map((tx) => (
-                    <Card key={tx.id} data-testid={`card-transaction-${tx.id}`}>
+                    <Card 
+                      key={tx.id} 
+                      className="hover-elevate cursor-pointer"
+                      onClick={() => navigate(`/rider/wallet/transaction/${tx.id}`)}
+                      data-testid={`card-transaction-${tx.id}`}
+                    >
                       <CardContent className="p-3 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
@@ -163,11 +177,14 @@ export default function RiderWallet() {
                             </p>
                           </div>
                         </div>
-                        <span className={`font-semibold ${
-                          tx.type === "CREDIT" ? "text-green-500" : "text-foreground"
-                        }`}>
-                          {tx.type === "CREDIT" ? "+" : "-"}NGN {tx.amount.toLocaleString()}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-semibold ${
+                            tx.type === "CREDIT" ? "text-green-500" : "text-foreground"
+                          }`}>
+                            {tx.type === "CREDIT" ? "+" : "-"}NGN {tx.amount.toLocaleString()}
+                          </span>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        </div>
                       </CardContent>
                     </Card>
                   ))}

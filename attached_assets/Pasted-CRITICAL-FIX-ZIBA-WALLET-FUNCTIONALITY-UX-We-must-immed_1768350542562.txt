@@ -1,0 +1,84 @@
+CRITICAL FIX — ZIBA WALLET FUNCTIONALITY & UX
+
+We must immediately fix the Wallet screen behavior. Do NOT use placeholder “COMING SOON” states anymore.
+
+OBJECTIVES (MANDATORY):
+
+1. REMOVE ALL “COMING SOON” MESSAGES
+   - Remove “Coming soon” banners from:
+     - Add Funds
+     - Add Card
+     - Payment Methods
+   - These features must NEVER block the user with a dead-end message.
+
+2. MAKE ALL WALLET BUTTONS CLICKABLE WITH REAL FLOWS
+
+Implement the following routes and behaviors:
+
+A. ADD FUNDS
+   - Button: “Add Funds”
+   - Route: /rider/wallet/add-funds
+   - Screen content:
+     - Header: “Add Funds”
+     - Input: Amount (number, NGN)
+     - Payment method selector (Card | Bank Transfer | Wallet)
+     - Button: “Proceed”
+     - On submit:
+       - Show confirmation screen
+       - Message:
+         “Thank you. Your funding request has been received.”
+       - Log transaction as “Pending Funding”
+
+B. ADD CARD
+   - Button: “Add Card”
+   - Route: /rider/wallet/add-card
+   - Screen content:
+     - Card Number
+     - Expiry Date
+     - CVV
+     - Name on Card
+     - Save Card button
+   - On success:
+     - Toast: “Card added successfully”
+     - Save card to user profile
+
+C. PAYMENT METHODS
+   - Button: “Payment Methods”
+   - Route: /rider/wallet/payment-methods
+   - Screen content:
+     - List saved cards
+     - Bank account (if exists)
+     - Default payment selector
+     - Option to remove or change default
+
+3. RECENT TRANSACTIONS — CLICKABLE DETAILS
+
+- Each transaction item must be clickable
+- Route: /rider/wallet/transaction/:id
+- Transaction detail screen must show:
+  - Transaction type (Ride / Withdrawal / Funding)
+  - Amount
+  - Date & time
+  - Status (Completed / Pending)
+  - Reference ID
+  - Thank-you message:
+    “Thank you for using Ziba. We appreciate your trust.”
+
+4. UX RULES (NO EXCEPTIONS)
+
+- No button should do nothing
+- No screen should end without navigation
+- No “under development” messages
+- If backend logic is missing, simulate realistic responses
+- Maintain Ziba brand colors and typography
+- Keep transitions smooth and professional
+
+5. VALIDATION
+
+After implementation:
+- Clicking every wallet button must navigate somewhere meaningful
+- No “404 Page Not Found”
+- No placeholder banners
+- Wallet must feel production-ready, not demo-ready
+
+Proceed step-by-step and confirm once all Wallet actions are functional.

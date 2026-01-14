@@ -3522,6 +3522,191 @@ export async function registerRoutes(
     }
   });
 
+  // Add funds to wallet (simulated for now)
+  app.post("/api/rider/wallet/add-funds", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { amount, method } = req.body;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ message: "Valid amount required" });
+      }
+
+      const wallet = await prisma.wallet.findUnique({
+        where: {
+          ownerId_ownerType: {
+            ownerId: req.session.userId,
+            ownerType: "USER"
+          }
+        }
+      });
+
+      if (!wallet) {
+        return res.status(404).json({ message: "Wallet not found" });
+      }
+
+      // Create a pending funding transaction
+      const transaction = await prisma.transaction.create({
+        data: {
+          walletId: wallet.id,
+          type: "PENDING_FUNDING",
+          amount,
+          reference: `Funding via ${method || "card"} - Pending`
+        }
+      });
+
+      res.json({ 
+        message: "Funding request received", 
+        transaction,
+        status: "PENDING"
+      });
+    } catch (error) {
+      console.error("Error adding funds:", error);
+      res.status(500).json({ message: "Failed to process funding request" });
+    }
+  });
+
+  // Add card (simulated for now)
+  app.post("/api/rider/wallet/add-card", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { cardNumber, expiryDate, cvv, cardName } = req.body;
+
+      if (!cardNumber || !expiryDate || !cvv || !cardName) {
+        return res.status(400).json({ message: "All card fields are required" });
+      }
+
+      // Simulate card validation and storage
+      const last4 = cardNumber.replace(/\s/g, "").slice(-4);
+      const brand = cardNumber.startsWith("4") ? "Visa" : 
+                    cardNumber.startsWith("5") ? "Mastercard" : "Verve";
+      const [month, year] = expiryDate.split("/");
+
+      res.json({ 
+        message: "Card added successfully",
+        card: {
+          id: `card_${Date.now()}`,
+          last4,
+          brand,
+          expiryMonth: parseInt(month),
+          expiryYear: 2000 + parseInt(year),
+          isDefault: true
+        }
+      });
+    } catch (error) {
+      console.error("Error adding card:", error);
+      res.status(500).json({ message: "Failed to add card" });
+    }
+  });
+
+  // Get payment methods
+  app.get("/api/rider/payment-methods", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      // Return empty arrays - in production this would fetch from payment provider
+      res.json({
+        cards: [],
+        bankAccounts: []
+      });
+    } catch (error) {
+      console.error("Error fetching payment methods:", error);
+      res.status(500).json({ message: "Failed to fetch payment methods" });
+    }
+  });
+
+  // Set default payment method
+  app.post("/api/rider/payment-methods/:id/default", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { id } = req.params;
+      const { type } = req.body;
+
+      res.json({ 
+        message: "Default payment method updated",
+        id,
+        type,
+        isDefault: true
+      });
+    } catch (error) {
+      console.error("Error setting default:", error);
+      res.status(500).json({ message: "Failed to update default" });
+    }
+  });
+
+  // Delete payment method
+  app.delete("/api/rider/payment-methods/:id", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { id } = req.params;
+
+      res.json({ 
+        message: "Payment method removed",
+        id
+      });
+    } catch (error) {
+      console.error("Error removing payment method:", error);
+      res.status(500).json({ message: "Failed to remove payment method" });
+    }
+  });
+
+  // Get single transaction
+  app.get("/api/rider/wallet/transaction/:id", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { id } = req.params;
+
+      const wallet = await prisma.wallet.findUnique({
+        where: {
+          ownerId_ownerType: {
+            ownerId: req.session.userId,
+            ownerType: "USER"
+          }
+        }
+      });
+
+      if (!wallet) {
+        return res.status(404).json({ message: "Wallet not found" });
+      }
+
+      const transaction = await prisma.transaction.findFirst({
+        where: {
+          id,
+          walletId: wallet.id
+        }
+      });
+
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      res.json({
+        ...transaction,
+        status: transaction.type === "PENDING_FUNDING" ? "PENDING" : "COMPLETED"
+      });
+    } catch (error) {
+      console.error("Error fetching transaction:", error);
+      res.status(500).json({ message: "Failed to fetch transaction" });
+    }
+  });
+
   // ==================== RIDER APP FARE ESTIMATE ====================
 
   // Get fare estimate (no auth required for guest browsing)

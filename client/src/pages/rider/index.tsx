@@ -12,6 +12,10 @@ import RiderProfile from "./profile";
 import RiderSupport from "./support";
 import RiderTripSummary from "./trip-summary";
 import RiderAccessDenied from "./access-denied";
+import WalletAddFunds from "./wallet-add-funds";
+import WalletAddCard from "./wallet-add-card";
+import WalletPaymentMethods from "./wallet-payment-methods";
+import WalletTransactionDetail from "./wallet-transaction-detail";
 import { Loader2 } from "lucide-react";
 
 function RiderAuthGuard({ children }: { children: React.ReactNode }) {
@@ -80,6 +84,26 @@ export default function RiderApp() {
       <Route path="/rider/trip-summary/:id">
         <RiderAuthGuard>
           <RiderTripSummary />
+        </RiderAuthGuard>
+      </Route>
+      <Route path="/rider/wallet/transaction/:id">
+        <RiderAuthGuard>
+          <WalletTransactionDetail />
+        </RiderAuthGuard>
+      </Route>
+      <Route path="/rider/wallet/add-funds">
+        <RiderAuthGuard>
+          <WalletAddFunds />
+        </RiderAuthGuard>
+      </Route>
+      <Route path="/rider/wallet/add-card">
+        <RiderAuthGuard>
+          <WalletAddCard />
+        </RiderAuthGuard>
+      </Route>
+      <Route path="/rider/wallet/payment-methods">
+        <RiderAuthGuard>
+          <WalletPaymentMethods />
         </RiderAuthGuard>
       </Route>
       <Route path="/rider/request">
