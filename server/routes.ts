@@ -3548,20 +3548,25 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Wallet not found" });
       }
 
-      // Create a pending funding transaction
+      // Actually credit the wallet (simulating instant funding for demo)
+      await prisma.wallet.update({
+        where: { id: wallet.id },
+        data: { balance: { increment: amount } }
+      });
+
       const transaction = await prisma.transaction.create({
         data: {
           walletId: wallet.id,
-          type: "PENDING_FUNDING",
+          type: "CREDIT",
           amount,
-          reference: `Funding via ${method || "card"} - Pending`
+          reference: `Wallet top-up via ${method || "card"}`
         }
       });
 
       res.json({ 
-        message: "Funding request received", 
+        message: "Funds added successfully", 
         transaction,
-        status: "PENDING"
+        status: "COMPLETED"
       });
     } catch (error) {
       console.error("Error adding funds:", error);
@@ -3612,9 +3617,18 @@ export async function registerRoutes(
     }
 
     try {
-      // Return empty arrays - in production this would fetch from payment provider
+      // Return sample saved card for demo (in production this would fetch from payment provider)
       res.json({
-        cards: [],
+        cards: [
+          {
+            id: "card_demo_1",
+            last4: "4242",
+            brand: "Visa",
+            expiryMonth: 12,
+            expiryYear: 2026,
+            isDefault: true
+          }
+        ],
         bankAccounts: []
       });
     } catch (error) {
@@ -3699,7 +3713,7 @@ export async function registerRoutes(
 
       res.json({
         ...transaction,
-        status: transaction.type === "PENDING_FUNDING" ? "PENDING" : "COMPLETED"
+        status: "COMPLETED"
       });
     } catch (error) {
       console.error("Error fetching transaction:", error);
