@@ -1,0 +1,157 @@
+ZIBA UI MATURITY UPGRADE — PHASE 1
+CRITICAL ROUTE FIX + DESIGN SYSTEM FOUNDATION
+
+CONTEXT:
+- App name: Ziba
+- This is the RIDER APP
+- Current bug: After clicking "Complete Trip", user sees a 404 page
+- Goal: Fix routing + upgrade UI maturity to Uber-level polish
+- Platform: Web app (mobile-first), Android & iOS wrapper later
+
+========================
+PART A — FIX 404 AFTER COMPLETE TRIP (MANDATORY)
+========================
+
+1. Ensure the Trip Summary route EXISTS and is REGISTERED in the router.
+
+Required route:
+- Path: /rider/trip-summary/:tripId
+- Component: RiderTripSummaryPage
+
+2. When "Complete Trip" is clicked:
+   - Finalize trip in backend
+   - Receive tripId from completion response
+   - Navigate using:
+     navigate(`/rider/trip-summary/${tripId}`)
+
+3. Remove ALL of the following if they exist:
+   - /trip-summary
+   - /rider/trip-summary (without :tripId)
+   - Any duplicate or legacy TripSummary routes
+
+4. Ensure route order:
+   - /rider/trip-summary/:tripId MUST be declared before any wildcard or 404 route
+
+5. Trip Summary page must:
+   - Fetch trip by tripId
+   - Gracefully handle loading & missing data
+   - NEVER show a blank page or 404 if trip exists
+
+Expected result:
+✔ Clicking “Complete Trip” ALWAYS lands on Trip Summary
+✔ No router error
+✔ No white screen
+✔ No 404
+
+========================
+PART B — DEFINE ZIBA DESIGN SYSTEM (FOUNDATION)
+========================
+
+Create a Ziba Design System and apply it to ALL Rider screens.
+
+COLORS (USE CONSISTENTLY):
+- Primary: Ziba Blue (#0B5ED7)
+- Primary Dark: #084298
+- Accent (Success): #198754
+- Accent (Warning/Test Mode): #F59E0B
+- Danger: #DC3545
+- Background: #F8FAFC
+- Surface/Card: #FFFFFF
+- Border: #E5E7EB
+- Text Primary: #111827
+- Text Secondary: #6B7280
+
+TYPOGRAPHY:
+- Font family: Inter, system-ui, sans-serif
+- H1 (Screen title): 20–22px, semibold
+- Section title: 14–16px, medium
+- Body text: 14px, regular
+- Caption/meta: 12px, muted
+- Buttons: 14px, semibold
+
+GLOBAL UI RULES:
+- Rounded corners: 12px cards, 10px buttons
+- Shadows: subtle, modern (no heavy shadows)
+- Padding: consistent 16px blocks
+- Touch targets: minimum 44px height
+- Mobile-first layout ONLY
+
+========================
+PART C — START WITH RIDER HOME UI (FIRST SCREEN)
+========================
+
+Upgrade Rider Home to look mature, clean, and professional:
+
+Home layout:
+1. Greeting card:
+   - “Hello, {First Name}”
+   - Soft background, no harsh borders
+
+2. Primary action card:
+   - Title: “Where are you going?”
+   - Destination input styled as a large pill
+   - Clear arrow icon
+
+3. Wallet card:
+   - Wallet balance displayed clearly
+   - Uses Ziba Blue accent
+   - Clickable
+
+4. Recent Trips:
+   - Card list with subtle dividers
+   - Location + date + fare
+   - “View all” link
+
+5. Bottom navigation:
+   - Home, Trips, Wallet, Profile
+   - Active tab highlighted with Ziba Blue
+   - Icons + labels
+
+NO clutter
+NO admin/test language on this screen
+
+========================
+PART D — FIX & POLISH RIDE STATUS SCREEN
+========================
+
+Upgrade Active Ride screens (Driver on the way, Arrived, In Progress):
+
+Rules:
+- One clear status headline
+- Friendly human language
+- Large status icon
+- Driver card with:
+  - Name
+  - Rating
+  - Vehicle plate
+  - Call icon
+
+Pickup & Drop-off:
+- Clean timeline dots
+- No cramped text
+
+TEST MODE:
+- Test controls must:
+  - Be visually separated
+  - Use warning color
+  - Clearly labeled “TEST MODE”
+  - Never look like production UI
+
+Cancel Ride:
+- Destructive button
+- Clear spacing
+- Red accent only for danger
+
+========================
+FINAL CHECK
+========================
+
+After implementation:
+- Complete Trip → Trip Summary works
+- Rider Home looks modern & calm
+- Ride Status feels trustworthy
+- App visually feels like a real transport product, not a prototype
+
+Proceed carefully.
+Do NOT add new features.
+Fix routes first, then UI polish.
