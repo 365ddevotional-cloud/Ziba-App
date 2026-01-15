@@ -1,10 +1,23 @@
-// Stage 16 complete — production hardened
-// Stage 17 complete — payments, wallet, tips, safe test mode
-// Admin bootstrap disabled after successful setup
-// Authentication now relies only on stored database credentials
-// No backdoors, no magic passwords, no auto-reset logic
+import { prisma } from "./prisma";
+import bcrypt from "bcryptjs";
 
 export async function bootstrapFounderAdmin(): Promise<void> {
-  // No-op: Bootstrap logic permanently removed for security
-  return;
+  try {
+    const adminCount = await prisma.admin.count();
+    
+    if (adminCount === 0) {
+      const hashedPassword = await bcrypt.hash("admin123", 10);
+      
+      await prisma.admin.create({
+        data: {
+          email: "founder@ziba.app",
+          passwordHash: hashedPassword,
+        },
+      });
+      
+      console.log("[BOOTSTRAP] Created founder admin: founder@ziba.app");
+    }
+  } catch (error) {
+    console.error("[BOOTSTRAP] Error during admin bootstrap:", error);
+  }
 }

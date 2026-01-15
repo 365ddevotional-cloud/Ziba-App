@@ -520,6 +520,10 @@ export async function registerRoutes(
   // ==================== ADMINS ====================
   
   app.get("/api/admins", async (req, res) => {
+    const currentUser = getCurrentUser(req);
+    if (currentUser.role !== "admin") {
+      return res.status(401).json({ message: "Not authenticated as admin" });
+    }
     try {
       const admins = await prisma.admin.findMany({
         orderBy: { createdAt: "desc" },
@@ -534,6 +538,10 @@ export async function registerRoutes(
   // ==================== ADMIN STATS ====================
   
   app.get("/api/admin/stats", async (req, res) => {
+    const currentUser = getCurrentUser(req);
+    if (currentUser.role !== "admin") {
+      return res.status(401).json({ message: "Not authenticated as admin" });
+    }
     try {
       const [
         totalUsers,
@@ -637,8 +645,8 @@ export async function registerRoutes(
   app.get("/api/admin/activity", async (req, res) => {
     try {
       const currentUser = getCurrentUser(req);
-      if (currentUser.role !== "admin" && currentUser.role !== "director") {
-        return res.status(403).json({ message: "Access denied" });
+      if (currentUser.role !== "admin") {
+        return res.status(401).json({ message: "Not authenticated as admin" });
       }
 
       const [recentRides, recentPayments, recentIncentives, recentUsers, recentDrivers] = await Promise.all([
@@ -3263,7 +3271,7 @@ export async function registerRoutes(
 
         // Get user wallet and create transaction record
         const userWallet = await tx.wallet.findUnique({
-          where: { ownerId_ownerType: { ownerId: req.session.userId, ownerType: "USER" } }
+          where: { ownerId_ownerType: { ownerId: ride.userId, ownerType: "USER" } }
         });
 
         if (userWallet) {
