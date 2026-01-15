@@ -6,7 +6,7 @@ export async function bootstrapFounderAdmin(): Promise<void> {
     const adminCount = await prisma.admin.count();
     
     if (adminCount === 0) {
-      const hashedPassword = await bcrypt.hash("admin123", 10);
+      const hashedPassword = await bcrypt.hash("admin-ziba-2013", 10);
       
       await prisma.admin.create({
         data: {

@@ -14,7 +14,7 @@ The Ziba platform is built with a modern web development stack:
 - **Backend**: Implemented with Node.js and Express, providing a robust API layer.
 - **Database**: PostgreSQL is used as the primary data store, with Prisma ORM facilitating seamless database interactions and schema management.
 - **Authentication**: Features `bcrypt` for secure password hashing and `express-session` with a PostgreSQL store for session management. 
-    - **Admin Login**: Available at `/api/auth/login` with role="admin". Founder admin account: `founder@ziba.app` with password `admin123` (auto-created on server start if no admins exist, idempotent).
+    - **Admin Login**: Available at `/api/auth/login` with role="admin". Founder admin account: `founder@ziba.app` with password `admin-ziba-2013` (auto-created on server start if no admins exist, idempotent).
     - **Rider Login**: Available at `/api/rider/login` and `/api/rider/register` for rider authentication.
     - All `/api/admin/*` routes require ADMIN role (401 if not authenticated as admin).
     - All `/api/rider/*` routes require RIDER role with active session.
