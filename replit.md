@@ -13,10 +13,15 @@ The Ziba platform is built with a modern web development stack:
 - **Frontend**: Developed using React, Vite, and TypeScript, providing a responsive and interactive user interface. Styling is handled with Tailwind CSS, augmented by Shadcn UI components for a polished design. The UI/UX emphasizes a professional, Uber-like aesthetic with a dark blue primary color, Inter font family, and mobile-first responsive design. Dark mode is the default, with a toggle for light mode.
 - **Backend**: Implemented with Node.js and Express, providing a robust API layer.
 - **Database**: PostgreSQL is used as the primary data store, with Prisma ORM facilitating seamless database interactions and schema management.
-- **Authentication**: Features `bcrypt` for secure password hashing and `express-session` with a PostgreSQL store for session management. Currently configured for **ADMIN-ONLY** login at `/admin/login`. Founder admin account: `founder@ziba.app` (auto-created on server start if no admins exist). All admin routes are protected by AdminGuard requiring ADMIN role. User, Driver, and Director logins are disabled pending future implementation. Test account impersonation system allows admin to login as any test account for development testing.
+- **Authentication**: Features `bcrypt` for secure password hashing and `express-session` with a PostgreSQL store for session management. 
+    - **Admin Login**: Available at `/api/auth/login` with role="admin". Founder admin account: `founder@ziba.app` with password `admin123` (auto-created on server start if no admins exist, idempotent).
+    - **Rider Login**: Available at `/api/rider/login` and `/api/rider/register` for rider authentication.
+    - All `/api/admin/*` routes require ADMIN role (401 if not authenticated as admin).
+    - All `/api/rider/*` routes require RIDER role with active session.
+    - Test account impersonation system allows admin to login as any test account for development testing.
 - **Production Hardening (Stage 16)**: 
-    - Admin bootstrap permanently disabled - no backdoors, no magic passwords, no auto-reset logic
-    - Authentication relies solely on stored database credentials
+    - Admin bootstrap is idempotent - creates founder admin only if no admins exist, with bcrypt-hashed password
+    - Authentication relies on stored database credentials with secure bcrypt hashing
     - Compute costs optimized by removing all refetchInterval polling
     - Debug routes and test account login blocked in production via NODE_ENV checks
     - Play Store preparation checklist created (PLAY_STORE_CHECKLIST.md)
