@@ -74,8 +74,8 @@ export default function RiderRegister() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <div className="flex-1 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex flex-col pt-2">
+      <div className="flex-1 flex items-center justify-center p-4 pb-8">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center space-y-4">
             <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center">
@@ -186,7 +186,7 @@ export default function RiderRegister() {
               </div>
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full relative z-10"
                 disabled={isLoading}
                 data-testid="button-register"
               >
