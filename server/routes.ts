@@ -1469,19 +1469,96 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Driver is currently on another ride" });
       }
 
-      const updatedRide = await prisma.ride.update({
-        where: { id },
-        data: { 
-          driverId,
-          status: "DRIVER_EN_ROUTE"
-        },
-        include: { user: true, driver: true },
+      // Use transaction for safe assignment
+      const result = await prisma.$transaction(async (tx) => {
+        // Re-check ride state within transaction
+        const rideCheck = await tx.ride.findUnique({ 
+          where: { id },
+          select: { status: true, driverId: true }
+        });
+        
+        if (!rideCheck) {
+          throw new Error("Ride not found");
+        }
+        if (rideCheck.status !== "REQUESTED") {
+          throw new Error(`Cannot assign driver. Ride status is ${rideCheck.status}, expected REQUESTED`);
+        }
+        if (rideCheck.driverId) {
+          throw new Error("Ride already has a driver assigned");
+        }
+
+        // Re-check driver state within transaction
+        const driverCheck = await tx.driver.findUnique({
+          where: { id: driverId },
+          include: {
+            rides: { where: { status: "IN_PROGRESS" } },
+            driverProfile: { select: { status: true } },
+          },
+        });
+
+        if (!driverCheck) {
+          throw new Error("Driver not found");
+        }
+        if (!driverCheck.driverProfile || driverCheck.driverProfile.status !== "APPROVED") {
+          throw new Error(`Driver cannot accept trips. Profile status: ${driverCheck.driverProfile?.status || "NOT_FOUND"}. Driver must be APPROVED.`);
+        }
+        if (driverCheck.status !== "ACTIVE") {
+          throw new Error("Driver must be ACTIVE to be assigned");
+        }
+        if (!driverCheck.isOnline) {
+          throw new Error("Driver must be ONLINE to be assigned");
+        }
+        if (driverCheck.rides.length > 0) {
+          throw new Error("Driver is currently on another ride");
+        }
+
+        // Atomically assign driver - only succeeds if ride is still REQUESTED and has no driver
+        const updatedRide = await tx.ride.update({
+          where: { 
+            id,
+            status: "REQUESTED", // Only update if still REQUESTED
+            driverId: null, // Only update if no driver assigned
+          },
+          data: { 
+            driverId,
+            status: "DRIVER_EN_ROUTE"
+          },
+          include: { user: true, driver: true },
+        });
+
+        return updatedRide;
+      }, {
+        timeout: 10000,
+        isolationLevel: "Serializable",
       });
 
-      res.json(updatedRide);
-    } catch (error) {
+      // Send notifications after successful assignment
+      if (result.driver) {
+        await createNotification(
+          result.driver.id,
+          "driver",
+          `You have been assigned a ride from ${result.pickupLocation} to ${result.dropoffLocation}`,
+          "RIDE_ASSIGNED"
+        );
+
+        await createNotification(
+          result.userId,
+          "rider",
+          `Driver ${result.driver.fullName} has been assigned to your ride`,
+          "RIDE_ASSIGNED"
+        );
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      if (error.code === "P2025" || error.message?.includes("not found")) {
+        return res.status(404).json({ message: error.message || "Ride or driver not found" });
+      }
+      if (error.code === "P2034") {
+        return res.status(409).json({ message: "Assignment conflict - ride or driver state changed" });
+      }
       console.error("Error assigning ride:", error);
-      res.status(500).json({ message: "Failed to assign ride" });
+      res.status(500).json({ message: error.message || "Failed to assign ride" });
     }
   });
 
@@ -1934,6 +2011,155 @@ export async function registerRoutes(
     return prisma.notification.create({
       data: { userId, role, message, type },
     });
+  }
+
+  // ==================== TRIP MATCHING ENGINE ====================
+  
+  /**
+   * Safe driver matching function with transaction-based locking
+   * Ensures atomic assignment and prevents race conditions
+   */
+  async function matchDriverToRide(rideId: string): Promise<{ success: boolean; driverId?: string; error?: string }> {
+    try {
+      // Use transaction to ensure atomicity
+      const result = await prisma.$transaction(async (tx) => {
+        // Step 1: Verify ride is still REQUESTED (not already assigned)
+        const ride = await tx.ride.findUnique({
+          where: { id: rideId },
+          include: { driver: true },
+        });
+
+        if (!ride) {
+          return { success: false, error: "Ride not found" };
+        }
+
+        if (ride.status !== "REQUESTED") {
+          return { success: false, error: `Ride already ${ride.status.toLowerCase()}` };
+        }
+
+        if (ride.driverId) {
+          return { success: false, error: "Ride already has a driver assigned" };
+        }
+
+        // Step 2: Find available drivers with all safety checks
+        // Must be: APPROVED, ONLINE, ACTIVE, not on IN_PROGRESS ride
+        const availableDrivers = await tx.driver.findMany({
+          where: {
+            status: "ACTIVE",
+            isOnline: true,
+            driverProfile: {
+              status: "APPROVED",
+            },
+            rides: {
+              none: {
+                status: "IN_PROGRESS",
+              },
+            },
+          },
+          include: {
+            driverProfile: {
+              select: {
+                status: true,
+                isApproved: true,
+              },
+            },
+            rides: {
+              where: {
+                status: "IN_PROGRESS",
+              },
+            },
+          },
+          orderBy: [
+            { averageRating: "desc" }, // Prefer higher rated drivers
+            { totalRatings: "desc" }, // Then more experienced
+          ],
+          take: 10, // Limit candidates for performance
+        });
+
+        if (availableDrivers.length === 0) {
+          return { success: false, error: "No available drivers at this time" };
+        }
+
+        // Step 3: Try to assign first available driver (transaction ensures atomicity)
+        // We iterate through candidates in case one is locked by another transaction
+        for (const driver of availableDrivers) {
+          // Double-check driver is still available (within transaction)
+          const driverCheck = await tx.driver.findUnique({
+            where: { id: driver.id },
+            include: {
+              rides: {
+                where: {
+                  status: "IN_PROGRESS",
+                },
+              },
+              driverProfile: {
+                select: {
+                  status: true,
+                },
+              },
+            },
+          });
+
+          if (!driverCheck) continue;
+          if (driverCheck.status !== "ACTIVE") continue;
+          if (!driverCheck.isOnline) continue;
+          if (driverCheck.rides.length > 0) continue; // Already on a trip
+          if (!driverCheck.driverProfile || driverCheck.driverProfile.status !== "APPROVED") continue;
+
+          // Step 4: Atomically assign driver to ride
+          // This update will fail if ride status changed or driverId was set
+          const updatedRide = await tx.ride.update({
+            where: {
+              id: rideId,
+              status: "REQUESTED", // Only update if still REQUESTED
+              driverId: null, // Only update if no driver assigned
+            },
+            data: {
+              driverId: driver.id,
+              status: "DRIVER_EN_ROUTE", // Transition to next state
+            },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                },
+              },
+              driver: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  phone: true,
+                  vehicleType: true,
+                  vehiclePlate: true,
+                  averageRating: true,
+                },
+              },
+            },
+          });
+
+          // If we got here, assignment succeeded
+          return { success: true, driverId: driver.id };
+        }
+
+        // All candidates were locked or became unavailable
+        return { success: false, error: "All available drivers were assigned to other rides" };
+      }, {
+        timeout: 10000, // 10 second timeout
+        isolationLevel: "Serializable", // Highest isolation to prevent race conditions
+      });
+
+      return result;
+    } catch (error: any) {
+      // Handle transaction conflicts and other errors
+      if (error.code === "P2034") {
+        // Transaction conflict - another transaction modified the data
+        return { success: false, error: "Driver assignment conflict - please try again" };
+      }
+      console.error("Error in matchDriverToRide:", error);
+      return { success: false, error: error.message || "Failed to match driver" };
+    }
   }
 
   // Get all wallets (admin only)
@@ -3542,6 +3768,59 @@ export async function registerRoutes(
             }
           });
           console.log(`[TEST_MODE] Auto-assigned driver ${testDriver.fullName} to ride ${ride.id}`);
+        }
+      } else {
+        // Production: Use trip matching engine
+        const matchResult = await matchDriverToRide(ride.id);
+        
+        if (matchResult.success && matchResult.driverId) {
+          // Reload ride with driver information
+          ride = await prisma.ride.findUnique({
+            where: { id: ride.id },
+            include: {
+              user: {
+                select: { id: true, fullName: true, email: true }
+              },
+              driver: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  phone: true,
+                  vehicleType: true,
+                  vehiclePlate: true,
+                  averageRating: true
+                }
+              }
+            }
+          }) || ride;
+
+          // Send notifications
+          if (ride.driver) {
+            // Notify driver
+            await createNotification(
+              ride.driver.id,
+              "driver",
+              `You have been assigned a ride from ${ride.pickupLocation} to ${ride.dropoffLocation}`,
+              "RIDE_ASSIGNED"
+            );
+
+            // Notify rider
+            await createNotification(
+              ride.userId,
+              "rider",
+              `Driver ${ride.driver.fullName} has been assigned to your ride`,
+              "RIDE_ASSIGNED"
+            );
+          }
+        } else {
+          // No driver available - ride remains REQUESTED
+          // Notify rider that we're searching for a driver
+          await createNotification(
+            ride.userId,
+            "rider",
+            "Your ride request has been received. We're searching for an available driver...",
+            "RIDE_REQUESTED"
+          );
         }
       }
 
