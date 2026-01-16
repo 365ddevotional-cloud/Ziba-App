@@ -3135,6 +3135,145 @@ export async function registerRoutes(
     });
   });
 
+  // Get last completed ride for driver (for ride completion page)
+  app.get("/api/driver/last-completed-ride", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const lastCompletedRide = await prisma.ride.findFirst({
+        where: {
+          driverId: req.session.userId,
+          status: "COMPLETED"
+        },
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: {
+            select: {
+              id: true,
+              fullName: true,
+              averageRating: true
+            }
+          },
+          userRating: true,
+          payment: true
+        }
+      });
+
+      if (!lastCompletedRide) {
+        return res.status(404).json({ message: "No completed ride found" });
+      }
+
+      // Calculate driver earnings (85% of fare after platform commission)
+      const fareAmount = lastCompletedRide.fareEstimate || 0;
+      const commissionRate = 0.15; // 15% platform commission
+      const driverEarnings = fareAmount * (1 - commissionRate);
+      const commission = fareAmount * commissionRate;
+
+      res.json({
+        ...lastCompletedRide,
+        driverEarnings,
+        commission
+      });
+    } catch (error) {
+      console.error("Error fetching last completed ride:", error);
+      res.status(500).json({ message: "Failed to fetch last completed ride" });
+    }
+  });
+
+  // Driver rate rider
+  app.post("/api/driver/rides/:id/rate-rider", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const { id } = req.params;
+      const { rating } = req.body;
+
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+
+      // Get the ride
+      const ride = await prisma.ride.findUnique({
+        where: { id },
+        include: { user: true }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.driverId !== req.session.userId) {
+        return res.status(403).json({ message: "Not authorized to rate this ride" });
+      }
+
+      if (ride.status !== "COMPLETED") {
+        return res.status(400).json({ message: "Can only rate completed rides" });
+      }
+
+      // Check if already rated
+      const existingRating = await prisma.userRating.findUnique({
+        where: { rideId: id }
+      });
+
+      if (existingRating) {
+        return res.status(400).json({ message: "Ride already rated" });
+      }
+
+      // Create the rating
+      await prisma.userRating.create({
+        data: {
+          rating,
+          rideId: id,
+          userId: ride.userId,
+          driverId: req.session.userId
+        }
+      });
+
+      // Update user's average rating
+      const userRatings = await prisma.userRating.findMany({
+        where: { userId: ride.userId }
+      });
+
+      const avgRating = userRatings.reduce((sum, r) => sum + r.rating, 0) / userRatings.length;
+
+      await prisma.user.update({
+        where: { id: ride.userId },
+        data: {
+          averageRating: avgRating,
+          totalRatings: userRatings.length
+        }
+      });
+
+      res.json({ message: "Rating submitted successfully" });
+    } catch (error) {
+      console.error("Error rating rider:", error);
+      res.status(500).json({ message: "Failed to submit rating" });
+    }
+  });
+
+  // Driver go online
+  app.post("/api/driver/go-online", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      await prisma.driver.update({
+        where: { id: req.session.userId },
+        data: { isOnline: true }
+      });
+
+      res.json({ message: "You are now online", isOnline: true });
+    } catch (error) {
+      console.error("Error going online:", error);
+      res.status(500).json({ message: "Failed to go online" });
+    }
+  });
+
   // Director login
   app.post("/api/director/login", async (req, res) => {
     try {
@@ -3383,6 +3522,46 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching active ride:", error);
       res.status(500).json({ message: "Failed to fetch active ride" });
+    }
+  });
+
+  // Get last completed ride for rider (for ride completion page)
+  app.get("/api/rider/last-completed-ride", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const lastCompletedRide = await prisma.ride.findFirst({
+        where: {
+          userId: req.session.userId,
+          status: "COMPLETED"
+        },
+        orderBy: { createdAt: "desc" },
+        include: {
+          driver: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              vehicleType: true,
+              vehiclePlate: true,
+              averageRating: true
+            }
+          },
+          driverRating: true,
+          payment: true
+        }
+      });
+
+      if (!lastCompletedRide) {
+        return res.status(404).json({ message: "No completed ride found" });
+      }
+
+      res.json(lastCompletedRide);
+    } catch (error) {
+      console.error("Error fetching last completed ride:", error);
+      res.status(500).json({ message: "Failed to fetch last completed ride" });
     }
   });
 
