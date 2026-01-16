@@ -83,29 +83,35 @@ model Driver {
 }
 
 model Ride {
-  id              String        @id @default(uuid())
-  pickupLocation  String
-  dropoffLocation String
-  fareEstimate    Float?
-  lockedFare      Float?        // Fare locked at trip start - never recalculated
-  estimatedDistance Float?      // Distance in km calculated at trip start
-  estimatedDuration Float?      // Duration in minutes calculated at trip start
-  pickupLat       Float?        // Pickup latitude for navigation
-  pickupLng       Float?        // Pickup longitude for navigation
-  dropoffLat      Float?        // Dropoff latitude for navigation
-  dropoffLng      Float?        // Dropoff longitude for navigation
-  status          RideStatus    @default(REQUESTED)
-  userId          String
-  driverId        String?
-  startedAt       DateTime?     // When trip actually started
-  completedAt     DateTime?     // When trip actually completed
-  createdAt       DateTime      @default(now())
-  user            User          @relation(fields: [userId], references: [id])
-  driver          Driver?       @relation(fields: [driverId], references: [id])
-  payment         Payment?
-  driverRating    DriverRating?
-  userRating      UserRating?
-  gpsLogs         GpsLog[]      // GPS tracking for safety/fraud detection
+  id                String        @id @default(uuid())
+  pickupLocation    String
+  dropoffLocation   String
+  fareEstimate      Float?
+  lockedFare        Float?        // Fare locked at trip start - never recalculated
+  estimatedDistance Float?        // Distance in km calculated at trip start
+  estimatedDuration Float?        // Duration in minutes calculated at trip start
+  pickupLat         Float?        // Pickup latitude for navigation
+  pickupLng         Float?        // Pickup longitude for navigation
+  dropoffLat        Float?        // Dropoff latitude for navigation
+  dropoffLng        Float?        // Dropoff longitude for navigation
+  status            RideStatus    @default(REQUESTED)
+  userId            String
+  driverId          String?
+  startedAt         DateTime?     // When trip actually started
+  completedAt       DateTime?     // When trip actually completed
+  actualDistance    Float?        // Actual GPS distance traveled in km
+  actualDuration    Float?        // Actual trip duration in minutes
+  fraudScore        Int           @default(0)    // Cumulative fraud score
+  isFlagged         Boolean       @default(false) // Trip flagged for review
+  payoutHeld        Boolean       @default(false) // Driver payout held pending review
+  fraudReasons      String?       // JSON array of fraud reasons
+  createdAt         DateTime      @default(now())
+  user              User          @relation(fields: [userId], references: [id])
+  driver            Driver?       @relation(fields: [driverId], references: [id])
+  payment           Payment?
+  driverRating      DriverRating?
+  userRating        UserRating?
+  gpsLogs           GpsLog[]      // GPS tracking for safety/fraud detection
 }
 
 // GPS tracking for safety and fraud detection (every 5-8 seconds)
@@ -238,6 +244,7 @@ enum TransactionType {
   TIP
   RIDE_PAYMENT
   ADMIN_ADJUSTMENT
+  PENDING
 }
 
 model Wallet {

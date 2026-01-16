@@ -73,6 +73,21 @@ The Ziba platform is built with a modern web development stack:
       - Idle GPS updates driver's lastLocationLat/Lng for dispatch proximity
     - **Database Fields**: Ride model extended with `pickupLat/Lng`, `dropoffLat/Lng`, `lockedFare`, `estimatedDistance`, `estimatedDuration`, `startedAt`, `completedAt`
     - **GpsLog Model**: Stores safety tracking data with `rideId`, `driverId`, `lat`, `lng`, `speed`, `bearing`, `createdAt`
+- **Fraud Detection System (Stage 18)**:
+    - **Distance/Time Thresholds**:
+      - AllowedDistance = estimatedDistance × 1.25
+      - AllowedTime = estimatedDuration × 1.4
+    - **FraudScore Logic**:
+      - Distance overage = +2 points
+      - Time overage = +1 point
+      - GPS jump (>500m in <5s) = +4 points
+      - Looping (same point ≥3 times) = +3 points
+      - Idle >10 min mid-trip = +2 points
+    - **Actions**:
+      - If any threshold exceeded: Flag trip for review (isFlagged=true)
+      - Fare is NEVER auto-adjusted
+      - If FraudScore >= 4: Hold payout (payoutHeld=true)
+    - **Database Fields**: Ride model extended with `actualDistance`, `actualDuration`, `fraudScore`, `isFlagged`, `payoutHeld`, `fraudReasons`
 - **Driver App (Stage 18)**:
     - Driver Home (`/driver/home`): Dashboard with online/offline toggle, today's earnings/trips, rating, waiting for requests state
     - Driver Active Ride (`/driver/ride/:id`): Full ride details, rider info, pickup/dropoff locations, Navigate button, status update buttons (Arrived, Start Trip, Complete Trip)

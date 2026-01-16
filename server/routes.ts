@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { prisma } from "./prisma";
 import { hashPassword, verifyPassword, requireAuth, getCurrentUser, UserRole } from "./auth";
+import { analyzeFraud } from "./fraud-detection";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -3395,10 +3396,35 @@ export async function registerRoutes(
         }
       }
 
-      // Set completion timestamp
+      // Set completion timestamp and run fraud detection
       if (status === "COMPLETED") {
         updateData.completedAt = new Date();
         
+        // Fetch GPS logs for fraud analysis
+        const gpsLogs = await (prisma as any).gpsLog.findMany({
+          where: { rideId: ride.id },
+          orderBy: { createdAt: "asc" }
+        });
+
+        // Run fraud detection
+        const fraudResult = analyzeFraud(
+          gpsLogs,
+          ride.estimatedDistance,
+          ride.estimatedDuration,
+          ride.startedAt,
+          updateData.completedAt
+        );
+
+        // Add fraud data to update
+        updateData.actualDistance = fraudResult.actualDistance;
+        updateData.actualDuration = fraudResult.actualDuration;
+        updateData.fraudScore = fraudResult.fraudScore;
+        updateData.isFlagged = fraudResult.isFlagged;
+        updateData.payoutHeld = fraudResult.payoutHeld;
+        updateData.fraudReasons = fraudResult.reasons.length > 0 
+          ? JSON.stringify(fraudResult.reasons) 
+          : null;
+
         // Handle payment and wallet transactions
         const fare = (ride.lockedFare || ride.fareEstimate || 0) as number;
         if (fare > 0) {
@@ -3417,20 +3443,32 @@ export async function registerRoutes(
             });
           }
 
-          // Credit driver wallet
-          await prisma.wallet.update({
-            where: { id: driverWallet.id },
-            data: { balance: { increment: driverEarnings } }
-          });
+          // Only credit driver if payout is NOT held
+          if (!fraudResult.payoutHeld) {
+            await prisma.wallet.update({
+              where: { id: driverWallet.id },
+              data: { balance: { increment: driverEarnings } }
+            });
 
-          await prisma.transaction.create({
-            data: {
-              walletId: driverWallet.id,
-              type: "CREDIT",
-              amount: driverEarnings,
-              reference: `Ride earnings: ${ride.id}`
-            }
-          });
+            await prisma.transaction.create({
+              data: {
+                walletId: driverWallet.id,
+                type: "CREDIT",
+                amount: driverEarnings,
+                reference: `Ride earnings: ${ride.id}`
+              }
+            });
+          } else {
+            // Create pending transaction for held payout
+            await prisma.transaction.create({
+              data: {
+                walletId: driverWallet.id,
+                type: "PENDING",
+                amount: driverEarnings,
+                reference: `Ride earnings (held for review): ${ride.id}`
+              }
+            });
+          }
 
           // Get or create user wallet and debit
           let userWallet = await prisma.wallet.findFirst({
