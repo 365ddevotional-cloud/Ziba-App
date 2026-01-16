@@ -5,6 +5,7 @@ import MemoryStore from "memorystore";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { createServer as createNetServer } from "net";
 import { bootstrapFounderAdmin } from "./bootstrap";
 
 const app = express();
@@ -69,6 +70,42 @@ export function log(message: string, source = "express") {
   });
 
   console.log(`${formattedTime} [${source}] ${message}`);
+}
+
+/**
+ * Get an available port by trying the preferred port and incrementing if needed
+ * @param preferredPort - The preferred port to try first
+ * @param maxAttempts - Maximum number of ports to try (default: 50)
+ * @returns Promise resolving to an available port number
+ */
+async function getAvailablePort(preferredPort: number, maxAttempts: number = 50): Promise<number> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const port = preferredPort + i;
+    const isAvailable = await new Promise<boolean>((resolve) => {
+      const server = createNetServer();
+      
+      server.once("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "EADDRINUSE") {
+          resolve(false);
+        } else {
+          resolve(false);
+        }
+      });
+      
+      server.once("listening", () => {
+        server.close();
+        resolve(true);
+      });
+      
+      server.listen(port, "127.0.0.1");
+    });
+    
+    if (isAvailable) {
+      return port;
+    }
+  }
+  
+  throw new Error(`No available port found in range ${preferredPort}-${preferredPort + maxAttempts - 1}`);
 }
 
 // Middleware to prevent caching on API responses and add request-time logging
@@ -151,11 +188,17 @@ app.use((req, res, next) => {
     // Other ports are firewalled. Default to 5000 if not specified.
     // this serves both the API and the client.
     // It is the only port that is not firewalled.
-    const port = parseInt(process.env.PORT || "5000", 10);
+    // Auto-fallback to next available port if preferred port is in use (dev only)
+    const preferred = parseInt(process.env.PORT || "5000", 10);
+    const isProduction = process.env.NODE_ENV === "production";
+    
+    // In production, use the exact PORT env var (no auto-fallback)
+    // In development, auto-fallback to next available port if needed
+    const port = isProduction ? preferred : await getAvailablePort(preferred);
     
     // Determine host binding: use 127.0.0.1 on Windows in development, 0.0.0.0 otherwise
     const isWindows = process.platform === "win32";
-    const isLocalDev = process.env.NODE_ENV !== "production";
+    const isLocalDev = !isProduction;
     const host = (isWindows && isLocalDev) ? "127.0.0.1" : "0.0.0.0";
     
     // reusePort is not supported on Windows, so only enable it on non-Windows platforms
@@ -170,7 +213,11 @@ app.use((req, res, next) => {
     httpServer.listen(
       listenOptions,
       () => {
-        log(`serving on ${host}:${port}`);
+        const url = `http://${host === "0.0.0.0" ? "localhost" : host}:${port}`;
+        log(`Server running at ${url}`);
+        if (!isProduction && port !== preferred) {
+          log(`Port ${preferred} was in use, using port ${port} instead`);
+        }
       },
     );
   } catch (error) {
