@@ -59,18 +59,18 @@ export default function AdminPage() {
 
   return (
     <AdminGuard>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-ziba-dark">
         <Header />
       <main className="container mx-auto py-8 px-4">
         <div className="mb-8">
           <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
             <div className="flex items-center gap-3">
-              <Shield className="h-8 w-8 text-primary" />
-              <h1 className="text-3xl font-bold" data-testid="text-page-title">Admin Dashboard</h1>
+              <Shield className="h-8 w-8 text-ziba-accent" />
+              <h1 className="text-3xl font-bold text-ziba-text-primary" data-testid="text-page-title">Admin Dashboard</h1>
             </div>
             <CountrySelector />
           </div>
-          <p className="text-muted-foreground">Real-time platform statistics and management</p>
+          <p className="text-ziba-text-secondary">Real-time platform statistics and management</p>
         </div>
 
         {isLoading ? (
@@ -80,13 +80,13 @@ export default function AdminPage() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <Card>
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover">
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-ziba-text-primary">Total Users</CardTitle>
+                  <Users className="h-4 w-4 text-ziba-accent" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold" data-testid="text-total-users">
+                  <div className="text-2xl font-bold ziba-stat" data-testid="text-total-users">
                     {stats?.users.total ?? 0}
                   </div>
                   <div className="flex flex-col gap-1 mt-2">
@@ -110,13 +110,13 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover">
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Drivers</CardTitle>
-                  <Car className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-ziba-text-primary">Total Drivers</CardTitle>
+                  <Car className="h-4 w-4 text-ziba-accent" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold" data-testid="text-total-drivers">
+                  <div className="text-2xl font-bold ziba-stat" data-testid="text-total-drivers">
                     {stats?.drivers.total ?? 0}
                   </div>
                   <div className="flex flex-col gap-1 mt-2">
@@ -144,13 +144,13 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover">
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Active Rides</CardTitle>
-                  <Activity className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-ziba-text-primary">Active Rides</CardTitle>
+                  <Activity className="h-4 w-4 text-ziba-accent" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-blue-500" data-testid="text-active-rides">
+                  <div className="text-2xl font-bold text-ziba-accent" data-testid="text-active-rides">
                     {stats?.rides.active ?? 0}
                   </div>
                   <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
@@ -170,13 +170,13 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover">
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Rides</CardTitle>
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-ziba-text-primary">Total Rides</CardTitle>
+                  <MapPin className="h-4 w-4 text-ziba-accent" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold" data-testid="text-total-rides">
+                  <div className="text-2xl font-bold ziba-stat" data-testid="text-total-rides">
                     {stats?.rides.total ?? 0}
                   </div>
                   <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
@@ -194,13 +194,13 @@ export default function AdminPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-              <Card>
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover">
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-ziba-text-primary">Revenue</CardTitle>
+                  <DollarSign className="h-4 w-4 text-ziba-accent" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-green-500" data-testid="text-total-revenue">
+                  <div className="text-2xl font-bold text-ziba-accent" data-testid="text-total-revenue">
                     {formatCurrency(stats?.revenue?.totalPaid ?? 0)}
                   </div>
                   <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
@@ -222,16 +222,16 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover">
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Driver Incentives</CardTitle>
-                  <Gift className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-ziba-text-primary">Driver Incentives</CardTitle>
+                  <Gift className="h-4 w-4 text-ziba-accent" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-purple-500" data-testid="text-total-incentives">
+                  <div className="text-2xl font-bold text-ziba-accent" data-testid="text-total-incentives">
                     {formatCurrency(stats?.incentives?.total ?? 0)}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">
+                  <p className="text-xs text-ziba-text-secondary mt-2">
                     {stats?.incentives?.count ?? 0} incentives awarded to drivers
                   </p>
                 </CardContent>
@@ -239,172 +239,172 @@ export default function AdminPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="hover-elevate cursor-pointer">
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover cursor-pointer">
                 <Link href="/admin/users">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Users className="h-5 w-5 text-primary" />
-                        <CardTitle>Manage Users</CardTitle>
+                        <Users className="h-5 w-5 text-ziba-accent" />
+                        <CardTitle className="text-ziba-text-primary">Manage Users</CardTitle>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
                     </div>
-                    <CardDescription>View and manage all registered users</CardDescription>
+                    <CardDescription className="text-ziba-text-secondary">View and manage all registered users</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
 
-              <Card className="hover-elevate cursor-pointer">
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover cursor-pointer">
                 <Link href="/admin/drivers">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Car className="h-5 w-5 text-primary" />
-                        <CardTitle>Manage Drivers</CardTitle>
+                        <Car className="h-5 w-5 text-ziba-accent" />
+                        <CardTitle className="text-ziba-text-primary">Manage Drivers</CardTitle>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
                     </div>
-                    <CardDescription>View and manage all registered drivers</CardDescription>
+                    <CardDescription className="text-ziba-text-secondary">View and manage all registered drivers</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
 
-              <Card className="hover-elevate cursor-pointer">
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover cursor-pointer">
                 <Link href="/admin/directors">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <UserCog className="h-5 w-5 text-primary" />
-                        <CardTitle>Manage Directors</CardTitle>
+                        <UserCog className="h-5 w-5 text-ziba-accent" />
+                        <CardTitle className="text-ziba-text-primary">Manage Directors</CardTitle>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
                     </div>
-                    <CardDescription>Manage {stats?.directors?.total ?? 0} directors overseeing operations</CardDescription>
+                    <CardDescription className="text-ziba-text-secondary">Manage {stats?.directors?.total ?? 0} directors overseeing operations</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
 
-              <Card className="hover-elevate cursor-pointer">
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover cursor-pointer">
                 <Link href="/admin/rides">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <MapPin className="h-5 w-5 text-primary" />
-                        <CardTitle>Manage Rides</CardTitle>
+                        <MapPin className="h-5 w-5 text-ziba-accent" />
+                        <CardTitle className="text-ziba-text-primary">Manage Rides</CardTitle>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
                     </div>
-                    <CardDescription>View all rides on the platform</CardDescription>
+                    <CardDescription className="text-ziba-text-secondary">View all rides on the platform</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
 
-              <Card className="hover-elevate cursor-pointer">
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover cursor-pointer">
                 <Link href="/admin/payments">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <DollarSign className="h-5 w-5 text-primary" />
-                        <CardTitle>Manage Payments</CardTitle>
+                        <DollarSign className="h-5 w-5 text-ziba-accent" />
+                        <CardTitle className="text-ziba-text-primary">Manage Payments</CardTitle>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
                     </div>
-                    <CardDescription>Track and manage ride payments</CardDescription>
+                    <CardDescription className="text-ziba-text-secondary">Track and manage ride payments</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
 
-              <Card className="hover-elevate cursor-pointer">
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover cursor-pointer">
                 <Link href="/admin/incentives">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Gift className="h-5 w-5 text-primary" />
-                        <CardTitle>Manage Incentives</CardTitle>
+                        <Gift className="h-5 w-5 text-ziba-accent" />
+                        <CardTitle className="text-ziba-text-primary">Manage Incentives</CardTitle>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
                     </div>
-                    <CardDescription>Award bonuses to drivers</CardDescription>
+                    <CardDescription className="text-ziba-text-secondary">Award bonuses to drivers</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
 
-              <Card className="hover-elevate cursor-pointer">
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover cursor-pointer">
                 <Link href="/admin/wallets">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Wallet className="h-5 w-5 text-primary" />
-                        <CardTitle>Manage Wallets</CardTitle>
+                        <Wallet className="h-5 w-5 text-ziba-accent" />
+                        <CardTitle className="text-ziba-text-primary">Manage Wallets</CardTitle>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
                     </div>
-                    <CardDescription>View and process driver payouts</CardDescription>
+                    <CardDescription className="text-ziba-text-secondary">View and process driver payouts</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
 
-              <Card className="hover-elevate cursor-pointer">
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover cursor-pointer">
                 <Link href="/admin/analytics">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <BarChart3 className="h-5 w-5 text-primary" />
-                        <CardTitle>Analytics</CardTitle>
+                        <BarChart3 className="h-5 w-5 text-ziba-accent" />
+                        <CardTitle className="text-ziba-text-primary">Analytics</CardTitle>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
                     </div>
-                    <CardDescription>Platform metrics and director performance</CardDescription>
+                    <CardDescription className="text-ziba-text-secondary">Platform metrics and director performance</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
 
-              <Card className="hover-elevate cursor-pointer">
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover cursor-pointer">
                 <Link href="/admin/fares">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Calculator className="h-5 w-5 text-primary" />
-                        <CardTitle>Manage Ride Fares</CardTitle>
+                        <Calculator className="h-5 w-5 text-ziba-accent" />
+                        <CardTitle className="text-ziba-text-primary">Manage Ride Fares</CardTitle>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
                     </div>
-                    <CardDescription>Configure pricing for each country</CardDescription>
+                    <CardDescription className="text-ziba-text-secondary">Configure pricing for each country</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
 
-              <Card className="hover-elevate cursor-pointer border-dashed border-amber-500/50">
+              <Card className="bg-ziba-card border-dashed border-amber-500/50 ziba-card-hover cursor-pointer">
                 <Link href="/admin/test-accounts">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <FlaskConical className="h-5 w-5 text-amber-500" />
-                        <CardTitle className="flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2 text-ziba-text-primary">
                           Manage Test Accounts
                           <KeyRound className="h-4 w-4 text-amber-500" />
                         </CardTitle>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
                     </div>
-                    <CardDescription>Create and manage test login credentials for Users, Drivers, and Directors</CardDescription>
+                    <CardDescription className="text-ziba-text-secondary">Create and manage test login credentials for Users, Drivers, and Directors</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
 
-              <Card className="hover-elevate cursor-pointer border-dashed border-green-500/50">
+              <Card className="bg-ziba-card border-dashed border-green-500/50 ziba-card-hover cursor-pointer">
                 <Link href="/admin/playstore-checklist">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Smartphone className="h-5 w-5 text-green-500" />
-                        <CardTitle className="flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2 text-ziba-text-primary">
                           Play Store Checklist
                         </CardTitle>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
                     </div>
-                    <CardDescription>Verify app readiness for Google Play Store submission</CardDescription>
+                    <CardDescription className="text-ziba-text-secondary">Verify app readiness for Google Play Store submission</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>
@@ -441,17 +441,17 @@ function ActivityFeed() {
   const getIcon = (iconType: string) => {
     switch (iconType) {
       case "map":
-        return <MapPin className="h-4 w-4 text-blue-500" />;
+        return <MapPin className="h-4 w-4 text-ziba-accent" />;
       case "dollar":
-        return <DollarSign className="h-4 w-4 text-green-500" />;
+        return <DollarSign className="h-4 w-4 text-ziba-accent" />;
       case "gift":
-        return <Gift className="h-4 w-4 text-purple-500" />;
+        return <Gift className="h-4 w-4 text-ziba-accent" />;
       case "user":
-        return <Users className="h-4 w-4 text-cyan-500" />;
+        return <Users className="h-4 w-4 text-ziba-accent" />;
       case "car":
-        return <Car className="h-4 w-4 text-orange-500" />;
+        return <Car className="h-4 w-4 text-ziba-accent" />;
       default:
-        return <Activity className="h-4 w-4 text-muted-foreground" />;
+        return <Activity className="h-4 w-4 text-ziba-text-secondary" />;
     }
   };
 
@@ -470,29 +470,29 @@ function ActivityFeed() {
   };
 
   return (
-    <Card className="mt-8">
+    <Card className="mt-8 bg-ziba-card border-ziba-border">
       <CardHeader>
         <div className="flex items-center gap-3">
-          <Activity className="h-5 w-5 text-primary" />
-          <CardTitle>Recent Activity</CardTitle>
+          <Activity className="h-5 w-5 text-ziba-accent" />
+          <CardTitle className="text-ziba-text-primary">Recent Activity</CardTitle>
         </div>
-        <CardDescription>Latest platform activity</CardDescription>
+        <CardDescription className="text-ziba-text-secondary">Latest platform activity</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-6 w-6 animate-spin text-ziba-accent" />
           </div>
         ) : activities && activities.length > 0 ? (
           <div className="space-y-4">
             {activities.map((activity, index) => (
-              <div key={index} className="flex items-start gap-3 pb-3 border-b last:border-0 last:pb-0">
+              <div key={index} className="flex items-start gap-3 pb-3 border-b border-ziba-border last:border-0 last:pb-0">
                 <div className="mt-0.5">{getIcon(activity.icon)}</div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm truncate" data-testid={`text-activity-${index}`}>
+                  <p className="text-sm truncate text-ziba-text-primary" data-testid={`text-activity-${index}`}>
                     {activity.message}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-ziba-text-secondary">
                     {formatTime(activity.timestamp)}
                   </p>
                 </div>
@@ -500,7 +500,7 @@ function ActivityFeed() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">
+          <p className="text-sm text-ziba-text-secondary text-center py-4">
             No recent activity
           </p>
         )}
