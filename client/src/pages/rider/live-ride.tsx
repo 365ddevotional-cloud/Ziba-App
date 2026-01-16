@@ -309,8 +309,9 @@ export default function RiderLiveRide() {
     if (!isTestMode || !currentTrip) return null;
     
     const isPending = testArriveMutation.isPending || testStartMutation.isPending || testCompleteMutation.isPending;
+    const status = currentTrip.status as TripStatus | "ACCEPTED" | "DRIVER_EN_ROUTE" | "ARRIVED";
 
-    switch (currentTrip.status) {
+    switch (status) {
       case "CONFIRMED":
         return (
           <Button
@@ -326,6 +327,7 @@ export default function RiderLiveRide() {
         );
       case "ACCEPTED":
       case "DRIVER_EN_ROUTE":
+        if (!activeRide) return null;
         return (
           <Button
             className="w-full"
@@ -343,6 +345,7 @@ export default function RiderLiveRide() {
           </Button>
         );
       case "ARRIVED":
+        if (!activeRide) return null;
         return (
           <Button
             className="w-full"
@@ -360,6 +363,7 @@ export default function RiderLiveRide() {
           </Button>
         );
       case "IN_PROGRESS":
+        if (!activeRide) return null;
         return (
           <Button
             className="w-full"

@@ -26,13 +26,6 @@ export default function DriverHome() {
   // Get driver wallet balance
   const driverWallet = getDriverWallet(assignedTrip?.driver?.id || "driver_1");
 
-  // Check if current driver has an assigned trip
-  // For in-memory matching, check if trip exists and has a driver assigned
-  // In production, this would match driver.id with trip.driver.id
-  const assignedTrip = currentTrip?.driver && currentTrip.status !== "COMPLETED" && currentTrip.status !== "CANCELLED" 
-    ? currentTrip 
-    : null;
-
   const handleCompleteTrip = () => {
     if (assignedTrip && assignedTrip.driver && assignedTrip.payment?.escrowHeld) {
       // Calculate payment distribution

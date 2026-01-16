@@ -4714,7 +4714,12 @@ export async function registerRoutes(
 
           // If trip IN_PROGRESS: apply penalty to this rider's share only
           if (rideWithShareGroup.status === "IN_PROGRESS") {
-            const participant = shareGroup.participants.find(p => p.userId === req.session.userId);
+            const userId = req.session.userId;
+            if (!userId) {
+              return res.status(401).json({ message: "Not authenticated" });
+            }
+
+            const participant = shareGroup.participants.find(p => p.userId === userId);
             const fareAmount = participant?.fareShareAmount || 0;
             const { penaltyAmount, refundAmount } = calculateCancellationPenalty(fareAmount, true);
 
@@ -4728,11 +4733,11 @@ export async function registerRoutes(
               // Handle wallet refund
               if (fareAmount > 0 && refundAmount > 0) {
                 let userWallet = await tx.wallet.findUnique({
-                  where: { ownerId_ownerType: { ownerId: req.session.userId, ownerType: "USER" } },
+                  where: { ownerId_ownerType: { ownerId: userId, ownerType: "USER" } },
                 });
                 if (!userWallet) {
                   userWallet = await tx.wallet.create({
-                    data: { ownerId: req.session.userId, ownerType: "USER", balance: 5000 },
+                    data: { ownerId: userId, ownerType: "USER", balance: 5000 },
                   });
                 }
 
@@ -4762,7 +4767,7 @@ export async function registerRoutes(
 
                 await tx.notification.create({
                   data: {
-                    userId: req.session.userId,
+                    userId: userId,
                     role: "user",
                     message: `Shared ride cancelled. Cancellation fee (20%): ₦${penaltyAmount.toLocaleString()}. Refunded (80%): ₦${refundAmount.toLocaleString()}`,
                     type: "STATUS_CHANGE",
@@ -5014,8 +5019,13 @@ export async function registerRoutes(
         });
 
         // Get user wallet and create transaction record
+        const userId = req.session.userId;
+        if (!userId) {
+          return res.status(401).json({ message: "Not authenticated" });
+        }
+
         const userWallet = await tx.wallet.findUnique({
-          where: { ownerId_ownerType: { ownerId: req.session.userId, ownerType: "USER" } }
+          where: { ownerId_ownerType: { ownerId: userId, ownerType: "USER" } }
         });
 
         if (userWallet) {
