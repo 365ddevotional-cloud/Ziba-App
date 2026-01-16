@@ -1053,6 +1053,58 @@ export async function registerRoutes(
 
   // ==================== RECENT ACTIVITY ====================
 
+  // Get platform settings (admin only)
+  app.get("/api/admin/platform-settings", requireAuth(["admin"]), async (req, res) => {
+    try {
+      const config = await getPlatformConfig();
+      res.json({
+        commissionRate: config.commissionRate,
+        cancellationPenaltyRate: config.cancellationPenaltyRate ?? 0.20,
+        testModeEnabled: config.testModeEnabled,
+        paymentGateway: config.paymentGateway,
+        paymentGatewayMode: config.paymentGatewayMode,
+      });
+    } catch (error) {
+      console.error("Error fetching platform settings:", error);
+      res.status(500).json({ message: "Failed to fetch platform settings" });
+    }
+  });
+
+  // Update platform settings (admin only)
+  app.post("/api/admin/platform-settings", requireAuth(["admin"]), async (req, res) => {
+    try {
+      const { cancellationPenaltyRate } = req.body;
+
+      // Validate cancellation penalty rate (0.00 to 0.50)
+      if (cancellationPenaltyRate !== undefined) {
+        if (typeof cancellationPenaltyRate !== "number" || cancellationPenaltyRate < 0 || cancellationPenaltyRate > 0.50) {
+          return res.status(400).json({ 
+            message: "Cancellation penalty rate must be a number between 0.00 and 0.50" 
+          });
+        }
+      }
+
+      const config = await getPlatformConfig();
+      const updatedConfig = await prisma.platformConfig.update({
+        where: { id: config.id },
+        data: {
+          cancellationPenaltyRate: cancellationPenaltyRate !== undefined ? cancellationPenaltyRate : config.cancellationPenaltyRate,
+        },
+      });
+
+      res.json({
+        commissionRate: updatedConfig.commissionRate,
+        cancellationPenaltyRate: updatedConfig.cancellationPenaltyRate ?? 0.20,
+        testModeEnabled: updatedConfig.testModeEnabled,
+        paymentGateway: updatedConfig.paymentGateway,
+        paymentGatewayMode: updatedConfig.paymentGatewayMode,
+      });
+    } catch (error) {
+      console.error("Error updating platform settings:", error);
+      res.status(500).json({ message: "Failed to update platform settings" });
+    }
+  });
+
   app.get("/api/admin/activity", async (req, res) => {
     try {
       const currentUser = getCurrentUser(req);
@@ -2199,7 +2251,7 @@ export async function registerRoutes(
     let config = await prisma.platformConfig.findFirst();
     if (!config) {
       config = await prisma.platformConfig.create({
-        data: { commissionRate: 0.15 },
+        data: { commissionRate: 0.15, cancellationPenaltyRate: 0.20 },
       });
     }
     return config;
@@ -2320,33 +2372,37 @@ export async function registerRoutes(
   
   /**
    * Calculate cancellation penalty and refund amounts
-   * Penalty: 20% of total fare (applied only after IN_PROGRESS)
-   * Refund: 80% if penalty applies, 100% if no penalty
+   * Penalty: Configurable rate (default 20%) of total fare
+   * Refund: Remaining amount after penalty
    * 
    * @param totalFare - The total fare amount from ride.fareEstimate
-   * @param applyPenalty - Whether to apply the 20% penalty (true if ride is IN_PROGRESS or later)
+   * @param applyPenalty - Whether to apply the penalty (true if ride is ASSIGNED or ARRIVED)
+   * @param penaltyRate - The penalty rate (default 0.20 = 20%)
    * @returns { penaltyAmount: number, refundAmount: number }
    */
-  function calculateCancellationPenalty(totalFare: number, applyPenalty: boolean): { penaltyAmount: number; refundAmount: number } {
+  function calculateCancellationPenalty(totalFare: number, applyPenalty: boolean, penaltyRate: number = 0.20): { penaltyAmount: number; refundAmount: number } {
     // Guard: Ensure fare is valid
     if (!totalFare || totalFare <= 0) {
       return { penaltyAmount: 0, refundAmount: 0 };
     }
+
+    // Guard: Ensure penalty rate is valid (0.00 to 1.00)
+    const validRate = Math.max(0, Math.min(1, penaltyRate));
 
     if (!applyPenalty) {
       // No penalty: 100% refund
       return { penaltyAmount: 0, refundAmount: totalFare };
     }
 
-    // Apply 20% penalty: refund 80%
+    // Apply penalty at configured rate
     // Use Math.round to avoid floating point drift
-    const penaltyAmount = Math.round(totalFare * 0.2);
+    const penaltyAmount = Math.round(totalFare * validRate);
     const refundAmount = totalFare - penaltyAmount;
 
     // Guard: Ensure refund + penalty = total (safety check)
     if (refundAmount + penaltyAmount !== totalFare) {
       // Recalculate to ensure exact match
-      const recalculatedPenalty = Math.round(totalFare * 0.2);
+      const recalculatedPenalty = Math.round(totalFare * validRate);
       const recalculatedRefund = totalFare - recalculatedPenalty;
       return { penaltyAmount: recalculatedPenalty, refundAmount: recalculatedRefund };
     }
@@ -4833,11 +4889,15 @@ export async function registerRoutes(
         }
       }
 
-      // Determine penalty: Apply 20% if ride is ASSIGNED or ARRIVED (driver assigned but before trip starts)
+      // Determine penalty: Apply if ride is ASSIGNED or ARRIVED (driver assigned but before trip starts)
       // Rider cannot cancel after IN_PROGRESS (enforced by state machine)
       const shouldApplyPenalty = ["ASSIGNED", "ARRIVED"].includes(ride.status);
       const fareAmount = ride.fareEstimate || 0;
-      const { penaltyAmount, refundAmount } = calculateCancellationPenalty(fareAmount, shouldApplyPenalty);
+
+      // Get platform config for cancellation penalty rate
+      const config = await getPlatformConfig();
+      const penaltyRate = config.cancellationPenaltyRate ?? 0.20;
+      const { penaltyAmount, refundAmount } = calculateCancellationPenalty(fareAmount, shouldApplyPenalty, penaltyRate);
 
       // Guard: Ensure cancelling before driver assignment (REQUESTED) never penalizes
       if (ride.status === "REQUESTED" && penaltyAmount > 0) {
@@ -4845,13 +4905,16 @@ export async function registerRoutes(
         return res.status(500).json({ message: "Internal error: Invalid penalty calculation" });
       }
 
-      // Guard: Ensure cancelling after driver assignment (ASSIGNED/ARRIVED) always penalizes at 20%
+      // Guard: Ensure cancelling after driver assignment (ASSIGNED/ARRIVED) always penalizes
       if (shouldApplyPenalty && penaltyAmount === 0 && fareAmount > 0) {
         console.error(`[GUARD] Penalty should apply but calculated as 0 for ride ${id}`);
         return res.status(500).json({ message: "Internal error: Penalty calculation failed" });
       }
 
       // Process cancellation with wallet refund
+      // Calculate penalty percentage for notifications (outside transaction)
+      const penaltyPercentage = Math.round(penaltyRate * 100);
+
       const result = await prisma.$transaction(async (tx) => {
         // Update ride status
         const updatedRide = await tx.ride.update({
@@ -4874,13 +4937,14 @@ export async function registerRoutes(
 
           // If penalty applies, charge penalty to rider wallet (debit)
           if (penaltyAmount > 0) {
+
             // Debit penalty from rider wallet (allows negative balance if insufficient)
             await tx.transaction.create({
               data: {
                 walletId: userWallet.id,
                 type: "DEBIT",
                 amount: -penaltyAmount,
-                reference: `Cancellation fee (20%) - Ride ${id}`,
+                reference: `Cancellation fee (${penaltyPercentage}%) - Ride ${id}`,
               },
             });
             await tx.wallet.update({
@@ -4888,13 +4952,19 @@ export async function registerRoutes(
               data: { balance: { decrement: penaltyAmount } },
             });
 
-            // Credit penalty to platform (record as COMMISSION for platform revenue tracking)
+            // Credit penalty to platform (record as CANCELLATION_PENALTY for platform revenue tracking)
             await tx.transaction.create({
               data: {
                 walletId: userWallet.id,
-                type: "COMMISSION",
+                type: "CANCELLATION_PENALTY",
                 amount: penaltyAmount,
-                reference: `Cancellation fee (20%) - Ride ${id} - Platform Revenue`,
+                reference: JSON.stringify({
+                  rideId: id,
+                  fare: fareAmount,
+                  penaltyRate: penaltyRate,
+                  penaltyAmount: penaltyAmount,
+                  cancelledBy: "RIDER"
+                }),
               },
             });
 
@@ -4905,7 +4975,7 @@ export async function registerRoutes(
                   walletId: userWallet.id,
                   type: "CREDIT",
                   amount: refundAmount,
-                  reference: `Ride cancellation refund - ${ride.pickupLocation} to ${ride.dropoffLocation} (after 20% fee)`,
+                  reference: `Ride cancellation refund - ${ride.pickupLocation} to ${ride.dropoffLocation} (after ${penaltyPercentage}% fee)`,
                 },
               });
               await tx.wallet.update({
@@ -4914,15 +4984,35 @@ export async function registerRoutes(
               });
             }
 
+            // Release driver if assigned
+            if (ride.driverId) {
+              await tx.driver.update({
+                where: { id: ride.driverId },
+                data: { isOnline: true },
+              });
+            }
+
             // Notify user about cancellation fee
             await tx.notification.create({
               data: {
                 userId: ride.userId,
                 role: "user",
-                message: `Ride cancelled. Cancellation fee (20%): ₦${penaltyAmount.toLocaleString()}. Refunded: ₦${refundAmount.toLocaleString()}`,
+                message: `Cancellation penalty charged: ₦${penaltyAmount.toLocaleString()}. Refunded: ₦${refundAmount.toLocaleString()}`,
                 type: "STATUS_CHANGE",
               },
             });
+
+            // Notify driver if assigned
+            if (ride.driverId) {
+              await tx.notification.create({
+                data: {
+                  userId: ride.driverId,
+                  role: "driver",
+                  message: "Ride cancelled by rider",
+                  type: "STATUS_CHANGE",
+                },
+              });
+            }
           } else {
             // Full refund (no penalty)
             if (refundAmount > 0) {
@@ -4940,6 +5030,14 @@ export async function registerRoutes(
               });
             }
 
+            // Release driver if assigned
+            if (ride.driverId) {
+              await tx.driver.update({
+                where: { id: ride.driverId },
+                data: { isOnline: true },
+              });
+            }
+
             // Full refund notification
             await tx.notification.create({
               data: {
@@ -4949,9 +5047,35 @@ export async function registerRoutes(
                 type: "STATUS_CHANGE",
               },
             });
+
+            // Notify driver if assigned
+            if (ride.driverId) {
+              await tx.notification.create({
+                data: {
+                  userId: ride.driverId,
+                  role: "driver",
+                  message: "Ride cancelled by rider",
+                  type: "STATUS_CHANGE",
+                },
+              });
+            }
           }
         } else {
-          // No fare, just notify
+          // No fare, just notify and release driver
+          if (ride.driverId) {
+            await tx.driver.update({
+              where: { id: ride.driverId },
+              data: { isOnline: true },
+            });
+            await tx.notification.create({
+              data: {
+                userId: ride.driverId,
+                role: "driver",
+                message: "Ride cancelled by rider",
+                type: "STATUS_CHANGE",
+              },
+            });
+          }
           await tx.notification.create({
             data: {
               userId: ride.userId,

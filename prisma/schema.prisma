@@ -441,15 +441,16 @@ model Notification {
 // }
 
 model PlatformConfig {
-  id                 String             @id @default(uuid())
-  commissionRate     Float              @default(0.15)
-  testModeEnabled    Boolean            @default(true)
+  id                    String             @id @default(uuid())
+  commissionRate        Float              @default(0.15)
+  cancellationPenaltyRate Float            @default(0.20)
+  testModeEnabled       Boolean            @default(true)
   // SQLite: String | PostgreSQL: PaymentGateway
-  paymentGateway     String             @default("STRIPE")
+  paymentGateway        String             @default("STRIPE")
   // SQLite: String | PostgreSQL: PaymentGatewayMode
-  paymentGatewayMode String             @default("SANDBOX")
-  updatedAt          DateTime           @updatedAt
-  updatedBy          String?
+  paymentGatewayMode    String             @default("SANDBOX")
+  updatedAt             DateTime           @updatedAt
+  updatedBy             String?
 }
 
 // ==================== FARE CONFIG ====================
