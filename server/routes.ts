@@ -2212,6 +2212,110 @@ export async function registerRoutes(
     });
   }
 
+  // ==================== RIDESHARE MATCHING HELPERS ====================
+  
+  /**
+   * Calculate distance between two coordinates (Haversine formula, simplified)
+   * Returns distance in kilometers
+   */
+  function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+  
+  /**
+   * Simple heuristic: Check if two routes are compatible for sharing
+   * - Pickup distance <= 1.5 km
+   * - Destination distance <= 5 km OR similar direction (bearing check)
+   */
+  function areRoutesCompatible(
+    pickup1Lat: number, pickup1Lng: number,
+    dest1Lat: number, dest1Lng: number,
+    pickup2Lat: number, pickup2Lng: number,
+    dest2Lat: number, dest2Lng: number
+  ): boolean {
+    const pickupDistance = calculateDistance(pickup1Lat, pickup1Lng, pickup2Lat, pickup2Lng);
+    const destDistance = calculateDistance(dest1Lat, dest1Lng, dest2Lat, dest2Lng);
+    
+    // Pickup distance must be within 1.5 km
+    if (pickupDistance > 1.5) {
+      return false;
+    }
+    
+    // Destination distance must be within 5 km
+    if (destDistance <= 5.0) {
+      return true;
+    }
+    
+    // Optional: Check bearing similarity (for MVP, accept if dest distance <= 10km as fallback)
+    return destDistance <= 10.0;
+  }
+  
+  /**
+   * Try to match rider into existing open share group
+   * Returns shareGroupId if matched, null if no match found
+   */
+  async function findMatchingShareGroup(
+    userId: string,
+    pickupLocation: string,
+    dropoffLocation: string,
+    pickupLat: number | null,
+    pickupLng: number | null,
+    destLat: number | null,
+    destLng: number | null
+  ): Promise<string | null> {
+    // Only search if we have coordinates (for MVP, if no coordinates, don't match)
+    if (!pickupLat || !pickupLng || !destLat || !destLng) {
+      return null;
+    }
+
+    // Find open share groups with only 1 participant
+    const openGroups = await prisma.shareGroup.findMany({
+      where: {
+        status: "OPEN"
+      },
+      include: {
+        participants: true
+      }
+    });
+
+    for (const group of openGroups) {
+      if (group.participants.length !== 1) {
+        continue; // Skip if not exactly 1 participant
+      }
+
+      const existingParticipant = group.participants[0];
+      
+      // Skip if same user
+      if (existingParticipant.userId === userId) {
+        continue;
+      }
+
+      // Check route compatibility
+      if (existingParticipant.pickupLat && existingParticipant.pickupLng &&
+          existingParticipant.destLat && existingParticipant.destLng) {
+        const isCompatible = areRoutesCompatible(
+          existingParticipant.pickupLat, existingParticipant.pickupLng,
+          existingParticipant.destLat, existingParticipant.destLng,
+          pickupLat, pickupLng,
+          destLat, destLng
+        );
+
+        if (isCompatible) {
+          return group.id;
+        }
+      }
+    }
+
+    return null;
+  }
+
   // ==================== CANCELLATION PENALTY CALCULATION ====================
   
   /**
@@ -3996,6 +4100,23 @@ export async function registerRoutes(
               averageRating: true
             }
           },
+          shareGroup: {
+            include: {
+              participants: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      fullName: true,
+                      phone: true,
+                      email: true
+                    }
+                  }
+                },
+                orderBy: { createdAt: "asc" }
+              }
+            }
+          },
           payment: true
         }
       });
@@ -4032,12 +4153,195 @@ export async function registerRoutes(
         return res.status(400).json({ message: "You already have an active ride" });
       }
 
+      const mode = req.body.rideMode || "PRIVATE";
+      const isShareMode = mode === "SHARE";
+
+      // Handle SHARE mode: Try to match into existing group or create new group
+      let shareGroupId: string | null = null;
+      let shareStatus: string = "PRIVATE";
+
+      if (isShareMode) {
+        // Try to find matching share group
+        const matchedGroupId = await findMatchingShareGroup(
+          req.session.userId,
+          pickupLocation,
+          dropoffLocation,
+          req.body.pickupLat || null,
+          req.body.pickupLng || null,
+          req.body.destLat || null,
+          req.body.destLng || null
+        );
+
+        if (matchedGroupId) {
+          // Found a match - add as participant
+          shareGroupId = matchedGroupId;
+          
+          // Calculate fare share (50/50 split with 10% discount)
+          const totalFare = fareEstimate || 1000;
+          const farePerPerson = (totalFare / 2) * 0.9; // 10% discount
+          
+          await prisma.shareParticipant.create({
+            data: {
+              shareGroupId: matchedGroupId,
+              userId: req.session.userId,
+              pickupLocation,
+              dropoffLocation,
+              pickupLat: req.body.pickupLat || null,
+              pickupLng: req.body.pickupLng || null,
+              destLat: req.body.destLat || null,
+              destLng: req.body.destLng || null,
+              fareShareAmount: farePerPerson,
+              paymentStatus: "PENDING"
+            }
+          });
+
+          // Update group status to FULL
+          await prisma.shareGroup.update({
+            where: { id: matchedGroupId },
+            data: { status: "FULL" }
+          });
+
+          shareStatus = "MATCHED";
+
+          // Create the actual ride for the shared trip
+          const firstParticipant = await prisma.shareParticipant.findFirst({
+            where: { shareGroupId: matchedGroupId },
+            orderBy: { createdAt: "asc" }
+          });
+
+          const ride = await prisma.ride.create({
+            data: {
+              userId: firstParticipant?.userId || req.session.userId,
+              pickupLocation: firstParticipant?.pickupLocation || pickupLocation,
+              dropoffLocation: firstParticipant?.dropoffLocation || dropoffLocation,
+              fareEstimate: totalFare,
+              rideMode: "SHARE",
+              shareGroupId: matchedGroupId,
+              maxPassengers: 2,
+              status: "REQUESTED"
+            },
+            include: {
+              user: {
+                select: { id: true, fullName: true, email: true }
+              },
+              shareGroup: {
+                include: {
+                  participants: {
+                    include: {
+                      user: {
+                        select: { id: true, fullName: true, email: true }
+                      }
+                    }
+                  }
+                }
+              },
+              driver: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  phone: true,
+                  vehicleType: true,
+                  vehiclePlate: true,
+                  averageRating: true
+                }
+              }
+            }
+          });
+
+          // Trigger driver matching
+          if (!TEST_MODE) {
+            const matchResult = await matchDriverToRide(ride.id);
+            
+            if (matchResult.success && matchResult.driverId) {
+              // Reload ride with driver
+              const updatedRide = await prisma.ride.findUnique({
+                where: { id: ride.id },
+                include: {
+                  user: {
+                    select: { id: true, fullName: true, email: true }
+                  },
+                  shareGroup: {
+                    include: {
+                      participants: {
+                        include: {
+                          user: {
+                            select: { id: true, fullName: true, email: true }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  driver: {
+                    select: {
+                      id: true,
+                      fullName: true,
+                      phone: true,
+                      vehicleType: true,
+                      vehiclePlate: true,
+                      averageRating: true
+                    }
+                  }
+                }
+              }) || ride;
+
+              // Notify all participants
+              for (const participant of ride.shareGroup?.participants || []) {
+                await createNotification(
+                  participant.userId,
+                  "rider",
+                  `Matched! Driver ${updatedRide.driver?.fullName || "is being assigned"} for your shared ride`,
+                  "RIDE_ASSIGNED"
+                );
+              }
+
+              return res.status(201).json({ ...updatedRide, shareStatus: "MATCHED_AND_ASSIGNED" });
+            }
+          }
+
+          return res.status(201).json({ ...ride, shareStatus: "MATCHED" });
+        } else {
+          // No match found - create new share group
+          const newShareGroup = await prisma.shareGroup.create({
+            data: {
+              status: "OPEN"
+            }
+          });
+
+          shareGroupId = newShareGroup.id;
+          
+          // Calculate fare share (50/50 split with 10% discount if matched later)
+          const totalFare = fareEstimate || 1000;
+          const farePerPerson = (totalFare / 2) * 0.9;
+          
+          await prisma.shareParticipant.create({
+            data: {
+              shareGroupId: newShareGroup.id,
+              userId: req.session.userId,
+              pickupLocation,
+              dropoffLocation,
+              pickupLat: req.body.pickupLat || null,
+              pickupLng: req.body.pickupLng || null,
+              destLat: req.body.destLat || null,
+              destLng: req.body.destLng || null,
+              fareShareAmount: farePerPerson,
+              paymentStatus: "PENDING"
+            }
+          });
+
+          shareStatus = "SEARCHING";
+        }
+      }
+
+      // Create ride (PRIVATE mode or SHARE mode waiting for match)
       let ride = await prisma.ride.create({
         data: {
           userId: req.session.userId,
           pickupLocation,
           dropoffLocation,
           fareEstimate: fareEstimate || null,
+          rideMode: mode,
+          shareGroupId: shareGroupId,
+          maxPassengers: isShareMode ? 2 : 1,
           status: "REQUESTED"
         },
         include: {
@@ -4053,9 +4357,20 @@ export async function registerRoutes(
               vehiclePlate: true,
               averageRating: true
             }
-          }
+          },
+          shareGroup: isShareMode ? {
+            include: {
+              participants: {
+                include: {
+                  user: {
+                    select: { id: true, fullName: true, email: true }
+                  }
+                }
+              }
+            }
+          } : undefined
         }
-      });
+      }) as any; // Type assertion to handle optional shareGroup
 
       // TEST_MODE: Auto-assign a test driver after a short delay simulation
       if (TEST_MODE) {
@@ -4148,6 +4463,135 @@ export async function registerRoutes(
     }
   });
 
+  // Timeout handler for share groups (convert to PRIVATE if no match after timeout)
+  // This should be called periodically (cron job or similar)
+  // For MVP: Simple check when rider checks status
+  async function checkShareGroupTimeout(shareGroupId: string, timeoutMinutes: number = 5): Promise<void> {
+    const group = await prisma.shareGroup.findUnique({
+      where: { id: shareGroupId },
+      include: { participants: true }
+    });
+
+    if (!group || group.status !== "OPEN") {
+      return;
+    }
+
+    const ageMinutes = (Date.now() - group.createdAt.getTime()) / (1000 * 60);
+    
+    if (ageMinutes >= timeoutMinutes && group.participants.length === 1) {
+      // Timeout reached with only 1 participant - convert to PRIVATE
+      const participant = group.participants[0];
+      
+      await prisma.$transaction(async (tx) => {
+        // Update share group status
+        await tx.shareGroup.update({
+          where: { id: shareGroupId },
+          data: { status: "CLOSED" }
+        });
+
+        // Update participant's fare to full fare (no discount)
+        const fullFare = (participant.fareShareAmount || 0) * 2 / 0.9; // Reverse the 50/50 split and discount
+        await tx.shareParticipant.update({
+          where: { id: participant.id },
+          data: { fareShareAmount: fullFare }
+        });
+
+        // Find or update the ride to PRIVATE mode
+        const ride = await tx.ride.findFirst({
+          where: { shareGroupId: shareGroupId }
+        });
+
+        if (ride) {
+          await tx.ride.update({
+            where: { id: ride.id },
+            data: {
+              rideMode: "PRIVATE",
+              maxPassengers: 1,
+              fareEstimate: fullFare
+            }
+          });
+
+          // Now trigger driver matching
+          const matchResult = await matchDriverToRide(ride.id);
+          if (matchResult.success && matchResult.driverId) {
+            // Notify rider
+            await createNotification(
+              participant.userId,
+              "rider",
+              "Converted to private ride due to timeout. Searching for driver...",
+              "RIDE_REQUESTED"
+            );
+          }
+        }
+      });
+    }
+  }
+
+  // Endpoint to check share group status (rider can poll this)
+  app.get("/api/rider/share-group/:groupId/status", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { groupId } = req.params;
+      
+      const group = await prisma.shareGroup.findUnique({
+        where: { id: groupId },
+        include: {
+          participants: {
+            where: { userId: req.session.userId },
+            include: {
+              user: {
+                select: { id: true, fullName: true, email: true }
+              }
+            }
+          }
+        }
+      });
+
+      if (!group || group.participants.length === 0) {
+        return res.status(404).json({ message: "Share group not found" });
+      }
+
+      // Check timeout
+      await checkShareGroupTimeout(groupId, 5); // 5 minute timeout
+
+      // Reload group after timeout check
+      const updatedGroup = await prisma.shareGroup.findUnique({
+        where: { id: groupId },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: { id: true, fullName: true, email: true }
+              }
+            }
+          },
+          rides: {
+            include: {
+              driver: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  phone: true,
+                  vehicleType: true,
+                  vehiclePlate: true,
+                  averageRating: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      res.json(updatedGroup);
+    } catch (error) {
+      console.error("Error fetching share group status:", error);
+      res.status(500).json({ message: "Failed to fetch share group status" });
+    }
+  });
+
   // Cancel ride (rider can only cancel before IN_PROGRESS)
   // Rider cannot cancel after IN_PROGRESS starts
   // If rider cancels AFTER IN_PROGRESS (via admin or edge case): 20% penalty applies
@@ -4183,7 +4627,156 @@ export async function registerRoutes(
         return res.status(400).json({ message: transitionCheck.error || "Cannot cancel ride in current state" });
       }
 
-      // Determine penalty: Apply 20% if ride is IN_PROGRESS or later
+      // Handle shared ride cancellation
+      const rideWithShareGroup = await prisma.ride.findUnique({
+        where: { id },
+        include: {
+          shareGroup: {
+            include: { participants: true }
+          }
+        }
+      });
+
+      if (rideWithShareGroup?.shareGroupId && rideWithShareGroup.rideMode === "SHARE") {
+        const shareGroup = rideWithShareGroup.shareGroup;
+        
+        if (shareGroup) {
+          // If group is OPEN and only 1 participant: cancel group, no penalty
+          if (shareGroup.status === "OPEN" && shareGroup.participants.length === 1) {
+            await prisma.$transaction(async (tx) => {
+              await tx.shareGroup.update({
+                where: { id: rideWithShareGroup.shareGroupId! },
+                data: { status: "CANCELLED" }
+              });
+              await tx.ride.update({
+                where: { id },
+                data: { status: "CANCELLED" }
+              });
+            });
+
+            await createNotification(
+              req.session.userId,
+              "rider",
+              "Shared ride cancelled. No penalty applied.",
+              "STATUS_CHANGE"
+            );
+
+            return res.json({ status: "CANCELLED", shareStatus: "GROUP_CANCELLED" });
+          }
+
+          // If group FULL but trip not IN_PROGRESS: remove rider, convert remaining to PRIVATE
+          if (shareGroup.status === "FULL" && !["IN_PROGRESS", "COMPLETED"].includes(rideWithShareGroup.status)) {
+            const otherParticipants = shareGroup.participants.filter(p => p.userId !== req.session.userId);
+            
+            if (otherParticipants.length === 1) {
+              // Convert to PRIVATE for remaining rider
+              const remainingParticipant = otherParticipants[0];
+              const fullFare = (remainingParticipant.fareShareAmount || 0) * 2 / 0.9;
+
+              await prisma.$transaction(async (tx) => {
+                // Remove cancelling rider's participant record
+                await tx.shareParticipant.deleteMany({
+                  where: { shareGroupId: rideWithShareGroup.shareGroupId!, userId: req.session.userId }
+                });
+
+                // Update remaining participant to full fare
+                await tx.shareParticipant.update({
+                  where: { id: remainingParticipant.id },
+                  data: { fareShareAmount: fullFare }
+                });
+
+                // Update group and ride
+                await tx.shareGroup.update({
+                  where: { id: rideWithShareGroup.shareGroupId! },
+                  data: { status: "CLOSED" }
+                });
+
+                await tx.ride.update({
+                  where: { id },
+                  data: {
+                    rideMode: "PRIVATE",
+                    maxPassengers: 1,
+                    fareEstimate: fullFare
+                  }
+                });
+              });
+
+              await createNotification(
+                req.session.userId,
+                "rider",
+                "You've been removed from the shared ride. No penalty applied.",
+                "STATUS_CHANGE"
+              );
+
+              return res.json({ status: "CANCELLED", shareStatus: "REMOVED_FROM_SHARE" });
+            }
+          }
+
+          // If trip IN_PROGRESS: apply penalty to this rider's share only
+          if (rideWithShareGroup.status === "IN_PROGRESS") {
+            const participant = shareGroup.participants.find(p => p.userId === req.session.userId);
+            const fareAmount = participant?.fareShareAmount || 0;
+            const { penaltyAmount, refundAmount } = calculateCancellationPenalty(fareAmount, true);
+
+            // Process cancellation with wallet refund
+            await prisma.$transaction(async (tx) => {
+              await tx.ride.update({
+                where: { id },
+                data: { status: "CANCELLED" }
+              });
+
+              // Handle wallet refund
+              if (fareAmount > 0 && refundAmount > 0) {
+                let userWallet = await tx.wallet.findUnique({
+                  where: { ownerId_ownerType: { ownerId: req.session.userId, ownerType: "USER" } },
+                });
+                if (!userWallet) {
+                  userWallet = await tx.wallet.create({
+                    data: { ownerId: req.session.userId, ownerType: "USER", balance: 5000 },
+                  });
+                }
+
+                await tx.transaction.create({
+                  data: {
+                    walletId: userWallet.id,
+                    type: "CREDIT",
+                    amount: refundAmount,
+                    reference: `Shared ride cancellation refund (Cancellation fee: ₦${penaltyAmount.toLocaleString()})`,
+                  },
+                });
+                await tx.wallet.update({
+                  where: { id: userWallet.id },
+                  data: { balance: { increment: refundAmount } },
+                });
+
+                if (penaltyAmount > 0) {
+                  await tx.transaction.create({
+                    data: {
+                      walletId: userWallet.id,
+                      type: "COMMISSION",
+                      amount: penaltyAmount,
+                      reference: `Cancellation fee (20%) - Shared Ride ${id}`,
+                    },
+                  });
+                }
+
+                await tx.notification.create({
+                  data: {
+                    userId: req.session.userId,
+                    role: "user",
+                    message: `Shared ride cancelled. Cancellation fee (20%): ₦${penaltyAmount.toLocaleString()}. Refunded (80%): ₦${refundAmount.toLocaleString()}`,
+                    type: "STATUS_CHANGE",
+                  },
+                });
+              }
+            });
+
+            return res.json({ status: "CANCELLED", shareStatus: "CANCELLED_WITH_PENALTY", penaltyAmount, refundAmount });
+          }
+        }
+      }
+
+      // Determine penalty: Apply 20% if ride is IN_PROGRESS or later (non-shared or already handled above)
       const shouldApplyPenalty = ["IN_PROGRESS", "COMPLETED"].includes(ride.status);
       const fareAmount = ride.fareEstimate || 0;
       const { penaltyAmount, refundAmount } = calculateCancellationPenalty(fareAmount, shouldApplyPenalty);

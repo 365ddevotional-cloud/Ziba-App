@@ -102,6 +102,7 @@ model User {
   tips          Tip[]
   driverProfile DriverProfile?
   passengers    TripPassenger[]
+  shareParticipants ShareParticipant[]
 }
 
 model Driver {
@@ -166,6 +167,10 @@ model Ride {
   fareEstimate    Float?
   // SQLite: String | PostgreSQL: RideStatus
   status          String        @default("REQUESTED")
+  // SQLite: String | PostgreSQL: RideMode (PRIVATE | SHARE)
+  rideMode        String        @default("PRIVATE")
+  shareGroupId    String?       // Link to ShareGroup if shared ride
+  maxPassengers   Int           @default(1) // 1 for PRIVATE, 2 for SHARE
   userId          String
   bookedByUserId  String?       // Trip Coordinator or Rider who booked/paid
   passengerId     String?       // Trip Passenger (if booked for someone else)
@@ -174,6 +179,7 @@ model Ride {
   user            User          @relation(fields: [userId], references: [id])
   bookedBy        User?         @relation("BookedRides", fields: [bookedByUserId], references: [id])
   passenger       TripPassenger? @relation(fields: [passengerId], references: [id])
+  shareGroup      ShareGroup?   @relation(fields: [shareGroupId], references: [id])
   driver          Driver?       @relation(fields: [driverId], references: [id])
   payment         Payment?
   driverRating    DriverRating?
@@ -181,6 +187,8 @@ model Ride {
   
   @@index([bookedByUserId])
   @@index([passengerId])
+  @@index([shareGroupId])
+  @@index([rideMode])
 }
 
 model TripPassenger {
@@ -195,6 +203,40 @@ model TripPassenger {
   rides           Ride[]
   
   @@index([createdByUserId])
+}
+
+model ShareGroup {
+  id              String   @id @default(uuid())
+  // SQLite: String | PostgreSQL: ShareGroupStatus (OPEN | FULL | CLOSED | CANCELLED)
+  status          String   @default("OPEN")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  participants    ShareParticipant[]
+  rides           Ride[]
+  
+  @@index([status])
+}
+
+model ShareParticipant {
+  id                String      @id @default(uuid())
+  shareGroupId      String
+  userId            String
+  pickupLocation    String
+  dropoffLocation   String
+  pickupLat         Float?
+  pickupLng         Float?
+  destLat           Float?
+  destLng           Float?
+  fareShareAmount   Float?
+  // SQLite: String | PostgreSQL: PaymentStatus (PENDING | PAID | REFUNDED)
+  paymentStatus     String      @default("PENDING")
+  createdAt         DateTime    @default(now())
+  shareGroup        ShareGroup  @relation(fields: [shareGroupId], references: [id], onDelete: Cascade)
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([shareGroupId, userId])
+  @@index([shareGroupId])
+  @@index([userId])
 }
 
 model Admin {

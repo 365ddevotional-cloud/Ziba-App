@@ -43,6 +43,7 @@ export default function RiderConfirm() {
   const { findNearestDriver, assignDriver: markDriverUnavailable } = useDriverStore();
   const { canAfford, updateRiderBalance } = useWallet();
   const [selectedPayment, setSelectedPayment] = useState("wallet");
+  const [rideMode, setRideMode] = useState<"PRIVATE" | "SHARE">("PRIVATE");
   const [routeData, setRouteData] = useState<{ distance: number; duration: number } | null>(
     distanceParam && durationParam
       ? { distance: parseFloat(distanceParam), duration: parseInt(durationParam, 10) }
@@ -55,80 +56,77 @@ export default function RiderConfirm() {
     return calculateFare(routeData.distance, routeData.duration);
   }, [routeData]);
 
+  // Calculate adjusted fare based on ride mode
+  const adjustedFare = useMemo(() => {
+    if (!fareEstimate) return null;
+    return rideMode === "SHARE" ? (fareEstimate.fare / 2) * 0.9 : fareEstimate.fare;
+  }, [fareEstimate, rideMode]);
+
   const requestRideMutation = useMutation({
     mutationFn: async () => {
-      if (!routeData || !fareEstimate) {
+      if (!routeData || !fareEstimate || !adjustedFare) {
         throw new Error("Missing route or fare data");
       }
 
       // Check wallet balance if paying with wallet
-      if (selectedPayment === "wallet" && !canAfford(fareEstimate.fare)) {
+      if (selectedPayment === "wallet" && !canAfford(adjustedFare)) {
         throw new Error("Insufficient wallet balance");
       }
 
-      // Create trip in memory (not persisted to database)
-      const tripId = `trip_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
       // Mock pickup coordinates (in production, use geocoding)
       const pickupLat = 6.5244 + (Math.random() - 0.5) * 0.1;
       const pickupLng = 3.3792 + (Math.random() - 0.5) * 0.1;
+      const destLat = 6.5244 + (Math.random() - 0.5) * 0.1;
+      const destLng = 3.3792 + (Math.random() - 0.5) * 0.1;
 
-      const trip = {
-        id: tripId,
-        pickupLocation: pickup,
-        dropoffLocation: destination,
-        distance: routeData.distance,
-        duration: routeData.duration,
-        fare: fareEstimate.fare,
-        status: "CONFIRMED" as const,
-        createdAt: new Date().toISOString(),
-        paymentMethod: selectedPayment,
-        pickupLat,
-        pickupLng,
-        payment: {
-          fare: fareEstimate.fare,
-          riderPaid: false,
-          driverPaid: false,
-          platformCommission: 0,
-          escrowHeld: false,
-        },
-      };
-
-      setCurrentTrip(trip);
-
-      // Find and assign nearest driver
-      setTimeout(() => {
-        const nearestDriver = findNearestDriver(pickupLat, pickupLng);
-        if (nearestDriver) {
-          markDriverUnavailable(nearestDriver.id);
-          assignDriverToTrip({
-            id: nearestDriver.id,
-            name: nearestDriver.name,
-            vehicleType: nearestDriver.vehicleType,
-            vehiclePlate: nearestDriver.vehiclePlate,
-            rating: nearestDriver.rating,
-            phone: nearestDriver.phone,
-          });
-        } else {
-          toast({
-            title: "No drivers available",
-            description: "Please try again in a moment",
-            variant: "destructive",
-          });
-        }
-      }, 1000);
-
-      // Note: Backend API call removed for this phase
-      // In production, this would persist to database
-      return trip;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });
-      toast({
-        title: "Ride confirmed!",
-        description: "Looking for a driver...",
+      // Make API call to request ride
+      const response = await fetch("/api/rider/request-ride", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pickupLocation: pickup,
+          dropoffLocation: destination,
+          fareEstimate: fareEstimate.fare,
+          rideMode: rideMode,
+          pickupLat,
+          pickupLng,
+          destLat,
+          destLng,
+        }),
+        credentials: "include",
       });
-      navigate("/rider/active-ride");
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to request ride");
+      }
+
+      const ride = await response.json();
+      return ride;
+    },
+    onSuccess: (ride: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });
+      
+      if (ride.shareStatus === "SEARCHING") {
+        toast({
+          title: "Finding a co-rider...",
+          description: "We'll match you with another rider going the same way.",
+        });
+        // Navigate to a waiting page or active ride page with polling
+        navigate("/rider/active-ride");
+      } else if (ride.shareStatus === "MATCHED_AND_ASSIGNED" || ride.driver) {
+        toast({
+          title: "Ride confirmed!",
+          description: "Driver is being assigned...",
+        });
+        navigate("/rider/active-ride");
+      } else {
+        toast({
+          title: "Ride confirmed!",
+          description: "Looking for a driver...",
+        });
+        navigate("/rider/active-ride");
+      }
     },
     onError: (error: any) => {
       toast({
