@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import * as walletService from "./wallet-service";
 
 const prisma = new PrismaClient();
 
@@ -125,10 +126,34 @@ export async function transitionTripStatus(
     };
 
     if (nextStatus === "IN_PROGRESS") {
+      const fareToLock = ride.lockedFare || ride.fareEstimate;
       if (!ride.lockedFare && ride.fareEstimate) {
         updateData.lockedFare = ride.fareEstimate;
       }
       updateData.startedAt = new Date();
+
+      if (fareToLock && fareToLock > 0) {
+        const holdResult = await walletService.holdFareForTrip(
+          tripId,
+          ride.userId,
+          fareToLock
+        );
+
+        if (!holdResult.success) {
+          console.error(
+            `[TRIP-STATE-ERROR] tripId=${tripId} failed to hold fare: ${holdResult.error}`
+          );
+          return {
+            success: false,
+            error: `Cannot start trip: ${holdResult.error}`,
+            code: 400,
+          };
+        }
+
+        console.log(
+          `[TRIP-STATE] tripId=${tripId} fare ${fareToLock} held in rider wallet`
+        );
+      }
     }
 
     if (nextStatus === "COMPLETED") {
@@ -136,7 +161,35 @@ export async function transitionTripStatus(
     }
 
     if (nextStatus === "SETTLED") {
-      updateData.settledAt = new Date();
+      const settlementResult = await walletService.settleTrip(tripId);
+
+      if (!settlementResult.success) {
+        console.error(
+          `[TRIP-STATE-ERROR] tripId=${tripId} settlement failed: ${settlementResult.error}`
+        );
+        return {
+          success: false,
+          error: `Settlement failed: ${settlementResult.error}`,
+          code: 400,
+        };
+      }
+
+      console.log(
+        `[TRIP-STATE] tripId=${tripId} settled: driver=${settlementResult.driverPayout}, platform=${settlementResult.platformFee}`
+      );
+
+      return {
+        success: true,
+        ride: {
+          ...ride,
+          status: "SETTLED",
+          settledAt: new Date(),
+          settlement: {
+            driverPayout: settlementResult.driverPayout,
+            platformFee: settlementResult.platformFee,
+          },
+        },
+      };
     }
 
     const updatedRide = await prisma.ride.update({

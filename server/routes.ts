@@ -1814,7 +1814,7 @@ export async function registerRoutes(
       }
       
       const wallet = await getOrCreateWallet(ownerId, ownerType);
-      const transactions = await prisma.transaction.findMany({
+      const transactions = await prisma.walletTransaction.findMany({
         where: { walletId: wallet.id },
         orderBy: { createdAt: "desc" },
         take: 20,
@@ -1835,7 +1835,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      const transactions = await prisma.transaction.findMany({
+      const transactions = await prisma.walletTransaction.findMany({
         orderBy: { createdAt: "desc" },
         take: 100,
         include: { wallet: true },
@@ -2449,7 +2449,7 @@ export async function registerRoutes(
       const totalDriverBalance = driverWallets.reduce((sum, w) => sum + w.balance, 0);
 
       // Transaction stats
-      const transactions = await prisma.transaction.findMany();
+      const transactions = await prisma.walletTransaction.findMany();
       const payouts = transactions.filter(t => t.type === "PAYOUT");
       const totalPayouts = Math.abs(payouts.reduce((sum, t) => sum + t.amount, 0));
 
@@ -3717,7 +3717,7 @@ export async function registerRoutes(
               data: { balance: { increment: driverEarnings } }
             });
 
-            await prisma.transaction.create({
+            await prisma.walletTransaction.create({
               data: {
                 walletId: driverWallet.id,
                 type: "CREDIT",
@@ -3727,7 +3727,7 @@ export async function registerRoutes(
             });
           } else {
             // Create pending transaction for held payout
-            await prisma.transaction.create({
+            await prisma.walletTransaction.create({
               data: {
                 walletId: driverWallet.id,
                 type: "PENDING",
@@ -3747,7 +3747,7 @@ export async function registerRoutes(
               data: { balance: { decrement: fare } }
             });
 
-            await prisma.transaction.create({
+            await prisma.walletTransaction.create({
               data: {
                 walletId: userWallet.id,
                 type: "RIDE_PAYMENT",
@@ -3910,6 +3910,53 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error logging idle GPS:", error);
       res.status(500).json({ message: "Failed to log idle GPS" });
+    }
+  });
+
+  // ==================== DRIVER WALLET ====================
+
+  // Get driver wallet
+  app.get("/api/driver/wallet", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      let wallet = await prisma.wallet.findUnique({
+        where: {
+          ownerId_ownerType: {
+            ownerId: req.session.userId,
+            ownerType: "DRIVER"
+          }
+        },
+        include: {
+          transactions: {
+            orderBy: { createdAt: "desc" },
+            take: 20
+          }
+        }
+      });
+
+      // Create wallet if doesn't exist
+      if (!wallet) {
+        wallet = await prisma.wallet.create({
+          data: {
+            ownerId: req.session.userId,
+            ownerType: "DRIVER",
+            balance: 0,
+            lockedBalance: 0,
+            currency: "NGN"
+          },
+          include: {
+            transactions: true
+          }
+        });
+      }
+
+      res.json(wallet);
+    } catch (error) {
+      console.error("Error fetching driver wallet:", error);
+      res.status(500).json({ message: "Failed to fetch wallet" });
     }
   });
 
@@ -4707,12 +4754,14 @@ export async function registerRoutes(
           data: { balance: { increment: amount } }
         });
 
-        await prisma.transaction.create({
+        await prisma.walletTransaction.create({
           data: {
             walletId: driverWallet.id,
             type: "TIP",
             amount,
-            reference: `Tip for ride ${rideId}`
+            tripId: rideId,
+            description: `Tip for ride ${rideId}`,
+            reference: `TIP-${rideId}-${Date.now()}`
           }
         });
       }
@@ -4750,18 +4799,26 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Wallet not found" });
       }
 
+      // Check if rider has locked funds (active trip)
+      if ((wallet as any).lockedBalance > 0) {
+        return res.status(400).json({ 
+          message: "Cannot add funds while you have an active trip. Please complete or cancel your current trip first."
+        });
+      }
+
       // Actually credit the wallet (simulating instant funding for demo)
       await prisma.wallet.update({
         where: { id: wallet.id },
         data: { balance: { increment: amount } }
       });
 
-      const transaction = await prisma.transaction.create({
+      const transaction = await prisma.walletTransaction.create({
         data: {
           walletId: wallet.id,
           type: "CREDIT",
           amount,
-          reference: `Wallet top-up via ${method || "card"}`
+          description: `Wallet top-up via ${method || "card"}`,
+          reference: `TOPUP-${wallet.id}-${Date.now()}`
         }
       });
 
@@ -4902,7 +4959,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Wallet not found" });
       }
 
-      const transaction = await prisma.transaction.findFirst({
+      const transaction = await prisma.walletTransaction.findFirst({
         where: {
           id,
           walletId: wallet.id
