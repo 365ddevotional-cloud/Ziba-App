@@ -1,0 +1,145 @@
+You are implementing the Wallet & Settlement Engine for the Ziba ride-hailing app.
+This must integrate STRICTLY with the Trip State Machine already implemented.
+
+GOAL:
+Create a secure, double-entry wallet system that settles funds ONLY after trip completion
+and prevents balance manipulation or double payouts.
+
+========================
+1. WALLET MODEL (DATABASE)
+========================
+Create a Wallet table with:
+- id
+- userId
+- role (RIDER | DRIVER | PLATFORM)
+- balance (number, default 0)
+- currency (NGN default)
+- lockedBalance (number, default 0)
+- createdAt
+- updatedAt
+
+Each user has exactly ONE wallet.
+Create a PLATFORM wallet on system init.
+
+========================
+2. TRANSACTION LEDGER (IMMUTABLE)
+========================
+Create WalletTransaction table:
+- id
+- walletId
+- tripId (nullable)
+- type (DEBIT | CREDIT | HOLD | RELEASE)
+- amount
+- description
+- reference
+- createdAt
+
+Transactions are APPEND-ONLY.
+No deletes. No updates.
+
+========================
+3. WALLET SERVICE (SERVER ONLY)
+========================
+Create atomic wallet functions:
+- debit(walletId, amount, ref)
+- credit(walletId, amount, ref)
+- hold(walletId, amount, ref)
+- release(walletId, amount, ref)
+
+Rules:
+- Cannot debit more than balance
+- Cannot release more than lockedBalance
+- All wallet ops must be inside DB transactions
+
+========================
+4. TRIP ↔ WALLET INTEGRATION (CRITICAL)
+========================
+Integrate with Trip State Machine hooks:
+
+ON TRIP IN_PROGRESS:
+- Move rider fare from balance → lockedBalance
+- Create HOLD transaction
+
+ON TRIP COMPLETED:
+- Do NOTHING financially
+- Trip must remain mutable until settlement
+
+ON TRIP SETTLED:
+- Split locked fare:
+   * DRIVER receives (fare - platformFee)
+   * PLATFORM receives platformFee
+- Credit driver wallet
+- Credit platform wallet
+- Release rider locked balance
+- Create CREDIT transactions
+- Mark trip as settledAt = now
+
+Settlement MUST FAIL if:
+- Trip is not COMPLETED
+- Trip already settled
+- lockedFare is missing
+
+========================
+5. PLATFORM FEE RULES
+========================
+Create configurable fee:
+- Default: 15%
+- Stored in server config
+- NEVER client-controlled
+
+========================
+6. API ENDPOINTS
+========================
+POST /api/wallet/add-funds
+- Rider only
+- Credits wallet
+- Mock payment for now
+
+GET /api/wallet
+- Returns balance, lockedBalance, recent transactions
+
+POST /api/trips/:id/settle
+- Admin or system only
+- Calls settlement logic
+- Returns settlement summary
+
+========================
+7. UI REQUIREMENTS
+========================
+Wallet page must show:
+- Available balance
+- Locked balance (if any)
+- Transaction history
+- Clear “Funds on hold” notice during active trip
+
+Disable:
+- Add Funds while lockedBalance > 0
+- Withdraw while lockedBalance > 0
+
+========================
+8. FAILSAFE & SECURITY
+========================
+- If ANY wallet step fails → rollback everything
+- No client-side math
+- Log every settlement with tripId
+
+========================
+9. TEST CONDITIONS (MANDATORY)
+========================
+Prove via logs/tests:
+- Rider cannot spend locked funds
+- Driver paid only after SETTLED
+- Platform fee always correct
+- Cannot settle twice
+- Cannot settle before completion
+
+========================
+10. DO NOT
+========================
+- Do NOT add cron jobs
+- Do NOT auto-settle without explicit call
+- Do NOT allow UI to modify balances
+- Do NOT hardcode fees in frontend
+
+END RESULT:
+Ziba must now have a production-grade wallet system identical in principle to Uber/Bolt.

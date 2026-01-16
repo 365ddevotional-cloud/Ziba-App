@@ -7,6 +7,302 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id            String       @id @default(uuid())
+  fullName      String
+  email         String       @unique
+  phone         String?
+  city          String?
+  status        UserStatus   @default(ACTIVE)
+  passwordHash  String?
+  averageRating Float        @default(0)
+  totalRatings  Int          @default(0)
+  isTestAccount Boolean      @default(false)
+  testDisabled  Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  isVerified    Boolean      @default(false)
+  rides         Ride[]
+  tips          Tip[]
+  ratings       UserRating[]
+}
+
+model Driver {
+  id                    String         @id @default(uuid())
+  fullName              String
+  email                 String         @unique
+  phone                 String
+  vehicleType           VehicleType    @default(CAR)
+  vehiclePlate          String
+  status                DriverStatus   @default(PENDING)
+  isOnline              Boolean        @default(false)
+  currentRate           Float          @default(1.0)
+  averageRating         Float          @default(0)
+  totalRatings          Int            @default(0)
+  avgStartTime          String?
+  avgEndTime            String?
+  isTestAccount         Boolean        @default(false)
+  testDisabled          Boolean        @default(false)
+  createdAt             DateTime       @default(now())
+  isVerified            Boolean        @default(false)
+  passwordHash          String?
+  lastLocationLat       Float?
+  lastLocationLng       Float?
+  lastLocationUpdatedAt DateTime?
+  ratings               DriverRating[]
+  incentives            Incentive[]
+  rides                 Ride[]
+  tips                  Tip[]
+}
+
+model Ride {
+  id                String        @id @default(uuid())
+  pickupLocation    String
+  dropoffLocation   String
+  fareEstimate      Float?
+  userId            String
+  driverId          String?
+  createdAt         DateTime      @default(now())
+  completedAt       DateTime?
+  dropoffLat        Float?
+  dropoffLng        Float?
+  estimatedDistance Float?
+  estimatedDuration Float?
+  lockedFare        Float?
+  pickupLat         Float?
+  pickupLng         Float?
+  startedAt         DateTime?
+  actualDistance    Float?
+  actualDuration    Float?
+  fraudReasons      String?
+  fraudScore        Int           @default(0)
+  isFlagged         Boolean       @default(false)
+  payoutHeld        Boolean       @default(false)
+  settledAt         DateTime?
+  statusHistory     Json          @default("[]")
+  status            TripStatus    @default(REQUESTED)
+  driverRating      DriverRating?
+  gpsLogs           GpsLog[]
+  payment           Payment?
+  driver            Driver?       @relation(fields: [driverId], references: [id])
+  user              User          @relation(fields: [userId], references: [id])
+  userRating        UserRating?
+}
+
+model GpsLog {
+  id        String   @id @default(uuid())
+  rideId    String
+  driverId  String
+  lat       Float
+  lng       Float
+  speed     Float?
+  bearing   Float?
+  createdAt DateTime @default(now())
+  ride      Ride     @relation(fields: [rideId], references: [id])
+}
+
+model Admin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  phone        String?
+  passwordHash String?
+  createdAt    DateTime @default(now())
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  amount      Float
+  status      PaymentStatus @default(PENDING)
+  rideId      String        @unique
+  gatewayRef  String?
+  gatewayMode String?       @default("SANDBOX")
+  createdAt   DateTime      @default(now())
+  ride        Ride          @relation(fields: [rideId], references: [id])
+}
+
+model Tip {
+  id        String   @id @default(uuid())
+  amount    Float
+  rideId    String   @unique
+  userId    String
+  driverId  String
+  createdAt DateTime @default(now())
+  driver    Driver   @relation(fields: [driverId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Incentive {
+  id        String   @id @default(uuid())
+  amount    Float
+  reason    String
+  driverId  String
+  createdAt DateTime @default(now())
+  driver    Driver   @relation(fields: [driverId], references: [id])
+}
+
+model Director {
+  id              String         @id @default(uuid())
+  fullName        String
+  email           String         @unique
+  phone           String?
+  role            DirectorRole
+  region          String
+  status          DirectorStatus @default(PENDING)
+  contractStart   DateTime?
+  contractEnd     DateTime?
+  driversAssigned Int            @default(0)
+  driversOnline   Int            @default(0)
+  passwordHash    String?
+  isTestAccount   Boolean        @default(false)
+  testDisabled    Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  isApproved      Boolean        @default(false)
+  isVerified      Boolean        @default(false)
+}
+
+model DriverRating {
+  id        String   @id @default(uuid())
+  rating    Int
+  rideId    String   @unique
+  driverId  String
+  userId    String
+  createdAt DateTime @default(now())
+  driver    Driver   @relation(fields: [driverId], references: [id])
+  ride      Ride     @relation(fields: [rideId], references: [id])
+}
+
+model UserRating {
+  id        String   @id @default(uuid())
+  rating    Int
+  rideId    String   @unique
+  userId    String
+  driverId  String
+  createdAt DateTime @default(now())
+  ride      Ride     @relation(fields: [rideId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Wallet {
+  id            String              @id @default(uuid())
+  ownerId       String?
+  ownerType     OwnerType
+  balance       Float               @default(0)
+  createdAt     DateTime            @default(now())
+  lockedBalance Float               @default(0)
+  currency      String              @default("NGN")
+  updatedAt     DateTime            @updatedAt
+  transactions  WalletTransaction[]
+
+  @@unique([ownerId, ownerType])
+}
+
+model WalletTransaction {
+  id          String          @id(map: "Transaction_pkey") @default(uuid())
+  walletId    String
+  type        TransactionType
+  amount      Float
+  reference   String?         @default(uuid())
+  createdAt   DateTime        @default(now())
+  tripId      String?
+  description String?
+  wallet      Wallet          @relation(fields: [walletId], references: [id], map: "Transaction_walletId_fkey")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  role      String
+  message   String
+  type      NotificationType
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+}
+
+model PlatformConfig {
+  id                 String             @id @default(uuid())
+  commissionRate     Float              @default(0.15)
+  testModeEnabled    Boolean            @default(true)
+  paymentGateway     PaymentGateway     @default(STRIPE)
+  paymentGatewayMode PaymentGatewayMode @default(SANDBOX)
+  updatedAt          DateTime           @updatedAt
+  updatedBy          String?
+}
+
+model FareConfig {
+  id                 String       @id @default(uuid())
+  countryCode        String       @unique
+  countryName        String
+  currency           String
+  currencySymbol     String
+  baseFare           Float        @default(500)
+  pricePerKm         Float        @default(120)
+  pricePerMinute     Float        @default(30)
+  minimumFare        Float        @default(300)
+  driverCommission   Float        @default(0.85)
+  platformCommission Float        @default(0.15)
+  distanceUnit       DistanceUnit @default(KM)
+  surgeEnabled       Boolean      @default(false)
+  surgeMultiplier    Float        @default(1.0)
+  maxSurgeCap        Float        @default(1.3)
+  peakHoursStart     String?
+  peakHoursEnd       String?
+  weatherMultiplier  Float        @default(1.0)
+  trafficMultiplier  Float        @default(1.0)
+  updatedAt          DateTime     @updatedAt
+  updatedBy          String?
+}
+
+model MapCostMetrics {
+  id               String   @id @default(uuid())
+  date             DateTime @unique @db.Date
+  mapCost          Float    @default(0)
+  completedTrips   Int      @default(0)
+  zibaRevenue      Float    @default(0)
+  paidMapRequests  Int      @default(0)
+  totalMapRequests Int      @default(0)
+  mapCostPerTrip   Float    @default(0)
+  paidUsageRate    Float    @default(0)
+  mapCostRatio     Float    @default(0)
+  protectionActive Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model MapCostProtectionConfig {
+  id                   String   @id @default(uuid())
+  maxCostPerTrip       Float    @default(0.03)
+  maxPaidUsageRate     Float    @default(0.20)
+  maxMapCostRatio      Float    @default(0.015)
+  criticalMapCostRatio Float    @default(0.02)
+  gpsFrequencyReduced  Boolean  @default(false)
+  autocompleteDisabled Boolean  @default(false)
+  forceCachedOnly      Boolean  @default(false)
+  lastUpdated          DateTime @updatedAt
+}
+
+model TestAccount {
+  id             String            @id @default(uuid())
+  email          String            @unique
+  passwordHash   String
+  role           TestAccountRole
+  countryCode    String
+  region         String?
+  city           String?
+  status         TestAccountStatus @default(ACTIVE)
+  fullName       String
+  isTestAccount  Boolean           @default(true)
+  linkedEntityId String?
+  createdAt      DateTime          @default(now())
+  createdBy      String?
+}
+
+model session {
+  sid    String   @id @db.VarChar
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "IDX_session_expire")
+}
+
 enum UserStatus {
   ACTIVE
   SUSPENDED
@@ -34,143 +330,10 @@ enum TripStatus {
   SETTLED
 }
 
-model User {
-  id            String       @id @default(uuid())
-  fullName      String
-  email         String       @unique
-  phone         String?
-  city          String?
-  status        UserStatus   @default(ACTIVE)
-  passwordHash  String?
-  isVerified    Boolean      @default(false)
-  averageRating Float        @default(0)
-  totalRatings  Int          @default(0)
-  isTestAccount Boolean      @default(false)
-  testDisabled  Boolean      @default(false)
-  createdAt     DateTime     @default(now())
-  rides         Ride[]
-  ratings       UserRating[]
-  tips          Tip[]
-}
-
-model Driver {
-  id                    String         @id @default(uuid())
-  fullName              String
-  email                 String         @unique
-  phone                 String
-  vehicleType           VehicleType    @default(CAR)
-  vehiclePlate          String
-  status                DriverStatus   @default(PENDING)
-  isOnline              Boolean        @default(false)
-  currentRate           Float          @default(1.0)
-  averageRating         Float          @default(0)
-  totalRatings          Int            @default(0)
-  avgStartTime          String?
-  avgEndTime            String?
-  passwordHash          String?
-  isVerified            Boolean        @default(false)
-  isTestAccount         Boolean        @default(false)
-  testDisabled          Boolean        @default(false)
-  lastLocationLat       Float?
-  lastLocationLng       Float?
-  lastLocationUpdatedAt DateTime?
-  createdAt             DateTime       @default(now())
-  rides                 Ride[]
-  incentives            Incentive[]
-  ratings               DriverRating[]
-  tips                  Tip[]
-}
-
-model Ride {
-  id                String        @id @default(uuid())
-  pickupLocation    String
-  dropoffLocation   String
-  fareEstimate      Float?
-  lockedFare        Float?        // Fare locked at trip start - never recalculated
-  estimatedDistance Float?        // Distance in km calculated at trip start
-  estimatedDuration Float?        // Duration in minutes calculated at trip start
-  pickupLat         Float?        // Pickup latitude for navigation
-  pickupLng         Float?        // Pickup longitude for navigation
-  dropoffLat        Float?        // Dropoff latitude for navigation
-  dropoffLng        Float?        // Dropoff longitude for navigation
-  status            TripStatus    @default(REQUESTED)
-  statusHistory     Json          @default("[]") // Array of {status, timestamp, actor}
-  userId            String
-  driverId          String?
-  startedAt         DateTime?     // When trip actually started
-  completedAt       DateTime?     // When trip actually completed
-  settledAt         DateTime?     // When trip was settled (immutable after this)
-  actualDistance    Float?        // Actual GPS distance traveled in km
-  actualDuration    Float?        // Actual trip duration in minutes
-  fraudScore        Int           @default(0)    // Cumulative fraud score
-  isFlagged         Boolean       @default(false) // Trip flagged for review
-  payoutHeld        Boolean       @default(false) // Driver payout held pending review
-  fraudReasons      String?       // JSON array of fraud reasons
-  createdAt         DateTime      @default(now())
-  user              User          @relation(fields: [userId], references: [id])
-  driver            Driver?       @relation(fields: [driverId], references: [id])
-  payment           Payment?
-  driverRating      DriverRating?
-  userRating        UserRating?
-  gpsLogs           GpsLog[]      // GPS tracking for safety/fraud detection
-}
-
-// GPS tracking for safety and fraud detection (every 5-8 seconds)
-model GpsLog {
-  id        String   @id @default(uuid())
-  rideId    String
-  driverId  String
-  lat       Float
-  lng       Float
-  speed     Float?   // Speed in km/h
-  bearing   Float?   // Heading direction
-  createdAt DateTime @default(now())
-  ride      Ride     @relation(fields: [rideId], references: [id])
-}
-
-model Admin {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  phone        String?
-  passwordHash String?
-  createdAt    DateTime @default(now())
-}
-
 enum PaymentStatus {
   PENDING
   PAID
   FAILED
-}
-
-model Payment {
-  id            String        @id @default(uuid())
-  amount        Float
-  status        PaymentStatus @default(PENDING)
-  rideId        String        @unique
-  gatewayRef    String?
-  gatewayMode   String?       @default("SANDBOX")
-  createdAt     DateTime      @default(now())
-  ride          Ride          @relation(fields: [rideId], references: [id])
-}
-
-model Tip {
-  id        String   @id @default(uuid())
-  amount    Float
-  rideId    String   @unique
-  userId    String
-  driverId  String
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-  driver    Driver   @relation(fields: [driverId], references: [id])
-}
-
-model Incentive {
-  id        String   @id @default(uuid())
-  amount    Float
-  reason    String
-  driverId  String
-  createdAt DateTime @default(now())
-  driver    Driver   @relation(fields: [driverId], references: [id])
 }
 
 enum DirectorRole {
@@ -188,53 +351,10 @@ enum DirectorStatus {
   TERMINATED
 }
 
-model Director {
-  id              String         @id @default(uuid())
-  fullName        String
-  email           String         @unique
-  phone           String?
-  role            DirectorRole
-  region          String
-  status          DirectorStatus @default(PENDING)
-  contractStart   DateTime?
-  contractEnd     DateTime?
-  driversAssigned Int            @default(0)
-  driversOnline   Int            @default(0)
-  passwordHash    String?
-  isVerified      Boolean        @default(false)
-  isApproved      Boolean        @default(false)
-  isTestAccount   Boolean        @default(false)
-  testDisabled    Boolean        @default(false)
-  createdAt       DateTime       @default(now())
-}
-
-model DriverRating {
-  id        String   @id @default(uuid())
-  rating    Int
-  rideId    String   @unique
-  driverId  String
-  userId    String
-  createdAt DateTime @default(now())
-  driver    Driver   @relation(fields: [driverId], references: [id])
-  ride      Ride     @relation(fields: [rideId], references: [id])
-}
-
-model UserRating {
-  id        String   @id @default(uuid())
-  rating    Int
-  rideId    String   @unique
-  userId    String
-  driverId  String
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-  ride      Ride     @relation(fields: [rideId], references: [id])
-}
-
-// ==================== WALLETS & TRANSACTIONS ====================
-
 enum OwnerType {
   USER
   DRIVER
+  PLATFORM
 }
 
 enum TransactionType {
@@ -246,30 +366,9 @@ enum TransactionType {
   RIDE_PAYMENT
   ADMIN_ADJUSTMENT
   PENDING
+  HOLD
+  RELEASE
 }
-
-model Wallet {
-  id           String        @id @default(uuid())
-  ownerId      String
-  ownerType    OwnerType
-  balance      Float         @default(0)
-  createdAt    DateTime      @default(now())
-  transactions Transaction[]
-
-  @@unique([ownerId, ownerType])
-}
-
-model Transaction {
-  id        String          @id @default(uuid())
-  walletId  String
-  type      TransactionType
-  amount    Float
-  reference String?
-  createdAt DateTime        @default(now())
-  wallet    Wallet          @relation(fields: [walletId], references: [id])
-}
-
-// ==================== NOTIFICATIONS ====================
 
 enum NotificationType {
   RIDE_REQUESTED
@@ -279,18 +378,6 @@ enum NotificationType {
   STATUS_CHANGE
   SYSTEM
 }
-
-model Notification {
-  id        String           @id @default(uuid())
-  userId    String
-  role      String
-  message   String
-  type      NotificationType
-  read      Boolean          @default(false)
-  createdAt DateTime         @default(now())
-}
-
-// ==================== PLATFORM CONFIG ====================
 
 enum PaymentGatewayMode {
   SANDBOX
@@ -303,78 +390,10 @@ enum PaymentGateway {
   FLUTTERWAVE
 }
 
-model PlatformConfig {
-  id                 String             @id @default(uuid())
-  commissionRate     Float              @default(0.15)
-  testModeEnabled    Boolean            @default(true)
-  paymentGateway     PaymentGateway     @default(STRIPE)
-  paymentGatewayMode PaymentGatewayMode @default(SANDBOX)
-  updatedAt          DateTime           @updatedAt
-  updatedBy          String?
-}
-
-// ==================== FARE CONFIG ====================
-
 enum DistanceUnit {
   KM
   MILE
 }
-
-model FareConfig {
-  id                  String       @id @default(uuid())
-  countryCode         String       @unique
-  countryName         String
-  currency            String
-  currencySymbol      String
-  baseFare            Float        @default(500)
-  pricePerKm          Float        @default(120)
-  pricePerMinute      Float        @default(30)
-  minimumFare         Float        @default(300)
-  driverCommission    Float        @default(0.85)
-  platformCommission  Float        @default(0.15)
-  distanceUnit        DistanceUnit @default(KM)
-  surgeEnabled        Boolean      @default(false)
-  surgeMultiplier     Float        @default(1.0)
-  maxSurgeCap         Float        @default(1.3)
-  peakHoursStart      String?
-  peakHoursEnd        String?
-  weatherMultiplier   Float        @default(1.0)
-  trafficMultiplier   Float        @default(1.0)
-  updatedAt           DateTime     @updatedAt
-  updatedBy           String?
-}
-
-// ==================== MAP COST TRACKING ====================
-
-model MapCostMetrics {
-  id                  String   @id @default(uuid())
-  date                DateTime @unique @db.Date
-  mapCost             Float    @default(0)
-  completedTrips      Int      @default(0)
-  zibaRevenue         Float    @default(0)
-  paidMapRequests     Int      @default(0)
-  totalMapRequests    Int      @default(0)
-  mapCostPerTrip      Float    @default(0)
-  paidUsageRate       Float    @default(0)
-  mapCostRatio        Float    @default(0)
-  protectionActive    Boolean  @default(false)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-}
-
-model MapCostProtectionConfig {
-  id                    String   @id @default(uuid())
-  maxCostPerTrip        Float    @default(0.03)
-  maxPaidUsageRate      Float    @default(0.20)
-  maxMapCostRatio       Float    @default(0.015)
-  criticalMapCostRatio  Float    @default(0.02)
-  gpsFrequencyReduced   Boolean  @default(false)
-  autocompleteDisabled  Boolean  @default(false)
-  forceCachedOnly       Boolean  @default(false)
-  lastUpdated           DateTime @updatedAt
-}
-
-// ==================== TEST ACCOUNTS ====================
 
 enum TestAccountRole {
   USER
@@ -386,20 +405,4 @@ enum TestAccountRole {
 enum TestAccountStatus {
   ACTIVE
   SUSPENDED
-}
-
-model TestAccount {
-  id              String            @id @default(uuid())
-  email           String            @unique
-  passwordHash    String
-  role            TestAccountRole
-  countryCode     String
-  region          String?
-  city            String?
-  status          TestAccountStatus @default(ACTIVE)
-  fullName        String
-  isTestAccount   Boolean           @default(true)
-  linkedEntityId  String?
-  createdAt       DateTime          @default(now())
-  createdBy       String?
 }
