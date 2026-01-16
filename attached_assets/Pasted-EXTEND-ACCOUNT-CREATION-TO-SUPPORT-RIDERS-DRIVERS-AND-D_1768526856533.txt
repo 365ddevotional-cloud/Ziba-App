@@ -1,0 +1,144 @@
+EXTEND ACCOUNT CREATION TO SUPPORT RIDERS, DRIVERS, AND DIRECTORS WITH VERIFICATION.
+
+CURRENT STATE:
+- “Create Account” works but only creates RIDER accounts.
+- Driver and Director signup flows do NOT exist yet.
+- Verification exists only for Rider.
+
+GOAL:
+- Allow users to create THREE account types:
+  1. Rider
+  2. Driver
+  3. Director
+- Each role must have its OWN signup flow, verification, and dashboard.
+- NO breaking changes to existing Rider flow.
+
+REQUIREMENTS (DO NOT SKIP):
+
+────────────────────────
+1️⃣ ACCOUNT TYPE SELECTION
+────────────────────────
+- Add a role selector BEFORE signup:
+  - Options: Rider | Driver | Director
+- This can be:
+  - Tabs, radio buttons, or a select dropdown
+- Selected role determines:
+  - Which form loads
+  - Which API endpoint is called
+  - Which verification logic runs
+  - Which dashboard user is redirected to
+
+────────────────────────
+2️⃣ SIGNUP FLOWS PER ROLE
+────────────────────────
+
+🧍 RIDER (already exists – keep working):
+- Endpoint: POST /api/rider/register
+- Fields:
+  - fullName
+  - email
+  - password
+  - confirmPassword
+  - phone (optional)
+  - city (optional)
+- Verification: email verification
+
+🚗 DRIVER (NEW):
+- Endpoint: POST /api/driver/register
+- Fields:
+  - fullName
+  - email
+  - phone (required)
+  - vehicleType
+  - vehiclePlate
+  - password
+  - confirmPassword
+- Verification REQUIRED:
+  - email verification
+  - driver starts as status = PENDING
+- Redirect after signup:
+  - /driver/pending-verification
+
+🧑‍💼 DIRECTOR (NEW – RESTRICTED):
+- Endpoint: POST /api/director/register
+- Fields:
+  - fullName
+  - email
+  - password
+  - confirmPassword
+- Verification REQUIRED:
+  - email verification
+  - admin approval flag (isApproved = false)
+- Director CANNOT access dashboard until approved by Admin
+- Redirect after signup:
+  - /director/pending-approval
+
+────────────────────────
+3️⃣ VERIFICATION SYSTEM (MANDATORY)
+────────────────────────
+- Implement unified verification system:
+  - Send verification email for ALL roles
+  - Token-based verification
+- Endpoints:
+  - POST /api/auth/send-verification
+  - GET /api/auth/verify?token=xxx
+- Until verified:
+  - User cannot log in
+  - Show “Check your email to verify your account”
+
+────────────────────────
+4️⃣ ROLE-AWARE LOGIN
+────────────────────────
+- Login must:
+  - Detect role (rider | driver | director)
+  - Enforce verification + approval rules
+- Redirects:
+  - Rider → /rider/home
+  - Driver (approved) → /driver/home
+  - Driver (pending) → /driver/pending-verification
+  - Director (approved) → /director/dashboard
+  - Director (pending) → /director/pending-approval
+
+────────────────────────
+5️⃣ DATABASE & SECURITY
+────────────────────────
+- Update Prisma models safely:
+  - Add role enum if not present
+  - Add isVerified flag
+  - Add isApproved flag for Director
+- Hash all passwords
+- Prevent role escalation (no switching roles after signup)
+
+────────────────────────
+6️⃣ UI / UX RULES
+────────────────────────
+- “Create Account” button must:
+  - Always be clickable
+  - Submit correct role form
+- Clear messages:
+  - “Verify your email”
+  - “Awaiting admin approval”
+- NO dead buttons
+- NO console errors
+
+────────────────────────
+7️⃣ VERIFY SUCCESS
+────────────────────────
+Confirm all of the following work:
+✅ Rider signup + verification
+✅ Driver signup + pending verification
+✅ Director signup + admin approval gate
+✅ Correct dashboards per role
+✅ Admin can see Drivers & Directors in Admin panel
+
+DO NOT:
+- Remove existing Rider logic
+- Fake verification
+- Auto-approve Directors
+- Mix roles in one dashboard
+
+END GOAL:
+Ziba supports proper multi-role onboarding like Uber/Bolt:
+Rider → Ride
+Driver → Drive
+Director → Manage

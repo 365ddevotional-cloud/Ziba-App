@@ -43,6 +43,7 @@ model User {
   city          String?
   status        UserStatus   @default(ACTIVE)
   passwordHash  String?
+  isVerified    Boolean      @default(false)
   averageRating Float        @default(0)
   totalRatings  Int          @default(0)
   isTestAccount Boolean      @default(false)
@@ -67,6 +68,8 @@ model Driver {
   totalRatings  Int            @default(0)
   avgStartTime  String?
   avgEndTime    String?
+  passwordHash  String?
+  isVerified    Boolean        @default(false)
   isTestAccount Boolean        @default(false)
   testDisabled  Boolean        @default(false)
   createdAt     DateTime       @default(now())
@@ -159,12 +162,14 @@ model Director {
   phone           String?
   role            DirectorRole
   region          String
-  status          DirectorStatus @default(ACTIVE)
+  status          DirectorStatus @default(PENDING)
   contractStart   DateTime?
   contractEnd     DateTime?
   driversAssigned Int            @default(0)
   driversOnline   Int            @default(0)
   passwordHash    String?
+  isVerified      Boolean        @default(false)
+  isApproved      Boolean        @default(false)
   isTestAccount   Boolean        @default(false)
   testDisabled    Boolean        @default(false)
   createdAt       DateTime       @default(now())
