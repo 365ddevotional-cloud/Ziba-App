@@ -55,28 +55,31 @@ model User {
 }
 
 model Driver {
-  id            String         @id @default(uuid())
-  fullName      String
-  email         String         @unique
-  phone         String
-  vehicleType   VehicleType    @default(CAR)
-  vehiclePlate  String
-  status        DriverStatus   @default(PENDING)
-  isOnline      Boolean        @default(false)
-  currentRate   Float          @default(1.0)
-  averageRating Float          @default(0)
-  totalRatings  Int            @default(0)
-  avgStartTime  String?
-  avgEndTime    String?
-  passwordHash  String?
-  isVerified    Boolean        @default(false)
-  isTestAccount Boolean        @default(false)
-  testDisabled  Boolean        @default(false)
-  createdAt     DateTime       @default(now())
-  rides         Ride[]
-  incentives    Incentive[]
-  ratings       DriverRating[]
-  tips          Tip[]
+  id                    String         @id @default(uuid())
+  fullName              String
+  email                 String         @unique
+  phone                 String
+  vehicleType           VehicleType    @default(CAR)
+  vehiclePlate          String
+  status                DriverStatus   @default(PENDING)
+  isOnline              Boolean        @default(false)
+  currentRate           Float          @default(1.0)
+  averageRating         Float          @default(0)
+  totalRatings          Int            @default(0)
+  avgStartTime          String?
+  avgEndTime            String?
+  passwordHash          String?
+  isVerified            Boolean        @default(false)
+  isTestAccount         Boolean        @default(false)
+  testDisabled          Boolean        @default(false)
+  lastLocationLat       Float?
+  lastLocationLng       Float?
+  lastLocationUpdatedAt DateTime?
+  createdAt             DateTime       @default(now())
+  rides                 Ride[]
+  incentives            Incentive[]
+  ratings               DriverRating[]
+  tips                  Tip[]
 }
 
 model Ride {

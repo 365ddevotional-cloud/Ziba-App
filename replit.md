@@ -65,7 +65,12 @@ The Ziba platform is built with a modern web development stack:
       - Android: `google.navigation:q=LAT,LNG&mode=d`
       - iOS: `comgooglemaps://?daddr=LAT,LNG&directionsmode=driving`
       - Fallback to browser-based Google Maps if app unavailable
-    - **Light GPS Tracking**: GPS logged every 5-8 seconds during IN_PROGRESS rides for safety and fraud detection only
+    - **Optimized GPS Tracking** (cost-efficient):
+      - Idle driver (online, no ride): GPS every 90 seconds
+      - En route to pickup: GPS every 10 seconds
+      - Trip in progress: GPS every 6 seconds
+      - Trip ends: GPS stops immediately
+      - Idle GPS updates driver's lastLocationLat/Lng for dispatch proximity
     - **Database Fields**: Ride model extended with `pickupLat/Lng`, `dropoffLat/Lng`, `lockedFare`, `estimatedDistance`, `estimatedDuration`, `startedAt`, `completedAt`
     - **GpsLog Model**: Stores safety tracking data with `rideId`, `driverId`, `lat`, `lng`, `speed`, `bearing`, `createdAt`
 - **Driver App (Stage 18)**:

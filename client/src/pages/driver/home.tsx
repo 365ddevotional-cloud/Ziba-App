@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -19,6 +19,8 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
+
+const IDLE_GPS_INTERVAL_MS = 90000;
 
 interface ActiveRide {
   id: string;
@@ -61,6 +63,7 @@ export default function DriverHome() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const idleGpsIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const { data: driver, isLoading: driverLoading } = useQuery<DriverProfile>({
     queryKey: ["/api/driver/me"],
@@ -93,6 +96,55 @@ export default function DriverHome() {
       toast({ title: "Failed to update status", variant: "destructive" });
     },
   });
+
+  const idleGpsMutation = useMutation({
+    mutationFn: async (data: { lat: number; lng: number }) => {
+      const res = await apiRequest("POST", "/api/driver/idle-gps", data);
+      return res.json();
+    },
+  });
+
+  const sendIdleGps = useCallback(() => {
+    if (!("geolocation" in navigator)) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        idleGpsMutation.mutate({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      (error) => {
+        console.warn("Idle GPS error:", error.message);
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 30000,
+      }
+    );
+  }, [idleGpsMutation]);
+
+  useEffect(() => {
+    const isOnlineAndIdle = driver?.isOnline && !activeRide;
+
+    if (isOnlineAndIdle && !idleGpsIntervalRef.current) {
+      sendIdleGps();
+      idleGpsIntervalRef.current = setInterval(sendIdleGps, IDLE_GPS_INTERVAL_MS);
+    }
+
+    if (!isOnlineAndIdle && idleGpsIntervalRef.current) {
+      clearInterval(idleGpsIntervalRef.current);
+      idleGpsIntervalRef.current = null;
+    }
+
+    return () => {
+      if (idleGpsIntervalRef.current) {
+        clearInterval(idleGpsIntervalRef.current);
+        idleGpsIntervalRef.current = null;
+      }
+    };
+  }, [driver?.isOnline, activeRide, sendIdleGps]);
 
   if (driverLoading) {
     return (

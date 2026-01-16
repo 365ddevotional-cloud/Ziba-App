@@ -46,6 +46,18 @@ export default function DriverActiveRide() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const [gpsInterval, setGpsInterval] = useState<NodeJS.Timeout | null>(null);
+  const [lastGpsStatus, setLastGpsStatus] = useState<string | null>(null);
+
+  const getGpsIntervalMs = (status: string): number => {
+    switch (status) {
+      case "DRIVER_EN_ROUTE":
+        return 10000;
+      case "IN_PROGRESS":
+        return 6000;
+      default:
+        return 0;
+    }
+  };
 
   const { data: ride, isLoading, refetch } = useQuery<Ride>({
     queryKey: ["/api/driver/ride", id],
@@ -82,48 +94,63 @@ export default function DriverActiveRide() {
     },
   });
 
-  const startGpsTracking = useCallback(() => {
-    if (!ride || ride.status !== "IN_PROGRESS") return;
+  const sendGpsUpdate = useCallback(() => {
+    if (!ride || !("geolocation" in navigator)) return;
 
-    const interval = setInterval(() => {
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            logGpsMutation.mutate({
-              rideId: ride.id,
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-              speed: position.coords.speed || undefined,
-              bearing: position.coords.heading || undefined,
-            });
-          },
-          (error) => {
-            console.warn("GPS tracking error:", error.message);
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0,
-          }
-        );
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        logGpsMutation.mutate({
+          rideId: ride.id,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          speed: position.coords.speed || undefined,
+          bearing: position.coords.heading || undefined,
+        });
+      },
+      (error) => {
+        console.warn("GPS tracking error:", error.message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 3000,
       }
-    }, 6000);
-
-    setGpsInterval(interval);
+    );
   }, [ride, logGpsMutation]);
 
   useEffect(() => {
-    if (ride?.status === "IN_PROGRESS" && !gpsInterval) {
-      startGpsTracking();
+    if (!ride) return;
+
+    const intervalMs = getGpsIntervalMs(ride.status);
+    const statusChanged = lastGpsStatus !== ride.status;
+
+    if (gpsInterval && statusChanged) {
+      clearInterval(gpsInterval);
+      setGpsInterval(null);
+    }
+
+    if (ride.status === "COMPLETED" || ride.status === "CANCELLED") {
+      if (gpsInterval) {
+        clearInterval(gpsInterval);
+        setGpsInterval(null);
+      }
+      return;
+    }
+
+    if (intervalMs > 0 && !gpsInterval) {
+      sendGpsUpdate();
+
+      const interval = setInterval(sendGpsUpdate, intervalMs);
+      setGpsInterval(interval);
+      setLastGpsStatus(ride.status);
     }
 
     return () => {
       if (gpsInterval) {
         clearInterval(gpsInterval);
-        setGpsInterval(null);
       }
     };
-  }, [ride?.status, gpsInterval, startGpsTracking]);
+  }, [ride?.status, ride?.id, gpsInterval, lastGpsStatus, sendGpsUpdate]);
 
   if (isLoading) {
     return (

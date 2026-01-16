@@ -3547,12 +3547,12 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      // Verify the ride belongs to this driver and is in progress
+      // Verify the ride belongs to this driver and is active (en route or in progress)
       const ride = await prisma.ride.findFirst({
         where: {
           id: rideId,
           driverId: req.session.userId,
-          status: "IN_PROGRESS"
+          status: { in: ["DRIVER_EN_ROUTE", "IN_PROGRESS"] }
         }
       });
 
@@ -3575,6 +3575,36 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error logging GPS:", error);
       res.status(500).json({ message: "Failed to log GPS" });
+    }
+  });
+
+  // Driver idle GPS logging (when online but no active ride)
+  app.post("/api/driver/idle-gps", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const { lat, lng } = req.body;
+
+      if (lat === undefined || lng === undefined) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Update driver's last known location
+      await prisma.driver.update({
+        where: { id: req.session.userId },
+        data: {
+          lastLocationLat: lat,
+          lastLocationLng: lng,
+          lastLocationUpdatedAt: new Date()
+        }
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error logging idle GPS:", error);
+      res.status(500).json({ message: "Failed to log idle GPS" });
     }
   });
 
