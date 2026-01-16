@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { prisma } from "./prisma";
 import { hashPassword, verifyPassword, requireAuth, getCurrentUser, UserRole } from "./auth";
 import { analyzeFraud } from "./fraud-detection";
+import { enforceMinimumFare, validateFare, MINIMUM_ZIBA_TAKE, COST_PER_TRIP, SAFETY_FACTOR } from "./minimum-fare";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -221,11 +222,28 @@ export async function registerRoutes(
         }
       }
 
+      // Enforce minimum fare to prevent negative margin
+      let adjustedFare = fareEstimate ? parseFloat(fareEstimate) : null;
+      if (adjustedFare !== null) {
+        // Get platform config for commission rate
+        const config = await prisma.platformConfig.findFirst();
+        const commissionRate = config?.commissionRate || 0.15;
+        
+        // Validate and auto-adjust fare if below minimum
+        const fareResult = enforceMinimumFare(adjustedFare, commissionRate);
+        adjustedFare = fareResult.adjustedFare;
+        
+        // Log if fare was adjusted
+        if (fareResult.wasAdjusted) {
+          console.log(`Fare adjusted for ride: ${fareResult.originalFare} -> ${fareResult.adjustedFare} (minimum: ${fareResult.minimumFare})`);
+        }
+      }
+
       const ride = await prisma.ride.create({
         data: { 
           pickupLocation, 
           dropoffLocation, 
-          fareEstimate: fareEstimate ? parseFloat(fareEstimate) : null,
+          fareEstimate: adjustedFare,
           userId,
           driverId,
           status: driverId ? "ACCEPTED" : "REQUESTED"
@@ -247,12 +265,21 @@ export async function registerRoutes(
       // This endpoint now only allows updating ride details, NOT status or driver assignment
       // Use the dedicated lifecycle endpoints for status changes: /assign, /start, /complete, /cancel
       
+      // Enforce minimum fare if fareEstimate is being updated
+      let adjustedFare = fareEstimate !== undefined ? parseFloat(fareEstimate) : undefined;
+      if (adjustedFare !== undefined) {
+        const config = await prisma.platformConfig.findFirst();
+        const commissionRate = config?.commissionRate || 0.15;
+        const fareResult = enforceMinimumFare(adjustedFare, commissionRate);
+        adjustedFare = fareResult.adjustedFare;
+      }
+      
       const ride = await prisma.ride.update({
         where: { id },
         data: { 
           pickupLocation, 
           dropoffLocation, 
-          fareEstimate: fareEstimate !== undefined ? parseFloat(fareEstimate) : undefined,
+          fareEstimate: adjustedFare,
         },
         include: { user: true, driver: true },
       });
@@ -3962,12 +3989,21 @@ export async function registerRoutes(
         return res.status(400).json({ message: "You already have an active ride" });
       }
 
+      // Enforce minimum fare to prevent negative margin
+      let adjustedFare = fareEstimate ? parseFloat(fareEstimate) : null;
+      if (adjustedFare !== null) {
+        const config = await prisma.platformConfig.findFirst();
+        const commissionRate = config?.commissionRate || 0.15;
+        const fareResult = enforceMinimumFare(adjustedFare, commissionRate);
+        adjustedFare = fareResult.adjustedFare;
+      }
+
       let ride = await prisma.ride.create({
         data: {
           userId: req.session.userId,
           pickupLocation,
           dropoffLocation,
-          fareEstimate: fareEstimate || null,
+          fareEstimate: adjustedFare,
           status: "REQUESTED"
         },
         include: {
@@ -4702,11 +4738,19 @@ export async function registerRoutes(
         fare *= surgeMultiplier;
       }
 
-      // Apply minimum fare
+      // Apply country-configured minimum fare
       fare = Math.max(fare, fareConfig.minimumFare);
 
+      // Enforce platform minimum fare to prevent negative margin
+      // MinimumFare = MinimumZibaTake / CommissionRate
+      const commissionRate = fareConfig.platformCommission || 0.15;
+      const minimumFareResult = enforceMinimumFare(fare, commissionRate);
+      
+      // Use the adjusted fare that ensures platform profitability
+      const finalFare = minimumFareResult.adjustedFare;
+
       res.json({
-        fare: Math.round(fare),
+        fare: Math.round(finalFare),
         currency: fareConfig.currency,
         currencySymbol: fareConfig.currencySymbol,
         breakdown: {
@@ -4715,7 +4759,10 @@ export async function registerRoutes(
           timeCharge: duration ? duration * fareConfig.pricePerMinute : 0,
           surgeApplied: fareConfig.surgeEnabled,
           surgeMultiplier: fareConfig.surgeEnabled ? fareConfig.surgeMultiplier : 1.0
-        }
+        },
+        minimumFareEnforced: minimumFareResult.wasAdjusted,
+        platformMinimumFare: minimumFareResult.minimumFare,
+        zibaTake: minimumFareResult.zibaTake
       });
     } catch (error) {
       console.error("Error calculating fare:", error);

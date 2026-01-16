@@ -73,6 +73,21 @@ The Ziba platform is built with a modern web development stack:
       - Idle GPS updates driver's lastLocationLat/Lng for dispatch proximity
     - **Database Fields**: Ride model extended with `pickupLat/Lng`, `dropoffLat/Lng`, `lockedFare`, `estimatedDistance`, `estimatedDuration`, `startedAt`, `completedAt`
     - **GpsLog Model**: Stores safety tracking data with `rideId`, `driverId`, `lat`, `lng`, `speed`, `bearing`, `createdAt`
+- **Minimum Fare Logic (Stage 18)**:
+    - **Constants**:
+      - CostPerTrip = $0.10 (platform operational cost)
+      - SafetyFactor = 3 (profitability buffer)
+      - MinimumZibaTake = CostPerTrip × SafetyFactor = $0.30
+    - **Formula**: MinimumFare = MinimumZibaTake / CommissionRate
+      - At 15% commission: MinimumFare = $2.00
+      - At 18% commission: MinimumFare = $1.67
+    - **Enforcement**: Auto-adjusts fares below minimum at:
+      - Fare estimate calculation
+      - Ride creation (POST /api/rides)
+      - Rider request ride (POST /api/rider/request-ride)
+      - Ride update (PATCH /api/rides/:id)
+    - **Guarantee**: No trip ever generates negative margin for Ziba
+    - **Implementation**: `server/minimum-fare.ts` utility module
 - **Fraud Detection System (Stage 18)**:
     - **Distance/Time Thresholds**:
       - AllowedDistance = estimatedDistance × 1.25
