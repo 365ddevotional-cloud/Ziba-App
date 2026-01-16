@@ -3960,6 +3960,492 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== DRIVER BANK ACCOUNT ====================
+
+  // Get driver bank account
+  app.get("/api/driver/bank-account", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const bankAccount = await prisma.driverBankAccount.findUnique({
+        where: { driverId: req.session.userId }
+      });
+
+      if (!bankAccount) {
+        return res.json(null);
+      }
+
+      // Mask account number for security
+      const maskedAccountNumber = bankAccount.accountNumber.slice(-4).padStart(
+        bankAccount.accountNumber.length, '*'
+      );
+
+      res.json({
+        ...bankAccount,
+        accountNumber: maskedAccountNumber,
+        fullAccountNumber: undefined // Never expose full number
+      });
+    } catch (error) {
+      console.error("Error fetching bank account:", error);
+      res.status(500).json({ message: "Failed to fetch bank account" });
+    }
+  });
+
+  // Add or update driver bank account
+  app.post("/api/driver/bank-account", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const { bankName, accountNumber, accountName, country } = req.body;
+
+      if (!bankName || !accountNumber || !accountName) {
+        return res.status(400).json({ message: "Bank name, account number, and account name are required" });
+      }
+
+      // Validate account number (basic validation)
+      if (accountNumber.length < 8 || accountNumber.length > 20) {
+        return res.status(400).json({ message: "Invalid account number length" });
+      }
+
+      const bankAccount = await prisma.driverBankAccount.upsert({
+        where: { driverId: req.session.userId },
+        update: {
+          bankName,
+          accountNumber,
+          accountName,
+          country: country || "NG",
+          verified: false // Reset verification on update
+        },
+        create: {
+          driverId: req.session.userId,
+          bankName,
+          accountNumber,
+          accountName,
+          country: country || "NG",
+          verified: false
+        }
+      });
+
+      // Mask account number in response
+      const maskedAccountNumber = bankAccount.accountNumber.slice(-4).padStart(
+        bankAccount.accountNumber.length, '*'
+      );
+
+      console.log(`[BankAccount] Driver ${req.session.userId} updated bank account`);
+
+      res.json({
+        ...bankAccount,
+        accountNumber: maskedAccountNumber
+      });
+    } catch (error) {
+      console.error("Error updating bank account:", error);
+      res.status(500).json({ message: "Failed to update bank account" });
+    }
+  });
+
+  // ==================== DRIVER WITHDRAWAL ====================
+
+  // Request withdrawal
+  app.post("/api/driver/withdraw", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const { amount } = req.body;
+      const driverId = req.session.userId;
+
+      if (typeof amount !== "number" || amount <= 0) {
+        return res.status(400).json({ message: "Invalid withdrawal amount" });
+      }
+
+      // Check for pending withdrawal request
+      const pendingRequest = await prisma.payoutRequest.findFirst({
+        where: {
+          driverId,
+          status: { in: ["PENDING", "APPROVED"] }
+        }
+      });
+
+      if (pendingRequest) {
+        return res.status(400).json({ 
+          message: "You already have a pending withdrawal request. Please wait for it to be processed." 
+        });
+      }
+
+      // Check bank account exists and is verified
+      const bankAccount = await prisma.driverBankAccount.findUnique({
+        where: { driverId }
+      });
+
+      if (!bankAccount) {
+        return res.status(400).json({ message: "Please add a bank account before withdrawing" });
+      }
+
+      // Get driver wallet
+      const wallet = await prisma.wallet.findUnique({
+        where: {
+          ownerId_ownerType: { ownerId: driverId, ownerType: "DRIVER" }
+        }
+      });
+
+      if (!wallet) {
+        return res.status(400).json({ message: "Wallet not found" });
+      }
+
+      // Check available balance (balance - lockedBalance)
+      const availableBalance = wallet.balance;
+      if (amount > availableBalance) {
+        return res.status(400).json({ 
+          message: `Insufficient balance. Available: ${availableBalance.toFixed(2)}` 
+        });
+      }
+
+      // Minimum withdrawal amount
+      const minWithdrawal = 1000; // 1000 NGN minimum
+      if (amount < minWithdrawal) {
+        return res.status(400).json({ 
+          message: `Minimum withdrawal amount is ${minWithdrawal}` 
+        });
+      }
+
+      // Create payout request and lock funds atomically
+      const result = await prisma.$transaction(async (tx) => {
+        // Lock the funds
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            balance: { decrement: amount },
+            lockedBalance: { increment: amount }
+          }
+        });
+
+        // Create payout request
+        const payoutRequest = await tx.payoutRequest.create({
+          data: {
+            driverId,
+            amount,
+            status: "PENDING"
+          }
+        });
+
+        // Create transaction record
+        await tx.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            type: "HOLD",
+            amount: -amount,
+            description: `Withdrawal request - ${amount.toFixed(2)} held for payout`,
+            reference: `WITHDRAW-HOLD-${payoutRequest.id}`
+          }
+        });
+
+        return payoutRequest;
+      });
+
+      console.log(`[Withdrawal] Driver ${driverId} requested withdrawal of ${amount}`);
+
+      res.json({
+        success: true,
+        message: "Withdrawal request submitted successfully",
+        payoutRequest: result
+      });
+    } catch (error) {
+      console.error("Error processing withdrawal:", error);
+      res.status(500).json({ message: "Failed to process withdrawal" });
+    }
+  });
+
+  // Get driver payout history
+  app.get("/api/driver/payouts", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const payouts = await prisma.payoutRequest.findMany({
+        where: { driverId: req.session.userId },
+        orderBy: { requestedAt: "desc" },
+        take: 50
+      });
+
+      res.json(payouts);
+    } catch (error) {
+      console.error("Error fetching payouts:", error);
+      res.status(500).json({ message: "Failed to fetch payouts" });
+    }
+  });
+
+  // ==================== ADMIN PAYOUT MANAGEMENT ====================
+
+  // Get all payout requests (admin only)
+  app.get("/api/admin/payouts", requireAuth("admin"), async (req, res) => {
+    try {
+      const { status } = req.query;
+
+      const where: any = {};
+      if (status && typeof status === "string") {
+        where.status = status;
+      }
+
+      const payouts = await prisma.payoutRequest.findMany({
+        where,
+        include: {
+          driver: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              phone: true
+            }
+          }
+        },
+        orderBy: { requestedAt: "desc" }
+      });
+
+      // Get bank accounts for all drivers
+      const driverIds = payouts.map(p => p.driverId);
+      const bankAccounts = await prisma.driverBankAccount.findMany({
+        where: { driverId: { in: driverIds } }
+      });
+
+      const bankAccountMap = new Map(bankAccounts.map(ba => [ba.driverId, ba]));
+
+      const payoutsWithBankInfo = payouts.map(p => ({
+        ...p,
+        bankAccount: bankAccountMap.get(p.driverId) ? {
+          bankName: bankAccountMap.get(p.driverId)!.bankName,
+          accountNumber: bankAccountMap.get(p.driverId)!.accountNumber.slice(-4).padStart(10, '*'),
+          accountName: bankAccountMap.get(p.driverId)!.accountName,
+          verified: bankAccountMap.get(p.driverId)!.verified
+        } : null
+      }));
+
+      res.json(payoutsWithBankInfo);
+    } catch (error) {
+      console.error("Error fetching payouts:", error);
+      res.status(500).json({ message: "Failed to fetch payouts" });
+    }
+  });
+
+  // Approve payout request (admin only)
+  app.post("/api/admin/payouts/:id/approve", requireAuth("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.session.userId;
+
+      const payout = await prisma.payoutRequest.findUnique({
+        where: { id },
+        include: { driver: true }
+      });
+
+      if (!payout) {
+        return res.status(404).json({ message: "Payout request not found" });
+      }
+
+      if (payout.status !== "PENDING") {
+        return res.status(400).json({ message: `Cannot approve payout. Status is ${payout.status}` });
+      }
+
+      await prisma.payoutRequest.update({
+        where: { id },
+        data: {
+          status: "APPROVED",
+          processedAt: new Date(),
+          processedBy: adminId
+        }
+      });
+
+      console.log(`[Payout] Admin ${adminId} approved payout ${id} for driver ${payout.driverId}`);
+
+      res.json({
+        success: true,
+        message: "Payout approved. Ready for payment processing."
+      });
+    } catch (error) {
+      console.error("Error approving payout:", error);
+      res.status(500).json({ message: "Failed to approve payout" });
+    }
+  });
+
+  // Reject payout request (admin only)
+  app.post("/api/admin/payouts/:id/reject", requireAuth("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { rejectionReason } = req.body;
+      const adminId = req.session.userId;
+
+      if (!rejectionReason || rejectionReason.trim().length === 0) {
+        return res.status(400).json({ message: "Rejection reason is required" });
+      }
+
+      const payout = await prisma.payoutRequest.findUnique({
+        where: { id }
+      });
+
+      if (!payout) {
+        return res.status(404).json({ message: "Payout request not found" });
+      }
+
+      if (payout.status !== "PENDING" && payout.status !== "APPROVED") {
+        return res.status(400).json({ message: `Cannot reject payout. Status is ${payout.status}` });
+      }
+
+      // Reject and return funds to available balance
+      await prisma.$transaction(async (tx) => {
+        // Update payout status
+        await tx.payoutRequest.update({
+          where: { id },
+          data: {
+            status: "REJECTED",
+            processedAt: new Date(),
+            processedBy: adminId,
+            rejectionReason: rejectionReason.trim()
+          }
+        });
+
+        // Return locked funds to available balance
+        const wallet = await tx.wallet.findUnique({
+          where: {
+            ownerId_ownerType: { ownerId: payout.driverId, ownerType: "DRIVER" }
+          }
+        });
+
+        if (wallet) {
+          await tx.wallet.update({
+            where: { id: wallet.id },
+            data: {
+              balance: { increment: payout.amount },
+              lockedBalance: { decrement: payout.amount }
+            }
+          });
+
+          await tx.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              type: "RELEASE",
+              amount: payout.amount,
+              description: `Withdrawal rejected - funds returned`,
+              reference: `WITHDRAW-REJECT-${id}`
+            }
+          });
+        }
+      });
+
+      console.log(`[Payout] Admin ${adminId} rejected payout ${id}: ${rejectionReason}`);
+
+      res.json({
+        success: true,
+        message: "Payout rejected. Funds returned to driver's available balance."
+      });
+    } catch (error) {
+      console.error("Error rejecting payout:", error);
+      res.status(500).json({ message: "Failed to reject payout" });
+    }
+  });
+
+  // Mark payout as paid (admin only)
+  app.post("/api/admin/payouts/:id/mark-paid", requireAuth("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.session.userId;
+
+      const payout = await prisma.payoutRequest.findUnique({
+        where: { id }
+      });
+
+      if (!payout) {
+        return res.status(404).json({ message: "Payout request not found" });
+      }
+
+      if (payout.status !== "APPROVED") {
+        return res.status(400).json({ message: `Cannot mark as paid. Status is ${payout.status}, expected APPROVED` });
+      }
+
+      // Mark as paid and deduct locked balance
+      await prisma.$transaction(async (tx) => {
+        await tx.payoutRequest.update({
+          where: { id },
+          data: {
+            status: "PAID",
+            processedAt: new Date(),
+            processedBy: adminId
+          }
+        });
+
+        const wallet = await tx.wallet.findUnique({
+          where: {
+            ownerId_ownerType: { ownerId: payout.driverId, ownerType: "DRIVER" }
+          }
+        });
+
+        if (wallet) {
+          await tx.wallet.update({
+            where: { id: wallet.id },
+            data: {
+              lockedBalance: { decrement: payout.amount }
+            }
+          });
+
+          await tx.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              type: "PAYOUT",
+              amount: -payout.amount,
+              description: `Withdrawal completed - paid to bank account`,
+              reference: `WITHDRAW-PAID-${id}`
+            }
+          });
+        }
+      });
+
+      console.log(`[Payout] Admin ${adminId} marked payout ${id} as PAID`);
+
+      res.json({
+        success: true,
+        message: "Payout marked as paid successfully."
+      });
+    } catch (error) {
+      console.error("Error marking payout as paid:", error);
+      res.status(500).json({ message: "Failed to mark payout as paid" });
+    }
+  });
+
+  // Verify bank account (admin only)
+  app.post("/api/admin/bank-accounts/:driverId/verify", requireAuth("admin"), async (req, res) => {
+    try {
+      const { driverId } = req.params;
+      const { verified } = req.body;
+
+      const bankAccount = await prisma.driverBankAccount.findUnique({
+        where: { driverId }
+      });
+
+      if (!bankAccount) {
+        return res.status(404).json({ message: "Bank account not found" });
+      }
+
+      await prisma.driverBankAccount.update({
+        where: { driverId },
+        data: { verified: verified === true }
+      });
+
+      console.log(`[BankAccount] Admin verified bank account for driver ${driverId}: ${verified}`);
+
+      res.json({
+        success: true,
+        message: verified ? "Bank account verified" : "Bank account verification removed"
+      });
+    } catch (error) {
+      console.error("Error verifying bank account:", error);
+      res.status(500).json({ message: "Failed to verify bank account" });
+    }
+  });
+
   // Director login
   app.post("/api/director/login", async (req, res) => {
     try {
