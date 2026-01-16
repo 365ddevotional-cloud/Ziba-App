@@ -4781,18 +4781,19 @@ export async function registerRoutes(
         }
       }
 
-      // Determine penalty: Apply 20% if ride is IN_PROGRESS or later (non-shared or already handled above)
-      const shouldApplyPenalty = ["IN_PROGRESS", "COMPLETED"].includes(ride.status);
+      // Determine penalty: Apply 20% if ride is ASSIGNED or ARRIVED (driver assigned but before trip starts)
+      // Rider cannot cancel after IN_PROGRESS (enforced by state machine)
+      const shouldApplyPenalty = ["ASSIGNED", "ARRIVED"].includes(ride.status);
       const fareAmount = ride.fareEstimate || 0;
       const { penaltyAmount, refundAmount } = calculateCancellationPenalty(fareAmount, shouldApplyPenalty);
 
-      // Guard: Ensure cancelling before IN_PROGRESS never penalizes
-      if (["REQUESTED", "ASSIGNED", "ARRIVED"].includes(ride.status) && penaltyAmount > 0) {
+      // Guard: Ensure cancelling before driver assignment (REQUESTED) never penalizes
+      if (ride.status === "REQUESTED" && penaltyAmount > 0) {
         console.error(`[GUARD] Invalid penalty applied for ride ${id} in state ${ride.status}`);
         return res.status(500).json({ message: "Internal error: Invalid penalty calculation" });
       }
 
-      // Guard: Ensure cancelling after IN_PROGRESS always penalizes at 20%
+      // Guard: Ensure cancelling after driver assignment (ASSIGNED/ARRIVED) always penalizes at 20%
       if (shouldApplyPenalty && penaltyAmount === 0 && fareAmount > 0) {
         console.error(`[GUARD] Penalty should apply but calculated as 0 for ride ${id}`);
         return res.status(500).json({ message: "Internal error: Penalty calculation failed" });
@@ -4807,8 +4808,8 @@ export async function registerRoutes(
           include: { user: true, driver: true, payment: true },
         });
 
-        // Handle wallet refund if fare exists
-        if (fareAmount > 0 && refundAmount > 0) {
+        // Handle wallet transactions if fare exists
+        if (fareAmount > 0) {
           // Get or create user wallet
           let userWallet = await tx.wallet.findUnique({
             where: { ownerId_ownerType: { ownerId: ride.userId, ownerType: "USER" } },
@@ -4819,41 +4820,74 @@ export async function registerRoutes(
             });
           }
 
-          // Refund to user wallet
-          await tx.transaction.create({
-            data: {
-              walletId: userWallet.id,
-              type: "CREDIT",
-              amount: refundAmount,
-              reference: `Ride cancellation refund - ${ride.pickupLocation} to ${ride.dropoffLocation}${penaltyAmount > 0 ? ` (Cancellation fee: ₦${penaltyAmount.toLocaleString()})` : ""}`,
-            },
-          });
-          await tx.wallet.update({
-            where: { id: userWallet.id },
-            data: { balance: { increment: refundAmount } },
-          });
-
-          // If penalty applies, record as platform revenue
+          // If penalty applies, charge penalty to rider wallet (debit)
           if (penaltyAmount > 0) {
+            // Debit penalty from rider wallet (allows negative balance if insufficient)
+            await tx.transaction.create({
+              data: {
+                walletId: userWallet.id,
+                type: "DEBIT",
+                amount: -penaltyAmount,
+                reference: `Cancellation fee (20%) - Ride ${id}`,
+              },
+            });
+            await tx.wallet.update({
+              where: { id: userWallet.id },
+              data: { balance: { decrement: penaltyAmount } },
+            });
+
+            // Credit penalty to platform (record as COMMISSION for platform revenue tracking)
             await tx.transaction.create({
               data: {
                 walletId: userWallet.id,
                 type: "COMMISSION",
                 amount: penaltyAmount,
-                reference: `Cancellation fee (20%) - Ride ${id}`,
+                reference: `Cancellation fee (20%) - Ride ${id} - Platform Revenue`,
               },
             });
+
+            // Refund remaining amount to rider wallet (if any)
+            if (refundAmount > 0) {
+              await tx.transaction.create({
+                data: {
+                  walletId: userWallet.id,
+                  type: "CREDIT",
+                  amount: refundAmount,
+                  reference: `Ride cancellation refund - ${ride.pickupLocation} to ${ride.dropoffLocation} (after 20% fee)`,
+                },
+              });
+              await tx.wallet.update({
+                where: { id: userWallet.id },
+                data: { balance: { increment: refundAmount } },
+              });
+            }
 
             // Notify user about cancellation fee
             await tx.notification.create({
               data: {
                 userId: ride.userId,
                 role: "user",
-                message: `Ride cancelled. Cancellation fee (20%): ₦${penaltyAmount.toLocaleString()}. Refunded (80%): ₦${refundAmount.toLocaleString()}`,
+                message: `Ride cancelled. Cancellation fee (20%): ₦${penaltyAmount.toLocaleString()}. Refunded: ₦${refundAmount.toLocaleString()}`,
                 type: "STATUS_CHANGE",
               },
             });
           } else {
+            // Full refund (no penalty)
+            if (refundAmount > 0) {
+              await tx.transaction.create({
+                data: {
+                  walletId: userWallet.id,
+                  type: "CREDIT",
+                  amount: refundAmount,
+                  reference: `Ride cancellation refund - ${ride.pickupLocation} to ${ride.dropoffLocation}`,
+                },
+              });
+              await tx.wallet.update({
+                where: { id: userWallet.id },
+                data: { balance: { increment: refundAmount } },
+              });
+            }
+
             // Full refund notification
             await tx.notification.create({
               data: {
@@ -4879,7 +4913,11 @@ export async function registerRoutes(
         return updatedRide;
       });
 
-      res.json(result);
+      res.json({
+        ...result,
+        penaltyApplied: shouldApplyPenalty,
+        penaltyAmount: penaltyAmount,
+      });
     } catch (error) {
       console.error("Error cancelling ride:", error);
       res.status(500).json({ message: "Failed to cancel ride" });

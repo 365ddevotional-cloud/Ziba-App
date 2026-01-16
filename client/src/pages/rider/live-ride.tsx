@@ -132,12 +132,21 @@ export default function RiderLiveRide() {
       const res = await apiRequest("POST", `/api/rider/rides/${rideId}/cancel`);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: { penaltyApplied?: boolean; penaltyAmount?: number }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });
-      toast({
-        title: "Ride cancelled",
-        description: "Your ride has been cancelled",
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/rider/wallet"] });
+      
+      if (data.penaltyApplied && data.penaltyAmount) {
+        toast({
+          title: "Ride cancelled",
+          description: `Cancellation fee (20%): ₦${data.penaltyAmount.toLocaleString()}. Remaining refund credited to wallet.`,
+        });
+      } else {
+        toast({
+          title: "Ride cancelled",
+          description: "Your ride has been cancelled. Full refund credited to wallet.",
+        });
+      }
       navigate("/rider/home");
     },
     onError: (error: any) => {
@@ -532,25 +541,32 @@ export default function RiderLiveRide() {
 
         {/* Cancel Button - Subtle, Secondary */}
         {canCancelTrip && (
-          <Button
-            variant="outline"
-            className="w-full ziba-cancel-btn"
-            onClick={handleCancel}
-            disabled={cancelMutation.isPending}
-            data-testid="button-cancel-ride"
-          >
-            {cancelMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Cancelling...
-              </>
-            ) : (
-              <>
-                <X className="w-4 h-4 mr-2" />
-                Cancel Ride
-              </>
+          <div className="space-y-2">
+            {displayTrip?.driver && (displayTrip.status === "ASSIGNED" || displayTrip.status === "ARRIVED") && (
+              <p className="text-xs text-muted-foreground text-center">
+                Cancellation after match incurs 20% fee.
+              </p>
             )}
-          </Button>
+            <Button
+              variant="outline"
+              className="w-full ziba-cancel-btn"
+              onClick={handleCancel}
+              disabled={cancelMutation.isPending}
+              data-testid="button-cancel-ride"
+            >
+              {cancelMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                <>
+                  <X className="w-4 h-4 mr-2" />
+                  Cancel Ride
+                </>
+              )}
+            </Button>
+          </div>
         )}
       </main>
 
