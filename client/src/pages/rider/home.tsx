@@ -1,6 +1,8 @@
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useRiderAuth } from "@/lib/rider-auth";
+import { useTrip } from "@/lib/trip-context";
+import { useWallet } from "@/lib/wallet-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { RiderBottomNav } from "@/components/rider-bottom-nav";
@@ -29,28 +31,43 @@ interface RideData {
 export default function RiderHome() {
   const { user } = useRiderAuth();
   const [, navigate] = useLocation();
+  const { currentTrip } = useTrip();
+  const { getRiderWallet } = useWallet();
 
-  const { data: activeRide } = useQuery<RideData | null>({
+  const { data: activeRide, isLoading: isLoadingRide } = useQuery<RideData | null>({
     queryKey: ["/api/rider/active-ride"],
     staleTime: 1000 * 60,
   });
 
-  const { data: wallet } = useQuery<WalletData>({
+  // Use trip context if available, otherwise fall back to API
+  const displayTrip = currentTrip || activeRide;
+
+  const { data: wallet, isLoading: isLoadingWallet } = useQuery<WalletData>({
     queryKey: ["/api/rider/wallet"],
     staleTime: 1000 * 60,
   });
 
-  const { data: recentRides } = useQuery<RideData[]>({
+  // Get wallet balance from context (in-memory)
+  const riderWallet = getRiderWallet();
+  const walletBalance = riderWallet.balance;
+
+  const { data: recentRides, isLoading: isLoadingRides } = useQuery<RideData[]>({
     queryKey: ["/api/rider/rides"],
     staleTime: 1000 * 60,
   });
 
+  const firstName = user?.fullName?.trim().split(" ")[0] || "there";
+
   // Active ride view - Clean redirect card
-  if (activeRide) {
+  // Show if there's an active trip (not cancelled or completed)
+  const hasActiveTrip = displayTrip && 
+    (currentTrip ? !["CANCELLED", "COMPLETED"].includes(currentTrip.status) : true);
+  
+  if (hasActiveTrip) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <header className="p-5 pb-3">
-          <p className="ziba-body-muted">Hello, {user?.fullName?.split(" ")[0]}</p>
+          <p className="ziba-body-muted">Hello, {firstName}</p>
         </header>
 
         <main className="flex-1 px-5 flex flex-col items-center justify-center pb-24">
@@ -81,7 +98,7 @@ export default function RiderHome() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Greeting Header */}
       <header className="p-5 pb-2">
-        <p className="ziba-body-muted">Hello, {user?.fullName?.split(" ")[0]}</p>
+        <p className="ziba-body-muted">Hello, {firstName}</p>
       </header>
 
       <main className="flex-1 px-5 space-y-5 pb-24">
@@ -107,31 +124,47 @@ export default function RiderHome() {
         </div>
 
         {/* Wallet Balance - Compact */}
-        {wallet && (
-          <Card 
-            className="ziba-card hover-elevate cursor-pointer" 
-            onClick={() => navigate("/rider/wallet")}
-            data-testid="card-wallet"
-          >
-            <CardContent className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-500/10 rounded-lg flex items-center justify-center">
-                  <Wallet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Wallet Balance</p>
-                  <p className="font-semibold text-foreground" data-testid="text-wallet-balance">
-                    NGN {(wallet.balance || 0).toLocaleString()}
-                  </p>
-                </div>
+        <Card 
+          className="ziba-card hover-elevate cursor-pointer" 
+          onClick={() => navigate("/rider/wallet")}
+          data-testid="card-wallet"
+        >
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-500/10 rounded-lg flex items-center justify-center">
+                <Wallet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
-            </CardContent>
-          </Card>
-        )}
+              <div>
+                <p className="text-xs text-muted-foreground">Wallet Balance</p>
+                <p className="font-semibold text-foreground" data-testid="text-wallet-balance">
+                  ₦ {walletBalance.toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </CardContent>
+        </Card>
 
         {/* Recent Trips - Clean List */}
-        {recentRides && recentRides.length > 0 && (
+        {isLoadingRides ? (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-foreground">Recent Trips</h2>
+            </div>
+            <div className="space-y-2">
+              <Card className="ziba-card">
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">Loading trips...</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        ) : recentRides && recentRides.length > 0 ? (
           <div>
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold text-foreground">Recent Trips</h2>
@@ -142,7 +175,7 @@ export default function RiderHome() {
               </Link>
             </div>
             <div className="space-y-2">
-              {recentRides.slice(0, 3).map((ride: any) => (
+              {recentRides.slice(0, 3).map((ride: RideData) => (
                 <Card 
                   key={ride.id} 
                   className="ziba-card hover-elevate cursor-pointer"
@@ -160,9 +193,11 @@ export default function RiderHome() {
                       <Clock className="w-5 h-5 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{ride.dropoffLocation}</p>
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {ride.dropoffLocation || "Unknown location"}
+                      </p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(ride.createdAt).toLocaleDateString()}
+                        {ride.createdAt ? new Date(ride.createdAt).toLocaleDateString() : "Unknown date"}
                       </p>
                     </div>
                     {ride.fareEstimate && (
@@ -175,7 +210,7 @@ export default function RiderHome() {
               ))}
             </div>
           </div>
-        )}
+        ) : null}
       </main>
 
       <RiderBottomNav activeTab="home" />

@@ -269,6 +269,21 @@ export default function AdminPage() {
                 </Link>
               </Card>
 
+              <Card className="hover-elevate cursor-pointer border-dashed border-blue-500/50">
+                <Link href="/admin/driver-onboarding">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle className="h-5 w-5 text-blue-500" />
+                        <CardTitle>Driver Onboarding</CardTitle>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <CardDescription>Review and approve driver applications</CardDescription>
+                  </CardHeader>
+                </Link>
+              </Card>
+
               <Card className="hover-elevate cursor-pointer">
                 <Link href="/admin/directors">
                   <CardHeader>

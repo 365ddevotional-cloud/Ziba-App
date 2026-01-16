@@ -1,7 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { calculateFare } from "@/lib/pricing";
+import { useTrip } from "@/lib/trip-context";
+import { useDriverStore } from "@/lib/driver-store";
+import { useWallet } from "@/lib/wallet-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -18,19 +22,6 @@ import {
   DollarSign,
 } from "lucide-react";
 
-interface FareEstimate {
-  fare: number;
-  currency: string;
-  currencySymbol: string;
-  breakdown: {
-    baseFare: number;
-    distanceCharge: number;
-    timeCharge: number;
-    surgeApplied: boolean;
-    surgeMultiplier: number;
-  };
-}
-
 const paymentMethods = [
   { id: "wallet", name: "Wallet Balance", icon: Wallet },
   { id: "card", name: "Debit/Credit Card", icon: CreditCard },
@@ -45,52 +36,96 @@ export default function RiderConfirm() {
   const params = new URLSearchParams(searchString);
   const pickup = params.get("pickup") || "";
   const destination = params.get("destination") || "";
+  const distanceParam = params.get("distance");
+  const durationParam = params.get("duration");
   
+  const { setCurrentTrip, assignDriver: assignDriverToTrip } = useTrip();
+  const { findNearestDriver, assignDriver: markDriverUnavailable } = useDriverStore();
+  const { canAfford, updateRiderBalance } = useWallet();
   const [selectedPayment, setSelectedPayment] = useState("wallet");
-  const [fareEstimate, setFareEstimate] = useState<FareEstimate | null>(null);
-  const [isEstimating, setIsEstimating] = useState(true);
+  const [routeData, setRouteData] = useState<{ distance: number; duration: number } | null>(
+    distanceParam && durationParam
+      ? { distance: parseFloat(distanceParam), duration: parseInt(durationParam, 10) }
+      : null
+  );
 
-  useEffect(() => {
-    const fetchEstimate = async () => {
-      try {
-        const mockDistance = 5 + Math.random() * 15;
-        const mockDuration = mockDistance * 2 + Math.random() * 10;
-        
-        const res = await apiRequest("POST", "/api/rider/fare-estimate", {
-          distance: mockDistance,
-          duration: mockDuration,
-          countryCode: "NG",
-        });
-        const data = await res.json();
-        setFareEstimate(data);
-      } catch (error) {
-        toast({
-          title: "Estimation failed",
-          description: "Could not calculate fare. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsEstimating(false);
-      }
-    };
-
-    fetchEstimate();
-  }, []);
+  // Calculate fare locally using pricing logic
+  const fareEstimate = useMemo(() => {
+    if (!routeData) return null;
+    return calculateFare(routeData.distance, routeData.duration);
+  }, [routeData]);
 
   const requestRideMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/rider/request-ride", {
+      if (!routeData || !fareEstimate) {
+        throw new Error("Missing route or fare data");
+      }
+
+      // Check wallet balance if paying with wallet
+      if (selectedPayment === "wallet" && !canAfford(fareEstimate.fare)) {
+        throw new Error("Insufficient wallet balance");
+      }
+
+      // Create trip in memory (not persisted to database)
+      const tripId = `trip_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Mock pickup coordinates (in production, use geocoding)
+      const pickupLat = 6.5244 + (Math.random() - 0.5) * 0.1;
+      const pickupLng = 3.3792 + (Math.random() - 0.5) * 0.1;
+
+      const trip = {
+        id: tripId,
         pickupLocation: pickup,
         dropoffLocation: destination,
-        fareEstimate: fareEstimate?.fare,
+        distance: routeData.distance,
+        duration: routeData.duration,
+        fare: fareEstimate.fare,
+        status: "CONFIRMED" as const,
+        createdAt: new Date().toISOString(),
         paymentMethod: selectedPayment,
-      });
-      return res.json();
+        pickupLat,
+        pickupLng,
+        payment: {
+          fare: fareEstimate.fare,
+          riderPaid: false,
+          driverPaid: false,
+          platformCommission: 0,
+          escrowHeld: false,
+        },
+      };
+
+      setCurrentTrip(trip);
+
+      // Find and assign nearest driver
+      setTimeout(() => {
+        const nearestDriver = findNearestDriver(pickupLat, pickupLng);
+        if (nearestDriver) {
+          markDriverUnavailable(nearestDriver.id);
+          assignDriverToTrip({
+            id: nearestDriver.id,
+            name: nearestDriver.name,
+            vehicleType: nearestDriver.vehicleType,
+            vehiclePlate: nearestDriver.vehiclePlate,
+            rating: nearestDriver.rating,
+            phone: nearestDriver.phone,
+          });
+        } else {
+          toast({
+            title: "No drivers available",
+            description: "Please try again in a moment",
+            variant: "destructive",
+          });
+        }
+      }, 1000);
+
+      // Note: Backend API call removed for this phase
+      // In production, this would persist to database
+      return trip;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });
       toast({
-        title: "Ride requested!",
+        title: "Ride confirmed!",
         description: "Looking for a driver...",
       });
       navigate("/rider/active-ride");
@@ -98,7 +133,7 @@ export default function RiderConfirm() {
     onError: (error: any) => {
       toast({
         title: "Request failed",
-        description: error.message || "Could not request ride",
+        description: error.message || "Could not confirm ride",
         variant: "destructive",
       });
     },
@@ -156,7 +191,7 @@ export default function RiderConfirm() {
 
         <Card>
           <CardContent className="p-4">
-            {isEstimating ? (
+            {!routeData ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
                 <span className="text-muted-foreground">Calculating fare...</span>
@@ -172,27 +207,21 @@ export default function RiderConfirm() {
                 <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t border-border">
                   <div className="flex justify-between">
                     <span>Base fare</span>
-                    <span>{fareEstimate.currencySymbol}{fareEstimate.breakdown.baseFare}</span>
+                    <span>{fareEstimate.currencySymbol}{fareEstimate.breakdown.baseFare.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Distance</span>
-                    <span>{fareEstimate.currencySymbol}{fareEstimate.breakdown.distanceCharge.toFixed(0)}</span>
+                    <span>Distance ({routeData.distance.toFixed(1)} km)</span>
+                    <span>{fareEstimate.currencySymbol}{fareEstimate.breakdown.distanceCharge.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Time</span>
-                    <span>{fareEstimate.currencySymbol}{fareEstimate.breakdown.timeCharge.toFixed(0)}</span>
+                    <span>Time (~{routeData.duration} min)</span>
+                    <span>{fareEstimate.currencySymbol}{fareEstimate.breakdown.timeCharge.toLocaleString()}</span>
                   </div>
-                  {fareEstimate.breakdown.surgeApplied && (
-                    <div className="flex justify-between text-yellow-500">
-                      <span>Surge ({fareEstimate.breakdown.surgeMultiplier}x)</span>
-                      <span>Applied</span>
-                    </div>
-                  )}
                 </div>
               </div>
             ) : (
               <div className="text-center py-4 text-muted-foreground">
-                Could not estimate fare
+                Could not calculate fare
               </div>
             )}
           </CardContent>
@@ -230,10 +259,14 @@ export default function RiderConfirm() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock className="w-4 h-4" />
-          <span>Estimated arrival: 3-5 minutes</span>
-        </div>
+        {routeData && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="w-4 h-4" />
+            <span>
+              Estimated duration: ~{routeData.duration} minutes • {routeData.distance.toFixed(1)} km
+            </span>
+          </div>
+        )}
       </main>
 
       <div className="fixed bottom-16 left-0 right-0 p-4 bg-card border-t border-border z-40">
@@ -241,7 +274,7 @@ export default function RiderConfirm() {
           className="w-full"
           size="lg"
           onClick={() => requestRideMutation.mutate()}
-          disabled={requestRideMutation.isPending || !fareEstimate}
+          disabled={requestRideMutation.isPending || !fareEstimate || !routeData}
           data-testid="button-confirm-ride"
         >
           {requestRideMutation.isPending ? (

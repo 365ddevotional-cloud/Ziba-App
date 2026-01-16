@@ -28,8 +28,14 @@ interface TransactionDetail {
 export default function WalletTransactionDetail() {
   const { id } = useParams<{ id: string }>();
 
-  const { data: transaction, isLoading } = useQuery<TransactionDetail>({
+  const { data: transaction, isLoading, isError } = useQuery<TransactionDetail>({
     queryKey: ["/api/rider/wallet/transaction", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/rider/wallet/transaction/${id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch transaction");
+      return res.json();
+    },
+    enabled: !!id,
     staleTime: 1000 * 60,
   });
 
@@ -117,7 +123,7 @@ export default function WalletTransactionDetail() {
     );
   }
 
-  if (!transaction) {
+  if (isError || !transaction) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <header className="p-4 flex items-center gap-3 border-b border-border">

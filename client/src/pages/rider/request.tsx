@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { RiderBottomNav } from "@/components/rider-bottom-nav";
+import { RouteMap } from "@/components/route-map";
 import {
   MapPin,
   Navigation,
@@ -14,12 +15,18 @@ import {
   Locate,
 } from "lucide-react";
 
+interface RouteData {
+  distance: number;
+  duration: number;
+}
+
 export default function RiderRequest() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [pickup, setPickup] = useState("");
   const [destination, setDestination] = useState("");
   const [isLocating, setIsLocating] = useState(false);
+  const [routeData, setRouteData] = useState<RouteData | null>(null);
 
   const handleUseCurrentLocation = () => {
     setIsLocating(true);
@@ -33,6 +40,10 @@ export default function RiderRequest() {
     }, 1000);
   };
 
+  const handleRouteCalculated = (distance: number, duration: number) => {
+    setRouteData({ distance, duration });
+  };
+
   const handleContinue = () => {
     if (!pickup || !destination) {
       toast({
@@ -42,7 +53,22 @@ export default function RiderRequest() {
       });
       return;
     }
-    const params = new URLSearchParams({ pickup, destination });
+
+    if (!routeData) {
+      toast({
+        title: "Calculating route",
+        description: "Please wait for route calculation to complete",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const params = new URLSearchParams({
+      pickup,
+      destination,
+      distance: routeData.distance.toFixed(2),
+      duration: routeData.duration.toString(),
+    });
     navigate(`/rider/confirm?${params.toString()}`);
   };
 
@@ -108,13 +134,30 @@ export default function RiderRequest() {
           </CardContent>
         </Card>
 
-        {/* Map Placeholder */}
-        <div className="bg-muted/30 rounded-xl p-6 flex items-center justify-center h-32">
-          <div className="text-center text-muted-foreground">
-            <MapPin className="w-6 h-6 mx-auto mb-2 opacity-50" />
-            <p className="text-xs">Map coming soon</p>
-          </div>
-        </div>
+        {/* Map */}
+        <RouteMap
+          pickup={pickup}
+          destination={destination}
+          onRouteCalculated={handleRouteCalculated}
+        />
+
+        {/* Route Info */}
+        {routeData && (
+          <Card className="ziba-card">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Navigation className="w-4 h-4" />
+                  <span>{routeData.distance.toFixed(1)} km</span>
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Clock className="w-4 h-4" />
+                  <span>~{routeData.duration} min</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Recent Places */}
         <div>

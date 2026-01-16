@@ -6,10 +6,15 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth";
 import { RiderAuthProvider } from "@/lib/rider-auth";
+import { DriverAuthProvider } from "@/lib/driver-auth";
 import { CountryProvider } from "@/lib/country";
+import { TripProvider } from "@/lib/trip-context";
+import { DriverStoreProvider } from "@/lib/driver-store";
+import { WalletProvider } from "@/lib/wallet-context";
 import { TestBanner } from "@/components/test-banner";
 import Landing from "@/pages/landing";
 import RiderApp from "@/pages/rider";
+import DriverApp from "@/pages/driver";
 import UsersPage from "@/pages/users";
 import DriversPage from "@/pages/drivers";
 import DirectorsPage from "@/pages/directors";
@@ -26,6 +31,7 @@ import AdminAnalyticsPage from "@/pages/admin-analytics";
 import AdminFaresPage from "@/pages/admin-fares";
 import AdminTestAccountsPage from "@/pages/admin-test-accounts";
 import AdminPlayStoreChecklistPage from "@/pages/admin-playstore-checklist";
+import AdminDriverOnboardingPage from "@/pages/admin-driver-onboarding";
 import AdminLoginPage from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
 import WhySafeAndSecure from "@/pages/info/why-safe-and-secure";
@@ -65,6 +71,7 @@ function Router() {
       <Route path="/admin/fares" component={AdminFaresPage} />
       <Route path="/admin/test-accounts" component={AdminTestAccountsPage} />
       <Route path="/admin/playstore-checklist" component={AdminPlayStoreChecklistPage} />
+      <Route path="/admin/driver-onboarding" component={AdminDriverOnboardingPage} />
       <Route path="/why/safe-and-secure" component={WhySafeAndSecure} />
       <Route path="/why/always-available" component={WhyAlwaysAvailable} />
       <Route path="/why/city-wide-coverage" component={WhyCityWideCoverage} />
@@ -81,6 +88,7 @@ function Router() {
       <Route path="/legal/privacy" component={LegalPrivacy} />
       <Route path="/legal/cookies" component={LegalCookies} />
       <Route path="/rider/:rest*" component={RiderApp} />
+      <Route path="/driver/:rest*" component={DriverApp} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -91,15 +99,23 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <RiderAuthProvider>
-          <AuthProvider>
-            <CountryProvider>
-              <TooltipProvider>
-                <TestBanner />
-                <Toaster />
-                <Router />
-              </TooltipProvider>
-            </CountryProvider>
-          </AuthProvider>
+          <DriverAuthProvider>
+            <AuthProvider>
+              <CountryProvider>
+                <WalletProvider>
+                  <DriverStoreProvider>
+                    <TripProvider>
+                      <TooltipProvider>
+                        <TestBanner />
+                        <Toaster />
+                        <Router />
+                      </TooltipProvider>
+                    </TripProvider>
+                  </DriverStoreProvider>
+                </WalletProvider>
+              </CountryProvider>
+            </AuthProvider>
+          </DriverAuthProvider>
         </RiderAuthProvider>
       </ThemeProvider>
     </QueryClientProvider>

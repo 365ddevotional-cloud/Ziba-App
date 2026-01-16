@@ -8,6 +8,221 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  // ==================== HEALTH CHECK ====================
+  // Runtime health check - returns current server time, DB provider, and Prisma connectivity
+  // No caching - always returns fresh data
+  app.get("/api/health", async (req, res) => {
+    // Set no-cache headers to prevent any caching
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    
+    try {
+      // Get current server time at request time (not build time)
+      const serverTime = new Date().toISOString();
+      
+      // Determine database provider from runtime environment
+      const databaseUrl = process.env.DATABASE_URL || "";
+      const isSQLite = databaseUrl.startsWith("file:");
+      const dbProvider = isSQLite ? "SQLite" : (databaseUrl ? "PostgreSQL" : "Unknown");
+      
+      // Test Prisma connectivity at request time
+      let dbConnected = false;
+      let dbError: string | null = null;
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+        dbConnected = true;
+      } catch (error: any) {
+        dbConnected = false;
+        dbError = error?.message || "Database connection failed";
+      }
+      
+      const healthStatus = {
+        status: dbConnected ? "healthy" : "unhealthy",
+        timestamp: serverTime,
+        database: {
+          provider: dbProvider,
+          connected: dbConnected,
+          error: dbError,
+        },
+        environment: {
+          nodeEnv: process.env.NODE_ENV || "development",
+          hasDatabaseUrl: !!process.env.DATABASE_URL,
+        },
+      };
+      
+      const statusCode = dbConnected ? 200 : 503;
+      res.status(statusCode).json(healthStatus);
+    } catch (error: any) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      res.status(500).json({
+        status: "error",
+        timestamp: new Date().toISOString(),
+        error: error?.message || "Health check failed",
+      });
+    }
+  });
+  
+  // ==================== DRIVER ONBOARDING ====================
+  
+  // Submit or update driver onboarding profile
+  app.post("/api/driver/onboard", requireAuth(["driver", "user"]), async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser.id) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const {
+        fullName,
+        phone,
+        email,
+        profilePhotoUrl,
+        driversLicenseNumber,
+        licenseExpiryDate,
+        vehicleType,
+        vehicleMake,
+        vehicleModel,
+        vehicleColor,
+        vehiclePlateNumber,
+      } = req.body;
+
+      // Validate required fields
+      if (!fullName || !phone || !email || !driversLicenseNumber || !licenseExpiryDate || 
+          !vehicleType || !vehicleMake || !vehicleModel || !vehicleColor || !vehiclePlateNumber) {
+        return res.status(400).json({ 
+          message: "All fields are required: fullName, phone, email, driversLicenseNumber, licenseExpiryDate, vehicleType, vehicleMake, vehicleModel, vehicleColor, vehiclePlateNumber" 
+        });
+      }
+
+      // Validate vehicle type
+      const validVehicleTypes = ["BIKE", "CAR", "SUV", "VAN"];
+      if (!validVehicleTypes.includes(vehicleType)) {
+        return res.status(400).json({ message: "Invalid vehicle type. Must be BIKE, CAR, SUV, or VAN" });
+      }
+
+      // Validate license expiry date
+      const expiryDate = new Date(licenseExpiryDate);
+      if (isNaN(expiryDate.getTime())) {
+        return res.status(400).json({ message: "Invalid license expiry date" });
+      }
+
+      // Get or verify user exists
+      const user = await prisma.user.findUnique({ where: { id: currentUser.id } });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if driver profile already exists
+      const existingProfile = await prisma.driverProfile.findUnique({
+        where: { userId: currentUser.id },
+      });
+
+      let driverProfile;
+      if (existingProfile) {
+        // Update existing profile - reset to PENDING if updating
+        driverProfile = await prisma.driverProfile.update({
+          where: { userId: currentUser.id },
+          data: {
+            fullName,
+            phone,
+            email,
+            profilePhotoUrl: profilePhotoUrl || null,
+            driversLicenseNumber,
+            licenseExpiryDate: expiryDate,
+            vehicleType,
+            vehicleMake,
+            vehicleModel,
+            vehicleColor,
+            vehiclePlateNumber,
+            status: "PENDING",
+            isApproved: false,
+            rejectionReason: null,
+          },
+        });
+      } else {
+        // Create new profile
+        driverProfile = await prisma.driverProfile.create({
+          data: {
+            userId: currentUser.id,
+            fullName,
+            phone,
+            email,
+            profilePhotoUrl: profilePhotoUrl || null,
+            driversLicenseNumber,
+            licenseExpiryDate: expiryDate,
+            vehicleType,
+            vehicleMake,
+            vehicleModel,
+            vehicleColor,
+            vehiclePlateNumber,
+            status: "PENDING",
+            isApproved: false,
+          },
+        });
+      }
+
+      // Send notification to driver
+      await createNotification(
+        currentUser.id,
+        "driver",
+        "Your driver application has been submitted and is under review.",
+        "SYSTEM"
+      );
+
+      res.status(201).json(driverProfile);
+    } catch (error: any) {
+      console.error("Error submitting driver onboarding:", error);
+      if (error.code === "P2002") {
+        return res.status(400).json({ message: "Driver profile already exists for this user" });
+      }
+      res.status(500).json({ message: "Failed to submit driver onboarding" });
+    }
+  });
+
+  // Get driver profile (for the authenticated driver)
+  app.get("/api/driver/profile", requireAuth(["driver", "user"]), async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser.id) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId: currentUser.id },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              fullName: true,
+            },
+          },
+          driver: {
+            select: {
+              id: true,
+              status: true,
+              isOnline: true,
+              averageRating: true,
+              totalRatings: true,
+            },
+          },
+        },
+      });
+
+      if (!driverProfile) {
+        return res.status(404).json({ message: "Driver profile not found. Please complete onboarding." });
+      }
+
+      res.json(driverProfile);
+    } catch (error) {
+      console.error("Error fetching driver profile:", error);
+      res.status(500).json({ message: "Failed to fetch driver profile" });
+    }
+  });
+  
   // ==================== USERS ====================
   
   app.get("/api/users", async (req, res) => {
@@ -519,6 +734,210 @@ export async function registerRoutes(
 
   // ==================== ADMINS ====================
   
+  // ==================== ADMIN DRIVER ONBOARDING ====================
+  
+  // Get driver profiles for admin review (with optional status filter)
+  app.get("/api/admin/drivers", requireAuth(["admin"]), async (req, res) => {
+    try {
+      const { status } = req.query;
+      const where: any = {};
+      if (status) {
+        where.status = status;
+      }
+
+      const driverProfiles = await prisma.driverProfile.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              fullName: true,
+              createdAt: true,
+            },
+          },
+          driver: {
+            select: {
+              id: true,
+              status: true,
+              isOnline: true,
+              averageRating: true,
+              totalRatings: true,
+            },
+          },
+        },
+      });
+
+      res.json(driverProfiles);
+    } catch (error) {
+      console.error("Error fetching driver profiles:", error);
+      res.status(500).json({ message: "Failed to fetch driver profiles" });
+    }
+  });
+
+  // Approve driver profile
+  app.post("/api/admin/driver/:id/approve", requireAuth(["admin"]), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { id },
+        include: { user: true },
+      });
+
+      if (!driverProfile) {
+        return res.status(404).json({ message: "Driver profile not found" });
+      }
+
+      if (driverProfile.status === "APPROVED") {
+        return res.status(400).json({ message: "Driver profile is already approved" });
+      }
+
+      // Update driver profile status
+      const updatedProfile = await prisma.driverProfile.update({
+        where: { id },
+        data: {
+          status: "APPROVED",
+          isApproved: true,
+          rejectionReason: null,
+        },
+      });
+
+      // Check if Driver record exists, if not create one
+      let driver = await prisma.driver.findUnique({
+        where: { driverProfileId: id },
+      });
+
+      if (!driver) {
+        // Create or find existing driver by email
+        const existingDriver = await prisma.driver.findUnique({
+          where: { email: driverProfile.email },
+        });
+
+        if (existingDriver) {
+          // Link existing driver to profile
+          driver = await prisma.driver.update({
+            where: { id: existingDriver.id },
+            data: {
+              driverProfileId: id,
+              status: "ACTIVE",
+              fullName: driverProfile.fullName,
+              phone: driverProfile.phone,
+              vehicleType: driverProfile.vehicleType,
+              vehiclePlate: driverProfile.vehiclePlateNumber,
+            },
+          });
+        } else {
+          // Create new driver record
+          driver = await prisma.driver.create({
+            data: {
+              fullName: driverProfile.fullName,
+              email: driverProfile.email,
+              phone: driverProfile.phone,
+              vehicleType: driverProfile.vehicleType,
+              vehiclePlate: driverProfile.vehiclePlateNumber,
+              status: "ACTIVE",
+              driverProfileId: id,
+            },
+          });
+        }
+      } else {
+        // Update existing driver
+        driver = await prisma.driver.update({
+          where: { id: driver.id },
+          data: {
+            status: "ACTIVE",
+            fullName: driverProfile.fullName,
+            phone: driverProfile.phone,
+            vehicleType: driverProfile.vehicleType,
+            vehiclePlate: driverProfile.vehiclePlateNumber,
+          },
+        });
+      }
+
+      // Send notification to driver
+      await createNotification(
+        driverProfile.userId,
+        "driver",
+        "Congratulations! Your driver application has been approved. You can now start accepting rides.",
+        "STATUS_CHANGE"
+      );
+
+      res.json({ 
+        profile: updatedProfile,
+        driver,
+        message: "Driver profile approved successfully" 
+      });
+    } catch (error: any) {
+      console.error("Error approving driver profile:", error);
+      res.status(500).json({ message: "Failed to approve driver profile" });
+    }
+  });
+
+  // Reject driver profile
+  app.post("/api/admin/driver/:id/reject", requireAuth(["admin"]), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+
+      if (!reason || reason.trim().length === 0) {
+        return res.status(400).json({ message: "Rejection reason is required" });
+      }
+
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { id },
+        include: { 
+          user: true,
+          driver: true,
+        },
+      });
+
+      if (!driverProfile) {
+        return res.status(404).json({ message: "Driver profile not found" });
+      }
+
+      if (driverProfile.status === "REJECTED") {
+        return res.status(400).json({ message: "Driver profile is already rejected" });
+      }
+
+      // Update driver profile status
+      const updatedProfile = await prisma.driverProfile.update({
+        where: { id },
+        data: {
+          status: "REJECTED",
+          isApproved: false,
+          rejectionReason: reason.trim(),
+        },
+      });
+
+      // If driver record exists, suspend it
+      if (driverProfile.driver) {
+        await prisma.driver.update({
+          where: { id: driverProfile.driver.id },
+          data: { status: "SUSPENDED" },
+        });
+      }
+
+      // Send notification to driver
+      await createNotification(
+        driverProfile.userId,
+        "driver",
+        `Your driver application has been rejected. Reason: ${reason.trim()}`,
+        "STATUS_CHANGE"
+      );
+
+      res.json({ 
+        profile: updatedProfile,
+        message: "Driver profile rejected successfully" 
+      });
+    } catch (error: any) {
+      console.error("Error rejecting driver profile:", error);
+      res.status(500).json({ message: "Failed to reject driver profile" });
+    }
+  });
+
   app.get("/api/admins", async (req, res) => {
     try {
       const admins = await prisma.admin.findMany({
@@ -979,10 +1398,21 @@ export async function registerRoutes(
             none: {
               status: "IN_PROGRESS"
             }
+          },
+          driverProfile: {
+            status: "APPROVED"
           }
         },
         orderBy: { averageRating: "desc" },
-        include: { _count: { select: { rides: true } } },
+        include: { 
+          _count: { select: { rides: true } },
+          driverProfile: {
+            select: {
+              status: true,
+              isApproved: true,
+            }
+          }
+        },
       });
       res.json(drivers);
     } catch (error) {
@@ -1013,11 +1443,22 @@ export async function registerRoutes(
 
       const driver = await prisma.driver.findUnique({ 
         where: { id: driverId },
-        include: { rides: { where: { status: "IN_PROGRESS" } } }
+        include: { 
+          rides: { where: { status: "IN_PROGRESS" } },
+          driverProfile: true,
+        }
       });
       if (!driver) {
         return res.status(404).json({ message: "Driver not found" });
       }
+      
+      // Check if driver profile is approved
+      if (driver.driverProfile && driver.driverProfile.status !== "APPROVED") {
+        return res.status(400).json({ 
+          message: `Driver cannot accept trips. Profile status: ${driver.driverProfile.status}. Driver must be APPROVED.` 
+        });
+      }
+      
       if (driver.status !== "ACTIVE") {
         return res.status(400).json({ message: "Driver must be ACTIVE to be assigned" });
       }
@@ -1272,9 +1713,19 @@ export async function registerRoutes(
     try {
       const { id } = req.params;
 
-      const driver = await prisma.driver.findUnique({ where: { id } });
+      const driver = await prisma.driver.findUnique({ 
+        where: { id },
+        include: { driverProfile: true },
+      });
       if (!driver) {
         return res.status(404).json({ message: "Driver not found" });
+      }
+
+      // Check if driver profile is approved
+      if (!driver.driverProfile || driver.driverProfile.status !== "APPROVED") {
+        return res.status(400).json({ 
+          message: `Cannot go online. Driver profile status: ${driver.driverProfile?.status || "NOT_FOUND"}. Driver must be APPROVED.` 
+        });
       }
 
       if (driver.status !== "ACTIVE") {
@@ -2546,7 +2997,9 @@ export async function registerRoutes(
           id: "database-connected",
           label: "Database Connection",
           status: process.env.DATABASE_URL ? "pass" as const : "fail" as const,
-          description: process.env.DATABASE_URL ? "PostgreSQL connected" : "Missing DATABASE_URL"
+          description: process.env.DATABASE_URL 
+            ? (process.env.DATABASE_URL.startsWith("file:") ? "SQLite connected" : "Database connected")
+            : "Missing DATABASE_URL"
         },
         {
           id: "verbose-logging",

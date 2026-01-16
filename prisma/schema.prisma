@@ -2,55 +2,101 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ==================== DATABASE CONFIGURATION ====================
+// 
+// LOCAL DEVELOPMENT (SQLite):
+// - Current provider: "sqlite"
+// - DATABASE_URL: "file:./dev.db"
+// - SQLite does NOT support enum types
+// - All enum fields are mapped to String type
+// - Enum definitions are provided below for PostgreSQL reference
+//
+// PRODUCTION (PostgreSQL):
+// - Change provider to: "postgresql"
+// - DATABASE_URL: PostgreSQL connection string (e.g., "postgresql://user:pass@host:5432/db")
+// - PostgreSQL supports native enum types
+// - Change all String fields back to their enum types (see comments on each field)
+// - Uncomment enum definitions are already active (they don't affect SQLite)
+//
+// SWITCHING BETWEEN PROVIDERS:
+// 1. Change datasource provider in this file
+// 2. Update DATABASE_URL in .env file
+// 3. For SQLite: Change enum field types to String
+// 4. For PostgreSQL: Change String field types to enum types
+// 5. Run: npx prisma generate
+// 6. Run: npx prisma migrate dev (or npx prisma db push for SQLite)
+//
+// ==================================================================
+
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-enum UserStatus {
-  ACTIVE
-  SUSPENDED
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum UserStatus {
+//   ACTIVE
+//   SUSPENDED
+// }
 
-enum DriverStatus {
-  PENDING
-  ACTIVE
-  SUSPENDED
-  OFFLINE
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum DriverStatus {
+//   PENDING
+//   ACTIVE
+//   SUSPENDED
+//   OFFLINE
+// }
 
-enum VehicleType {
-  CAR
-  BIKE
-  VAN
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum VehicleType {
+//   CAR
+//   BIKE
+//   SUV
+//   VAN
+// }
 
-enum RideStatus {
-  REQUESTED
-  ACCEPTED
-  DRIVER_EN_ROUTE
-  ARRIVED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum DriverProfileStatus {
+//   PENDING
+//   APPROVED
+//   REJECTED
+//   SUSPENDED
+// }
+
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum RideStatus {
+//   REQUESTED
+//   ACCEPTED
+//   DRIVER_EN_ROUTE
+//   ARRIVED
+//   IN_PROGRESS
+//   COMPLETED
+//   CANCELLED
+// }
 
 model User {
-  id            String       @id @default(uuid())
+  id            String          @id @default(uuid())
   fullName      String
-  email         String       @unique
+  email         String          @unique
   phone         String?
   city          String?
-  status        UserStatus   @default(ACTIVE)
+  // SQLite: String | PostgreSQL: UserStatus
+  status        String          @default("ACTIVE")
   passwordHash  String?
-  averageRating Float        @default(0)
-  totalRatings  Int          @default(0)
-  isTestAccount Boolean      @default(false)
-  testDisabled  Boolean      @default(false)
-  createdAt     DateTime     @default(now())
+  averageRating Float           @default(0)
+  totalRatings  Int             @default(0)
+  isTestAccount Boolean         @default(false)
+  testDisabled  Boolean         @default(false)
+  createdAt     DateTime        @default(now())
   rides         Ride[]
   ratings       UserRating[]
   tips          Tip[]
+  driverProfile DriverProfile?
 }
 
 model Driver {
@@ -58,9 +104,11 @@ model Driver {
   fullName      String
   email         String         @unique
   phone         String
-  vehicleType   VehicleType    @default(CAR)
+  // SQLite: String | PostgreSQL: VehicleType
+  vehicleType   String         @default("CAR")
   vehiclePlate  String
-  status        DriverStatus   @default(PENDING)
+  // SQLite: String | PostgreSQL: DriverStatus
+  status        String         @default("PENDING")
   isOnline      Boolean        @default(false)
   currentRate   Float          @default(1.0)
   averageRating Float          @default(0)
@@ -74,6 +122,36 @@ model Driver {
   incentives    Incentive[]
   ratings       DriverRating[]
   tips          Tip[]
+  driverProfileId String?      @unique
+  driverProfile DriverProfile? @relation(fields: [driverProfileId], references: [id])
+}
+
+model DriverProfile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  fullName           String
+  phone              String
+  email              String
+  profilePhotoUrl    String?
+  driversLicenseNumber String
+  licenseExpiryDate  DateTime
+  // SQLite: String | PostgreSQL: VehicleType
+  vehicleType        String
+  vehicleMake        String
+  vehicleModel       String
+  vehicleColor       String
+  vehiclePlateNumber String
+  isApproved         Boolean  @default(false)
+  // SQLite: String | PostgreSQL: DriverProfileStatus
+  status             String   @default("PENDING")
+  rejectionReason    String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id])
+  driver             Driver?
+
+  @@index([userId])
+  @@index([status])
 }
 
 model Ride {
@@ -81,7 +159,8 @@ model Ride {
   pickupLocation  String
   dropoffLocation String
   fareEstimate    Float?
-  status          RideStatus    @default(REQUESTED)
+  // SQLite: String | PostgreSQL: RideStatus
+  status          String        @default("REQUESTED")
   userId          String
   driverId        String?
   createdAt       DateTime      @default(now())
@@ -100,16 +179,19 @@ model Admin {
   createdAt    DateTime @default(now())
 }
 
-enum PaymentStatus {
-  PENDING
-  PAID
-  FAILED
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum PaymentStatus {
+//   PENDING
+//   PAID
+//   FAILED
+// }
 
 model Payment {
   id            String        @id @default(uuid())
   amount        Float
-  status        PaymentStatus @default(PENDING)
+  // SQLite: String | PostgreSQL: PaymentStatus
+  status        String         @default("PENDING")
   rideId        String        @unique
   gatewayRef    String?
   gatewayMode   String?       @default("SANDBOX")
@@ -137,29 +219,35 @@ model Incentive {
   driver    Driver   @relation(fields: [driverId], references: [id])
 }
 
-enum DirectorRole {
-  OPERATIONS
-  FINANCE
-  COMPLIANCE
-  GROWTH
-  REGIONAL_MANAGER
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum DirectorRole {
+//   OPERATIONS
+//   FINANCE
+//   COMPLIANCE
+//   GROWTH
+//   REGIONAL_MANAGER
+// }
 
-enum DirectorStatus {
-  ACTIVE
-  PENDING
-  SUSPENDED
-  TERMINATED
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum DirectorStatus {
+//   ACTIVE
+//   PENDING
+//   SUSPENDED
+//   TERMINATED
+// }
 
 model Director {
   id              String         @id @default(uuid())
   fullName        String
   email           String         @unique
   phone           String?
-  role            DirectorRole
+  // SQLite: String | PostgreSQL: DirectorRole
+  role            String
   region          String
-  status          DirectorStatus @default(ACTIVE)
+  // SQLite: String | PostgreSQL: DirectorStatus
+  status          String         @default("ACTIVE")
   contractStart   DateTime?
   contractEnd     DateTime?
   driversAssigned Int            @default(0)
@@ -194,25 +282,30 @@ model UserRating {
 
 // ==================== WALLETS & TRANSACTIONS ====================
 
-enum OwnerType {
-  USER
-  DRIVER
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum OwnerType {
+//   USER
+//   DRIVER
+// }
 
-enum TransactionType {
-  CREDIT
-  DEBIT
-  COMMISSION
-  PAYOUT
-  TIP
-  RIDE_PAYMENT
-  ADMIN_ADJUSTMENT
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum TransactionType {
+//   CREDIT
+//   DEBIT
+//   COMMISSION
+//   PAYOUT
+//   TIP
+//   RIDE_PAYMENT
+//   ADMIN_ADJUSTMENT
+// }
 
 model Wallet {
   id           String        @id @default(uuid())
   ownerId      String
-  ownerType    OwnerType
+  // SQLite: String | PostgreSQL: OwnerType
+  ownerType    String
   balance      Float         @default(0)
   createdAt    DateTime      @default(now())
   transactions Transaction[]
@@ -223,7 +316,8 @@ model Wallet {
 model Transaction {
   id        String          @id @default(uuid())
   walletId  String
-  type      TransactionType
+  // SQLite: String | PostgreSQL: TransactionType
+  type      String
   amount    Float
   reference String?
   createdAt DateTime        @default(now())
@@ -232,54 +326,65 @@ model Transaction {
 
 // ==================== NOTIFICATIONS ====================
 
-enum NotificationType {
-  RIDE_REQUESTED
-  RIDE_ASSIGNED
-  RIDE_COMPLETED
-  WALLET_UPDATED
-  STATUS_CHANGE
-  SYSTEM
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum NotificationType {
+//   RIDE_REQUESTED
+//   RIDE_ASSIGNED
+//   RIDE_COMPLETED
+//   WALLET_UPDATED
+//   STATUS_CHANGE
+//   SYSTEM
+// }
 
 model Notification {
   id        String           @id @default(uuid())
   userId    String
   role      String
   message   String
-  type      NotificationType
+  // SQLite: String | PostgreSQL: NotificationType
+  type      String
   read      Boolean          @default(false)
   createdAt DateTime         @default(now())
 }
 
 // ==================== PLATFORM CONFIG ====================
 
-enum PaymentGatewayMode {
-  SANDBOX
-  LIVE
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum PaymentGatewayMode {
+//   SANDBOX
+//   LIVE
+// }
 
-enum PaymentGateway {
-  STRIPE
-  PAYSTACK
-  FLUTTERWAVE
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum PaymentGateway {
+//   STRIPE
+//   PAYSTACK
+//   FLUTTERWAVE
+// }
 
 model PlatformConfig {
   id                 String             @id @default(uuid())
   commissionRate     Float              @default(0.15)
   testModeEnabled    Boolean            @default(true)
-  paymentGateway     PaymentGateway     @default(STRIPE)
-  paymentGatewayMode PaymentGatewayMode @default(SANDBOX)
+  // SQLite: String | PostgreSQL: PaymentGateway
+  paymentGateway     String             @default("STRIPE")
+  // SQLite: String | PostgreSQL: PaymentGatewayMode
+  paymentGatewayMode String             @default("SANDBOX")
   updatedAt          DateTime           @updatedAt
   updatedBy          String?
 }
 
 // ==================== FARE CONFIG ====================
 
-enum DistanceUnit {
-  KM
-  MILE
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum DistanceUnit {
+//   KM
+//   MILE
+// }
 
 model FareConfig {
   id                  String       @id @default(uuid())
@@ -293,7 +398,8 @@ model FareConfig {
   minimumFare         Float        @default(300)
   driverCommission    Float        @default(0.85)
   platformCommission  Float        @default(0.15)
-  distanceUnit        DistanceUnit @default(KM)
+  // SQLite: String | PostgreSQL: DistanceUnit
+  distanceUnit        String         @default("KM")
   surgeEnabled        Boolean      @default(false)
   surgeMultiplier     Float        @default(1.0)
   maxSurgeCap         Float        @default(1.3)
@@ -307,27 +413,33 @@ model FareConfig {
 
 // ==================== TEST ACCOUNTS ====================
 
-enum TestAccountRole {
-  USER
-  DRIVER
-  DIRECTOR
-  ADMIN
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum TestAccountRole {
+//   USER
+//   DRIVER
+//   DIRECTOR
+//   ADMIN
+// }
 
-enum TestAccountStatus {
-  ACTIVE
-  SUSPENDED
-}
+// PostgreSQL enum definition (not used in SQLite)
+// Commented out for SQLite compatibility - uncomment when using PostgreSQL
+// enum TestAccountStatus {
+//   ACTIVE
+//   SUSPENDED
+// }
 
 model TestAccount {
   id              String            @id @default(uuid())
   email           String            @unique
   passwordHash    String
-  role            TestAccountRole
+  // SQLite: String | PostgreSQL: TestAccountRole
+  role            String
   countryCode     String
   region          String?
   city            String?
-  status          TestAccountStatus @default(ACTIVE)
+  // SQLite: String | PostgreSQL: TestAccountStatus
+  status          String            @default("ACTIVE")
   fullName        String
   isTestAccount   Boolean           @default(true)
   linkedEntityId  String?

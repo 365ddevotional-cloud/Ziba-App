@@ -1,5 +1,6 @@
 import { Switch, Route, Redirect } from "wouter";
 import { useRiderAuth } from "@/lib/rider-auth";
+import { useDriverAuth } from "@/lib/driver-auth";
 import RiderHome from "./home";
 import RiderLogin from "./login";
 import RiderRegister from "./register";
@@ -20,6 +21,7 @@ import { Loader2 } from "lucide-react";
 
 function RiderAuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, isRider, user } = useRiderAuth();
+  const { isDriver } = useDriverAuth();
 
   if (isLoading) {
     return (
@@ -27,6 +29,11 @@ function RiderAuthGuard({ children }: { children: React.ReactNode }) {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  // Block drivers from accessing rider routes
+  if (isDriver) {
+    return <RiderAccessDenied />;
   }
 
   if (!isAuthenticated) {
@@ -42,6 +49,7 @@ function RiderAuthGuard({ children }: { children: React.ReactNode }) {
 
 function RiderGuestGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, isRider } = useRiderAuth();
+  const { isDriver } = useDriverAuth();
 
   if (isLoading) {
     return (
@@ -49,6 +57,11 @@ function RiderGuestGuard({ children }: { children: React.ReactNode }) {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  // Block drivers from accessing rider routes
+  if (isDriver) {
+    return <RiderAccessDenied />;
   }
 
   if (isAuthenticated && isRider) {

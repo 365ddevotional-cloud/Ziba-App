@@ -1,6 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useTrip, TripStatus } from "@/lib/trip-context";
+import { useWallet, PLATFORM_COMMISSION_RATE } from "@/lib/wallet-context";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -40,11 +43,48 @@ export default function RiderLiveRide() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const { currentTrip, updateTripStatus, cancelTrip, canCancel: tripCanCancel, setCurrentTrip } = useTrip();
+  const { updateRiderBalance, updateDriverBalance, updatePlatformBalance } = useWallet();
 
   const { data: activeRide, isLoading, refetch, isFetching } = useQuery<Ride | null>({
     queryKey: ["/api/rider/active-ride"],
     staleTime: 1000 * 60,
   });
+
+  // Use trip context if available, otherwise fall back to API
+  const displayTrip = currentTrip || activeRide;
+  const tripStatus = currentTrip ? currentTrip.status : (activeRide?.status as TripStatus);
+  
+  // Show driver info from trip context if available
+  const driverInfo = currentTrip?.driver;
+
+  // Process payment when trip enters IN_PROGRESS (escrow)
+  useEffect(() => {
+    if (currentTrip?.status === "IN_PROGRESS" && currentTrip.payment && !currentTrip.payment.escrowHeld) {
+      // Deduct fare from rider wallet and hold in escrow
+      if (currentTrip.paymentMethod === "wallet") {
+        updateRiderBalance(-currentTrip.fare);
+        setCurrentTrip({
+          ...currentTrip,
+          payment: {
+            ...currentTrip.payment,
+            riderPaid: true,
+            escrowHeld: true,
+          },
+        });
+      }
+    }
+  }, [currentTrip?.status, currentTrip?.payment?.escrowHeld, currentTrip?.fare, currentTrip?.paymentMethod, updateRiderBalance, setCurrentTrip]);
+
+  // Show notification when driver is assigned
+  useEffect(() => {
+    if (currentTrip?.driver && currentTrip.status === "IN_PROGRESS") {
+      toast({
+        title: "Driver assigned!",
+        description: `${currentTrip.driver.name} is on the way`,
+      });
+    }
+  }, [currentTrip?.driver?.id, currentTrip?.status, toast]);
 
   const { data: testModeData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/test-mode"],
@@ -52,6 +92,40 @@ export default function RiderLiveRide() {
   });
 
   const isTestMode = testModeData?.enabled ?? false;
+
+  const handleCancel = () => {
+    if (currentTrip) {
+      // Cancel in-memory trip
+      if (tripCanCancel()) {
+        // No charge if cancelled before IN_PROGRESS
+        cancelTrip();
+        toast({
+          title: "Ride cancelled",
+          description: "Your ride has been cancelled",
+        });
+        navigate("/rider/home");
+      } else if (currentTrip.status === "IN_PROGRESS" && currentTrip.payment?.escrowHeld) {
+        // Partial refund if cancelled after IN_PROGRESS (50% refund)
+        const refundAmount = Math.round(currentTrip.fare * 0.5);
+        updateRiderBalance(refundAmount);
+        cancelTrip();
+        toast({
+          title: "Ride cancelled",
+          description: `₦${refundAmount.toLocaleString()} refunded to your wallet`,
+        });
+        navigate("/rider/home");
+      } else {
+        toast({
+          title: "Cannot cancel",
+          description: "Trip is already in progress",
+          variant: "destructive",
+        });
+      }
+    } else if (activeRide) {
+      // Cancel via API (existing flow)
+      cancelMutation.mutate(activeRide.id);
+    }
+  };
 
   const cancelMutation = useMutation({
     mutationFn: async (rideId: string) => {
@@ -135,7 +209,7 @@ export default function RiderLiveRide() {
     );
   }
 
-  if (!activeRide) {
+  if (!displayTrip) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <header className="p-4 flex items-center gap-3 border-b border-border">
@@ -167,35 +241,25 @@ export default function RiderLiveRide() {
     );
   }
 
-  const getStatusInfo = (status: string) => {
+  const getStatusInfo = (status: TripStatus) => {
     switch (status) {
       case "REQUESTED":
         return {
-          headline: "Finding your driver",
-          subtext: "This usually takes less than a minute",
+          headline: "Ride requested",
+          subtext: "Waiting for confirmation",
           colorClass: "ziba-status-searching",
           bgClass: "ziba-status-searching-bg",
           icon: Loader2,
           animate: true,
         };
-      case "ACCEPTED":
-      case "DRIVER_EN_ROUTE":
+      case "CONFIRMED":
         return {
-          headline: "Driver on the way",
-          subtext: "Your driver is heading to pick you up",
-          colorClass: "ziba-status-enroute",
-          bgClass: "ziba-status-enroute-bg",
-          icon: Navigation,
-          animate: false,
-        };
-      case "ARRIVED":
-        return {
-          headline: "Driver has arrived",
-          subtext: "Your driver is waiting at the pickup location",
-          colorClass: "ziba-status-arrived",
-          bgClass: "ziba-status-arrived-bg",
-          icon: MapPin,
-          animate: false,
+          headline: "Ride confirmed",
+          subtext: "Looking for a driver",
+          colorClass: "ziba-status-searching",
+          bgClass: "ziba-status-searching-bg",
+          icon: Loader2,
+          animate: true,
         };
       case "IN_PROGRESS":
         return {
@@ -204,6 +268,24 @@ export default function RiderLiveRide() {
           colorClass: "ziba-status-progress",
           bgClass: "ziba-status-progress-bg",
           icon: Car,
+          animate: false,
+        };
+      case "COMPLETED":
+        return {
+          headline: "Trip completed",
+          subtext: "Thanks for riding with Ziba",
+          colorClass: "text-emerald-600",
+          bgClass: "bg-emerald-100 dark:bg-emerald-900/30",
+          icon: CheckCircle,
+          animate: false,
+        };
+      case "CANCELLED":
+        return {
+          headline: "Trip cancelled",
+          subtext: "This trip has been cancelled",
+          colorClass: "text-red-600",
+          bgClass: "bg-red-100 dark:bg-red-900/30",
+          icon: X,
           animate: false,
         };
       default:
@@ -218,17 +300,30 @@ export default function RiderLiveRide() {
     }
   };
 
-  const statusInfo = getStatusInfo(activeRide.status);
+  const statusInfo = getStatusInfo(tripStatus || "REQUESTED");
   const StatusIcon = statusInfo.icon;
 
-  const canCancel = ["REQUESTED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED"].includes(activeRide.status);
+  const canCancelTrip = currentTrip ? tripCanCancel() : (activeRide && ["REQUESTED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED"].includes(activeRide.status));
 
   const getTestControlButton = () => {
-    if (!isTestMode) return null;
+    if (!isTestMode || !currentTrip) return null;
     
     const isPending = testArriveMutation.isPending || testStartMutation.isPending || testCompleteMutation.isPending;
 
-    switch (activeRide.status) {
+    switch (currentTrip.status) {
+      case "CONFIRMED":
+        return (
+          <Button
+            className="w-full"
+            variant="secondary"
+            onClick={() => updateTripStatus("IN_PROGRESS")}
+            disabled={isPending}
+            data-testid="button-test-start"
+          >
+            <Play className="w-4 h-4 mr-2" />
+            Simulate: Start Trip
+          </Button>
+        );
       case "ACCEPTED":
       case "DRIVER_EN_ROUTE":
         return (
@@ -316,8 +411,20 @@ export default function RiderLiveRide() {
           <p className="ziba-subheadline">{statusInfo.subtext}</p>
         </div>
 
+        {/* Trip Status Badge */}
+        <Card className="ziba-card">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Trip Status</span>
+              <span className="text-sm font-semibold text-foreground capitalize">
+                {tripStatus?.toLowerCase().replace("_", " ") || "Unknown"}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Driver Card - Clean, Single Card */}
-        {activeRide.driver && (
+        {(driverInfo || activeRide?.driver) && (
           <Card className="ziba-card-elevated">
             <CardContent className="p-4">
               <div className="flex items-center gap-4">
@@ -325,20 +432,28 @@ export default function RiderLiveRide() {
                   <User className="w-7 h-7 text-muted-foreground" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground truncate">{activeRide.driver.fullName}</p>
+                  <p className="font-semibold text-foreground truncate">
+                    {driverInfo?.name || activeRide?.driver?.fullName || "Driver"}
+                  </p>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
                     <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                    <span>{activeRide.driver.averageRating.toFixed(1)}</span>
+                    <span>
+                      {(driverInfo?.rating || activeRide?.driver?.averageRating || 0).toFixed(1)}
+                    </span>
                     <span className="text-border">|</span>
-                    <span>{activeRide.driver.vehicleType}</span>
+                    <span>{driverInfo?.vehicleType || activeRide?.driver?.vehicleType || "Vehicle"}</span>
                   </div>
-                  <p className="text-sm font-medium text-primary mt-1">{activeRide.driver.vehiclePlate}</p>
+                  <p className="text-sm font-medium text-primary mt-1">
+                    {driverInfo?.vehiclePlate || activeRide?.driver?.vehiclePlate || ""}
+                  </p>
                 </div>
-                <a href={`tel:${activeRide.driver.phone}`}>
-                  <Button size="icon" variant="outline" data-testid="button-call-driver">
-                    <Phone className="w-5 h-5" />
-                  </Button>
-                </a>
+                {(driverInfo?.phone || activeRide?.driver?.phone) && (
+                  <a href={`tel:${driverInfo?.phone || activeRide?.driver?.phone}`}>
+                    <Button size="icon" variant="outline" data-testid="button-call-driver">
+                      <Phone className="w-5 h-5" />
+                    </Button>
+                  </a>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -351,22 +466,48 @@ export default function RiderLiveRide() {
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="ziba-caption">Pickup</p>
-                <p className="ziba-body truncate">{activeRide.pickupLocation}</p>
+                <p className="ziba-body truncate">{displayTrip?.pickupLocation || "Unknown"}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <div className="w-2.5 h-2.5 rounded-full bg-primary mt-1.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="ziba-caption">Drop-off</p>
-                <p className="ziba-body truncate">{activeRide.dropoffLocation}</p>
+                <p className="ziba-body truncate">{displayTrip?.dropoffLocation || "Unknown"}</p>
               </div>
             </div>
-            {activeRide.fareEstimate && (
-              <div className="pt-3 border-t border-border flex items-center justify-between">
-                <span className="ziba-body-muted">Estimated fare</span>
-                <span className="font-semibold text-foreground">
-                  NGN {activeRide.fareEstimate.toLocaleString()}
-                </span>
+            {(currentTrip?.fare || activeRide?.fareEstimate) && (
+              <div className="pt-3 border-t border-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="ziba-body-muted">Fare</span>
+                  <span className="font-semibold text-foreground">
+                    ₦ {(currentTrip?.fare || activeRide?.fareEstimate || 0).toLocaleString()}
+                  </span>
+                </div>
+                {currentTrip?.payment && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Payment Status</span>
+                    <span className={`font-medium ${
+                      currentTrip.payment.escrowHeld 
+                        ? "text-emerald-600" 
+                        : "text-muted-foreground"
+                    }`}>
+                      {currentTrip.payment.escrowHeld ? "Paid (Escrow)" : "Pending"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+            {currentTrip && (
+              <div className="pt-3 border-t border-border space-y-1 text-xs text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>Distance</span>
+                  <span>{currentTrip.distance.toFixed(1)} km</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Duration</span>
+                  <span>~{currentTrip.duration} min</span>
+                </div>
               </div>
             )}
           </CardContent>
@@ -386,11 +527,11 @@ export default function RiderLiveRide() {
         )}
 
         {/* Cancel Button - Subtle, Secondary */}
-        {canCancel && (
+        {canCancelTrip && (
           <Button
             variant="outline"
             className="w-full ziba-cancel-btn"
-            onClick={() => cancelMutation.mutate(activeRide.id)}
+            onClick={handleCancel}
             disabled={cancelMutation.isPending}
             data-testid="button-cancel-ride"
           >
