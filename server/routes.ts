@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import { hashPassword, verifyPassword, requireAuth, getCurrentUser, UserRole } from "./auth";
 import { analyzeFraud } from "./fraud-detection";
 import { enforceMinimumFare, validateFare, MINIMUM_ZIBA_TAKE, COST_PER_TRIP, SAFETY_FACTOR } from "./minimum-fare";
+import { computeMapMetrics, getProtectionStatus, getGpsInterval, formatMetricsReport, MAP_COST_TARGETS, type DailyMapMetrics } from "./map-cost-protection";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -4767,6 +4768,228 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error calculating fare:", error);
       res.status(500).json({ message: "Failed to calculate fare" });
+    }
+  });
+
+  // ==================== MAP COST PROTECTION ====================
+
+  // Get current map cost protection status
+  app.get("/api/map-cost/protection-status", async (req, res) => {
+    try {
+      // Get today's date
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Get today's metrics
+      let metrics = await (prisma as any).mapCostMetrics.findUnique({
+        where: { date: today }
+      });
+
+      if (!metrics) {
+        metrics = {
+          date: today,
+          mapCost: 0,
+          completedTrips: 0,
+          zibaRevenue: 0,
+          paidMapRequests: 0,
+          totalMapRequests: 0,
+          mapCostPerTrip: 0,
+          paidUsageRate: 0,
+          mapCostRatio: 0,
+          protectionActive: false
+        };
+      }
+
+      const dailyMetrics: DailyMapMetrics = {
+        date: today.toISOString().split('T')[0],
+        mapCost: metrics.mapCost,
+        completedTrips: metrics.completedTrips,
+        zibaRevenue: metrics.zibaRevenue,
+        paidMapRequests: metrics.paidMapRequests,
+        totalMapRequests: metrics.totalMapRequests
+      };
+
+      const computed = computeMapMetrics(dailyMetrics);
+      const protection = getProtectionStatus(computed);
+
+      res.json({
+        metrics: dailyMetrics,
+        computed,
+        protection,
+        targets: MAP_COST_TARGETS,
+        gpsIntervals: {
+          idle: getGpsInterval('IDLE', protection.gpsFrequencyReduced),
+          enRoute: getGpsInterval('EN_ROUTE', protection.gpsFrequencyReduced),
+          inProgress: getGpsInterval('IN_PROGRESS', protection.gpsFrequencyReduced)
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching map cost protection status:", error);
+      res.status(500).json({ message: "Failed to fetch protection status" });
+    }
+  });
+
+  // Record map API usage
+  app.post("/api/map-cost/record", async (req, res) => {
+    try {
+      const { cost, isPaid } = req.body;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Upsert today's metrics
+      const metrics = await (prisma as any).mapCostMetrics.upsert({
+        where: { date: today },
+        create: {
+          date: today,
+          mapCost: cost || 0,
+          paidMapRequests: isPaid ? 1 : 0,
+          totalMapRequests: 1
+        },
+        update: {
+          mapCost: { increment: cost || 0 },
+          paidMapRequests: isPaid ? { increment: 1 } : undefined,
+          totalMapRequests: { increment: 1 }
+        }
+      });
+
+      res.json({ recorded: true, metrics });
+    } catch (error) {
+      console.error("Error recording map cost:", error);
+      res.status(500).json({ message: "Failed to record map cost" });
+    }
+  });
+
+  // Update daily metrics (called on ride completion)
+  app.post("/api/map-cost/update-daily", async (req, res) => {
+    try {
+      const { tripCompleted, revenue } = req.body;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const updateData: any = {};
+      if (tripCompleted) {
+        updateData.completedTrips = { increment: 1 };
+      }
+      if (revenue && revenue > 0) {
+        updateData.zibaRevenue = { increment: revenue };
+      }
+
+      const metrics = await (prisma as any).mapCostMetrics.upsert({
+        where: { date: today },
+        create: {
+          date: today,
+          completedTrips: tripCompleted ? 1 : 0,
+          zibaRevenue: revenue || 0
+        },
+        update: updateData
+      });
+
+      // Recompute ratios
+      const dailyMetrics: DailyMapMetrics = {
+        date: today.toISOString().split('T')[0],
+        mapCost: metrics.mapCost,
+        completedTrips: metrics.completedTrips,
+        zibaRevenue: metrics.zibaRevenue,
+        paidMapRequests: metrics.paidMapRequests,
+        totalMapRequests: metrics.totalMapRequests
+      };
+
+      const computed = computeMapMetrics(dailyMetrics);
+      const protection = getProtectionStatus(computed);
+
+      // Update computed values
+      await (prisma as any).mapCostMetrics.update({
+        where: { date: today },
+        data: {
+          mapCostPerTrip: computed.mapCostPerTrip,
+          paidUsageRate: computed.paidUsageRate,
+          mapCostRatio: computed.mapCostRatio,
+          protectionActive: protection.gpsFrequencyReduced
+        }
+      });
+
+      res.json({ updated: true, computed, protection });
+    } catch (error) {
+      console.error("Error updating daily metrics:", error);
+      res.status(500).json({ message: "Failed to update daily metrics" });
+    }
+  });
+
+  // Admin: Get map cost metrics history
+  app.get("/api/admin/map-cost/history", requireAuth("admin"), async (req, res) => {
+    try {
+      const { days } = req.query;
+      const daysBack = parseInt(days as string) || 30;
+
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysBack);
+      startDate.setHours(0, 0, 0, 0);
+
+      const metrics = await (prisma as any).mapCostMetrics.findMany({
+        where: {
+          date: { gte: startDate }
+        },
+        orderBy: { date: 'desc' }
+      });
+
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching map cost history:", error);
+      res.status(500).json({ message: "Failed to fetch map cost history" });
+    }
+  });
+
+  // Admin: Get/update protection config
+  app.get("/api/admin/map-cost/config", requireAuth("admin"), async (req, res) => {
+    try {
+      let config = await (prisma as any).mapCostProtectionConfig.findFirst();
+
+      if (!config) {
+        config = await (prisma as any).mapCostProtectionConfig.create({
+          data: {}
+        });
+      }
+
+      res.json(config);
+    } catch (error) {
+      console.error("Error fetching map cost config:", error);
+      res.status(500).json({ message: "Failed to fetch map cost config" });
+    }
+  });
+
+  app.patch("/api/admin/map-cost/config", requireAuth("admin"), async (req, res) => {
+    try {
+      const { maxCostPerTrip, maxPaidUsageRate, maxMapCostRatio, criticalMapCostRatio } = req.body;
+
+      let config = await (prisma as any).mapCostProtectionConfig.findFirst();
+
+      if (!config) {
+        config = await (prisma as any).mapCostProtectionConfig.create({
+          data: {
+            maxCostPerTrip: maxCostPerTrip || 0.03,
+            maxPaidUsageRate: maxPaidUsageRate || 0.20,
+            maxMapCostRatio: maxMapCostRatio || 0.015,
+            criticalMapCostRatio: criticalMapCostRatio || 0.02
+          }
+        });
+      } else {
+        config = await (prisma as any).mapCostProtectionConfig.update({
+          where: { id: config.id },
+          data: {
+            maxCostPerTrip: maxCostPerTrip !== undefined ? maxCostPerTrip : config.maxCostPerTrip,
+            maxPaidUsageRate: maxPaidUsageRate !== undefined ? maxPaidUsageRate : config.maxPaidUsageRate,
+            maxMapCostRatio: maxMapCostRatio !== undefined ? maxMapCostRatio : config.maxMapCostRatio,
+            criticalMapCostRatio: criticalMapCostRatio !== undefined ? criticalMapCostRatio : config.criticalMapCostRatio
+          }
+        });
+      }
+
+      res.json(config);
+    } catch (error) {
+      console.error("Error updating map cost config:", error);
+      res.status(500).json({ message: "Failed to update map cost config" });
     }
   });
 

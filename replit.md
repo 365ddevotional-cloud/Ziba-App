@@ -73,6 +73,27 @@ The Ziba platform is built with a modern web development stack:
       - Idle GPS updates driver's lastLocationLat/Lng for dispatch proximity
     - **Database Fields**: Ride model extended with `pickupLat/Lng`, `dropoffLat/Lng`, `lockedFare`, `estimatedDistance`, `estimatedDuration`, `startedAt`, `completedAt`
     - **GpsLog Model**: Stores safety tracking data with `rideId`, `driverId`, `lat`, `lng`, `speed`, `bearing`, `createdAt`
+- **Map Cost Protection System (Stage 18)**:
+    - **Daily Metrics Tracked**:
+      - MapCost: Total cost of map API calls
+      - CompletedTrips: Number of completed rides
+      - ZibaRevenue: Platform revenue (commission earned)
+      - PaidMapRequests: Count of billable map API calls
+      - TotalMapRequests: Total map API calls (cached + paid)
+    - **Computed Ratios**:
+      - MapCostPerTrip = MapCost / CompletedTrips
+      - PaidUsageRate = PaidMapRequests / TotalMapRequests
+      - MapCostRatio = MapCost / ZibaRevenue
+    - **Target Thresholds**:
+      - MapCostPerTrip ≤ $0.03
+      - PaidUsageRate < 20%
+      - MapCostRatio ≤ 1.5%
+    - **Protection Actions** (when MapCostRatio > 2%):
+      - Reduce GPS tracking frequency (double intervals)
+      - Disable paid address autocomplete
+      - Force cached addresses only
+    - **Database Models**: MapCostMetrics, MapCostProtectionConfig
+    - **Implementation**: `server/map-cost-protection.ts` utility module
 - **Minimum Fare Logic (Stage 18)**:
     - **Constants**:
       - CostPerTrip = $0.10 (platform operational cost)

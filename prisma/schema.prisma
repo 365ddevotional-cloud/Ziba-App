@@ -343,6 +343,36 @@ model FareConfig {
   updatedBy           String?
 }
 
+// ==================== MAP COST TRACKING ====================
+
+model MapCostMetrics {
+  id                  String   @id @default(uuid())
+  date                DateTime @unique @db.Date
+  mapCost             Float    @default(0)
+  completedTrips      Int      @default(0)
+  zibaRevenue         Float    @default(0)
+  paidMapRequests     Int      @default(0)
+  totalMapRequests    Int      @default(0)
+  mapCostPerTrip      Float    @default(0)
+  paidUsageRate       Float    @default(0)
+  mapCostRatio        Float    @default(0)
+  protectionActive    Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model MapCostProtectionConfig {
+  id                    String   @id @default(uuid())
+  maxCostPerTrip        Float    @default(0.03)
+  maxPaidUsageRate      Float    @default(0.20)
+  maxMapCostRatio       Float    @default(0.015)
+  criticalMapCostRatio  Float    @default(0.02)
+  gpsFrequencyReduced   Boolean  @default(false)
+  autocompleteDisabled  Boolean  @default(false)
+  forceCachedOnly       Boolean  @default(false)
+  lastUpdated           DateTime @updatedAt
+}
+
 // ==================== TEST ACCOUNTS ====================
 
 enum TestAccountRole {

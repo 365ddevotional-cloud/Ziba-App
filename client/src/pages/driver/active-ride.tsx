@@ -18,6 +18,14 @@ import {
   Clock,
 } from "lucide-react";
 
+interface ProtectionStatus {
+  gpsIntervals: {
+    idle: number;
+    enRoute: number;
+    inProgress: number;
+  };
+}
+
 interface Ride {
   id: string;
   pickupLocation: string;
@@ -48,12 +56,18 @@ export default function DriverActiveRide() {
   const [gpsInterval, setGpsInterval] = useState<NodeJS.Timeout | null>(null);
   const [lastGpsStatus, setLastGpsStatus] = useState<string | null>(null);
 
+  const { data: protectionStatus } = useQuery<ProtectionStatus>({
+    queryKey: ["/api/map-cost/protection-status"],
+    staleTime: 1000 * 60 * 5,
+  });
+
   const getGpsIntervalMs = (status: string): number => {
+    const intervals = protectionStatus?.gpsIntervals || { enRoute: 10000, inProgress: 6000 };
     switch (status) {
       case "DRIVER_EN_ROUTE":
-        return 10000;
+        return intervals.enRoute;
       case "IN_PROGRESS":
-        return 6000;
+        return intervals.inProgress;
       default:
         return 0;
     }
@@ -118,28 +132,25 @@ export default function DriverActiveRide() {
     );
   }, [ride, logGpsMutation]);
 
+  const currentIntervalMs = ride ? getGpsIntervalMs(ride.status) : 0;
+
   useEffect(() => {
     if (!ride) return;
 
-    const intervalMs = getGpsIntervalMs(ride.status);
-    const statusChanged = lastGpsStatus !== ride.status;
-
-    if (gpsInterval && statusChanged) {
+    // Always clear existing interval when dependencies change
+    if (gpsInterval) {
       clearInterval(gpsInterval);
       setGpsInterval(null);
     }
 
     if (ride.status === "COMPLETED" || ride.status === "CANCELLED") {
-      if (gpsInterval) {
-        clearInterval(gpsInterval);
-        setGpsInterval(null);
-      }
       return;
     }
 
-    if (intervalMs > 0 && !gpsInterval) {
-      sendGpsUpdate();
+    const intervalMs = getGpsIntervalMs(ride.status);
 
+    if (intervalMs > 0) {
+      sendGpsUpdate();
       const interval = setInterval(sendGpsUpdate, intervalMs);
       setGpsInterval(interval);
       setLastGpsStatus(ride.status);
@@ -150,7 +161,7 @@ export default function DriverActiveRide() {
         clearInterval(gpsInterval);
       }
     };
-  }, [ride?.status, ride?.id, gpsInterval, lastGpsStatus, sendGpsUpdate]);
+  }, [ride?.status, ride?.id, currentIntervalMs, sendGpsUpdate, protectionStatus?.gpsIntervals]);
 
   if (isLoading) {
     return (

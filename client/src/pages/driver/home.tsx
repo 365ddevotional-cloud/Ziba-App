@@ -20,7 +20,13 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-const IDLE_GPS_INTERVAL_MS = 90000;
+interface ProtectionStatus {
+  gpsIntervals: {
+    idle: number;
+    enRoute: number;
+    inProgress: number;
+  };
+}
 
 interface ActiveRide {
   id: string;
@@ -80,6 +86,13 @@ export default function DriverHome() {
     staleTime: 1000 * 60,
   });
 
+  const { data: protectionStatus } = useQuery<ProtectionStatus>({
+    queryKey: ["/api/map-cost/protection-status"],
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const idleGpsInterval = protectionStatus?.gpsIntervals?.idle || 90000;
+
   const toggleOnlineMutation = useMutation({
     mutationFn: async (goOnline: boolean) => {
       const res = await apiRequest("POST", goOnline ? "/api/driver/go-online" : "/api/driver/go-offline");
@@ -128,14 +141,16 @@ export default function DriverHome() {
   useEffect(() => {
     const isOnlineAndIdle = driver?.isOnline && !activeRide;
 
-    if (isOnlineAndIdle && !idleGpsIntervalRef.current) {
-      sendIdleGps();
-      idleGpsIntervalRef.current = setInterval(sendIdleGps, IDLE_GPS_INTERVAL_MS);
-    }
-
-    if (!isOnlineAndIdle && idleGpsIntervalRef.current) {
+    // Always clear existing interval when dependencies change
+    if (idleGpsIntervalRef.current) {
       clearInterval(idleGpsIntervalRef.current);
       idleGpsIntervalRef.current = null;
+    }
+
+    // Set new interval if conditions are met
+    if (isOnlineAndIdle) {
+      sendIdleGps();
+      idleGpsIntervalRef.current = setInterval(sendIdleGps, idleGpsInterval);
     }
 
     return () => {
@@ -144,7 +159,7 @@ export default function DriverHome() {
         idleGpsIntervalRef.current = null;
       }
     };
-  }, [driver?.isOnline, activeRide, sendIdleGps]);
+  }, [driver?.isOnline, activeRide, sendIdleGps, idleGpsInterval]);
 
   if (driverLoading) {
     return (
