@@ -24,6 +24,7 @@ import AdminIncentivesPage from "@/pages/admin-incentives";
 import AdminWalletsPage from "@/pages/admin-wallets";
 import AdminAnalyticsPage from "@/pages/admin-analytics";
 import AdminFaresPage from "@/pages/admin-fares";
+import AdminPlatformSettingsPage from "@/pages/admin-platform-settings";
 import AdminTestAccountsPage from "@/pages/admin-test-accounts";
 import AdminPlayStoreChecklistPage from "@/pages/admin-playstore-checklist";
 import AdminLoginPage from "@/pages/admin-login";
@@ -68,6 +69,7 @@ function Router() {
       <Route path="/admin/wallets" component={AdminWalletsPage} />
       <Route path="/admin/analytics" component={AdminAnalyticsPage} />
       <Route path="/admin/fares" component={AdminFaresPage} />
+      <Route path="/admin/platform-settings" component={AdminPlatformSettingsPage} />
       <Route path="/admin/test-accounts" component={AdminTestAccountsPage} />
       <Route path="/admin/playstore-checklist" component={AdminPlayStoreChecklistPage} />
       <Route path="/why/safe-and-secure" component={WhySafeAndSecure} />

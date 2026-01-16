@@ -515,6 +515,9 @@ export async function settleTrip(tripId: string): Promise<SettlementResult> {
         data: {
           status: "SETTLED",
           settledAt: new Date(),
+          platformCommissionRate: commissionRate,
+          platformCommissionAmount: platformFee,
+          driverPayoutAmount: driverPayout,
           statusHistory: [
             ...statusHistory,
             {

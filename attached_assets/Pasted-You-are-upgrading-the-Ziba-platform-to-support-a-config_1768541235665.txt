@@ -1,0 +1,114 @@
+You are upgrading the Ziba platform to support a configurable, admin-controlled commission system.
+
+GOAL:
+Allow Ziba platform commission to be adjustable between 15% and 18%, editable ONLY by Admin, enforced server-side, and applied automatically during trip settlement.
+
+STRICT RULES:
+- Riders, drivers, and directors must NEVER be able to change commission
+- Commission must be enforced server-side only
+- Commission must be applied ONLY during SETTLED trip state
+- Commission changes must NOT affect already-settled trips
+
+--------------------------------
+1. DATABASE CHANGES
+--------------------------------
+
+Create a new table or config record:
+
+PlatformSettings:
+- id (singleton, always 1)
+- commissionRate (decimal, default = 0.15)
+- minCommission = 0.15
+- maxCommission = 0.18
+- updatedAt
+- updatedBy (admin user id)
+
+Ensure ONLY ONE record exists.
+
+--------------------------------
+2. ADMIN-ONLY API ENDPOINTS
+--------------------------------
+
+Create endpoints:
+
+GET /api/admin/platform-settings
+- Returns current commissionRate
+- Admin-only (403 for non-admin)
+
+POST /api/admin/platform-settings/commission
+- Body: { commissionRate }
+- Validate:
+  - Must be between 0.15 and 0.18
+- Persist change
+- Log admin action
+- Admin-only
+
+--------------------------------
+3. SETTLEMENT LOGIC UPDATE (CRITICAL)
+--------------------------------
+
+During trip settlement (SETTLED transition):
+
+- Fetch current commissionRate from PlatformSettings
+- Calculate:
+  - platformShare = lockedFare * commissionRate
+  - driverShare = lockedFare - platformShare
+
+Persist on trip:
+- trip.platformCommissionRate
+- trip.platformCommissionAmount
+- trip.driverPayoutAmount
+
+These values MUST be immutable after settlement.
+
+--------------------------------
+4. WALLET DISTRIBUTION UPDATE
+--------------------------------
+
+When settling a trip:
+- Debit rider locked balance
+- Credit driver wallet with driverShare
+- Credit platform wallet with platformShare
+- All operations must be atomic (single transaction)
+
+If ANY step fails:
+- Entire settlement rolls back
+
+--------------------------------
+5. ADMIN UI
+--------------------------------
+
+Add Admin → Platform Settings page:
+- Show current commission %
+- Slider or input (15%–18%)
+- Save button
+- Confirmation modal:
+  “This change affects future trips only”
+
+--------------------------------
+6. AUDIT & SAFETY
+--------------------------------
+
+- Log every commission change with:
+  adminId, oldRate, newRate, timestamp
+- Prevent deletion of PlatformSettings
+- Prevent direct DB edits via API
+
+--------------------------------
+7. DO NOT
+--------------------------------
+
+- Do NOT hardcode percentages
+- Do NOT allow client-side overrides
+- Do NOT apply commission before SETTLED
+- Do NOT retroactively alter settled trips
+
+--------------------------------
+END RESULT
+--------------------------------
+
+Ziba now has a production-grade, admin-controlled commission engine with:
+- Editable 15–18% range
+- Full auditability
+- Immutable historical accuracy
+- Zero trust on client inputs

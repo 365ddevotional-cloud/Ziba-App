@@ -55,37 +55,40 @@ model Driver {
 }
 
 model Ride {
-  id                String        @id @default(uuid())
-  pickupLocation    String
-  dropoffLocation   String
-  fareEstimate      Float?
-  userId            String
-  driverId          String?
-  createdAt         DateTime      @default(now())
-  completedAt       DateTime?
-  dropoffLat        Float?
-  dropoffLng        Float?
-  estimatedDistance Float?
-  estimatedDuration Float?
-  lockedFare        Float?
-  pickupLat         Float?
-  pickupLng         Float?
-  startedAt         DateTime?
-  actualDistance    Float?
-  actualDuration    Float?
-  fraudReasons      String?
-  fraudScore        Int           @default(0)
-  isFlagged         Boolean       @default(false)
-  payoutHeld        Boolean       @default(false)
-  settledAt         DateTime?
-  statusHistory     Json          @default("[]")
-  status            TripStatus    @default(REQUESTED)
-  driverRating      DriverRating?
-  gpsLogs           GpsLog[]
-  payment           Payment?
-  driver            Driver?       @relation(fields: [driverId], references: [id])
-  user              User          @relation(fields: [userId], references: [id])
-  userRating        UserRating?
+  id                       String        @id @default(uuid())
+  pickupLocation           String
+  dropoffLocation          String
+  fareEstimate             Float?
+  userId                   String
+  driverId                 String?
+  createdAt                DateTime      @default(now())
+  completedAt              DateTime?
+  dropoffLat               Float?
+  dropoffLng               Float?
+  estimatedDistance        Float?
+  estimatedDuration        Float?
+  lockedFare               Float?
+  pickupLat                Float?
+  pickupLng                Float?
+  startedAt                DateTime?
+  actualDistance           Float?
+  actualDuration           Float?
+  fraudReasons             String?
+  fraudScore               Int           @default(0)
+  isFlagged                Boolean       @default(false)
+  payoutHeld               Boolean       @default(false)
+  settledAt                DateTime?
+  statusHistory            Json          @default("[]")
+  status                   TripStatus    @default(REQUESTED)
+  platformCommissionRate   Float?
+  platformCommissionAmount Float?
+  driverPayoutAmount       Float?
+  driverRating             DriverRating?
+  gpsLogs                  GpsLog[]
+  payment                  Payment?
+  driver                   Driver?       @relation(fields: [driverId], references: [id])
+  user                     User          @relation(fields: [userId], references: [id])
+  userRating               UserRating?
 }
 
 model GpsLog {
@@ -220,11 +223,21 @@ model Notification {
 model PlatformConfig {
   id                 String             @id @default(uuid())
   commissionRate     Float              @default(0.15)
+  minCommissionRate  Float              @default(0.15)
+  maxCommissionRate  Float              @default(0.18)
   testModeEnabled    Boolean            @default(true)
   paymentGateway     PaymentGateway     @default(STRIPE)
   paymentGatewayMode PaymentGatewayMode @default(SANDBOX)
   updatedAt          DateTime           @updatedAt
   updatedBy          String?
+}
+
+model CommissionAuditLog {
+  id          String   @id @default(uuid())
+  adminId     String
+  oldRate     Float
+  newRate     Float
+  createdAt   DateTime @default(now())
 }
 
 model FareConfig {

@@ -5289,5 +5289,115 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== ADMIN PLATFORM SETTINGS ====================
+
+  // Get platform settings (commission rate)
+  app.get("/api/admin/platform-settings", requireAuth("admin"), async (req, res) => {
+    try {
+      let config = await prisma.platformConfig.findFirst();
+
+      if (!config) {
+        config = await prisma.platformConfig.create({
+          data: {
+            commissionRate: 0.15,
+            minCommissionRate: 0.15,
+            maxCommissionRate: 0.18,
+          }
+        });
+      }
+
+      res.json({
+        id: config.id,
+        commissionRate: config.commissionRate,
+        minCommissionRate: config.minCommissionRate,
+        maxCommissionRate: config.maxCommissionRate,
+        updatedAt: config.updatedAt,
+        updatedBy: config.updatedBy,
+      });
+    } catch (error) {
+      console.error("Error fetching platform settings:", error);
+      res.status(500).json({ message: "Failed to fetch platform settings" });
+    }
+  });
+
+  // Update commission rate (admin only)
+  app.post("/api/admin/platform-settings/commission", requireAuth("admin"), async (req, res) => {
+    try {
+      const { commissionRate } = req.body;
+      const adminId = req.session.userId;
+
+      if (typeof commissionRate !== "number") {
+        return res.status(400).json({ message: "Commission rate must be a number" });
+      }
+
+      let config = await prisma.platformConfig.findFirst();
+
+      if (!config) {
+        config = await prisma.platformConfig.create({
+          data: {
+            commissionRate: 0.15,
+            minCommissionRate: 0.15,
+            maxCommissionRate: 0.18,
+          }
+        });
+      }
+
+      const minRate = config.minCommissionRate;
+      const maxRate = config.maxCommissionRate;
+
+      if (commissionRate < minRate || commissionRate > maxRate) {
+        return res.status(400).json({ 
+          message: `Commission rate must be between ${minRate * 100}% and ${maxRate * 100}%` 
+        });
+      }
+
+      const oldRate = config.commissionRate;
+
+      // Update commission rate
+      const updatedConfig = await prisma.platformConfig.update({
+        where: { id: config.id },
+        data: {
+          commissionRate,
+          updatedBy: adminId,
+        }
+      });
+
+      // Create audit log
+      await prisma.commissionAuditLog.create({
+        data: {
+          adminId: adminId!,
+          oldRate,
+          newRate: commissionRate,
+        }
+      });
+
+      console.log(`[PlatformSettings] Commission updated from ${oldRate * 100}% to ${commissionRate * 100}% by admin ${adminId}`);
+
+      res.json({
+        success: true,
+        commissionRate: updatedConfig.commissionRate,
+        message: `Commission rate updated to ${commissionRate * 100}%`,
+      });
+    } catch (error) {
+      console.error("Error updating commission rate:", error);
+      res.status(500).json({ message: "Failed to update commission rate" });
+    }
+  });
+
+  // Get commission audit log
+  app.get("/api/admin/platform-settings/audit-log", requireAuth("admin"), async (req, res) => {
+    try {
+      const logs = await prisma.commissionAuditLog.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching commission audit log:", error);
+      res.status(500).json({ message: "Failed to fetch audit log" });
+    }
+  });
+
   return httpServer;
 }
