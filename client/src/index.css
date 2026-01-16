@@ -177,42 +177,93 @@
 }
 
 /* Ziba Design System - Brand Colors */
+:root {
+  /* Primary Brand Colors */
+  --ziba-blue: #0A3D62;
+  --ziba-teal: #1ABC9C;
+  
+  /* Backgrounds */
+  --ziba-dark: #0F172A;
+  --ziba-surface: #111827;
+  --ziba-light: #F7F9FB;
+  
+  /* Text Colors */
+  --ziba-text-primary: #FFFFFF;
+  --ziba-text-secondary: #CBD5E1;
+  --ziba-text-muted: #94A3B8;
+  
+  /* Status Colors */
+  --ziba-success: #22C55E;
+  --ziba-warning: #F59E0B;
+  --ziba-error: #EF4444;
+}
+
 @layer utilities {
   /* Brand Color Utilities */
   .ziba-primary {
-    color: #0A3D62;
+    color: var(--ziba-blue);
   }
-  .ziba-accent {
-    color: #1ABC9C;
+  .ziba-accent, .text-ziba-accent {
+    color: var(--ziba-teal);
   }
-  .ziba-bg-primary {
-    background-color: #0A3D62;
+  .ziba-bg-primary, .bg-ziba-primary {
+    background-color: var(--ziba-blue);
   }
-  .ziba-bg-accent {
-    background-color: #1ABC9C;
+  .ziba-bg-accent, .bg-ziba-accent {
+    background-color: var(--ziba-teal);
   }
-  .ziba-bg-dark {
-    background-color: #0F172A;
+  .ziba-bg-dark, .bg-ziba-dark {
+    background-color: var(--ziba-dark);
   }
-  .ziba-bg-card {
-    background-color: #111827;
+  .ziba-bg-card, .bg-ziba-card {
+    background-color: var(--ziba-surface);
   }
-  .ziba-border {
-    border-color: #1F2937;
+  .ziba-bg-surface, .bg-ziba-surface {
+    background-color: var(--ziba-surface);
   }
-  .ziba-text-primary {
-    color: #E5E7EB;
+  .ziba-border, .border-ziba-border {
+    border-color: rgba(255, 255, 255, 0.05);
   }
-  .ziba-text-secondary {
-    color: #9CA3AF;
+  .ziba-text-primary, .text-ziba-text-primary {
+    color: var(--ziba-text-primary);
+  }
+  .ziba-text-secondary, .text-ziba-text-secondary {
+    color: var(--ziba-text-secondary);
+  }
+  .ziba-text-muted, .text-ziba-text-muted {
+    color: var(--ziba-text-muted);
+  }
+  
+  /* Status Colors */
+  .text-ziba-success {
+    color: var(--ziba-success);
+  }
+  .text-ziba-warning {
+    color: var(--ziba-warning);
+  }
+  .text-ziba-error {
+    color: var(--ziba-error);
   }
 
-  /* Hero Gradient Text */
+  /* Hero Gradient - Premium 135deg */
+  .ziba-hero-gradient {
+    background: linear-gradient(135deg, var(--ziba-blue) 0%, var(--ziba-dark) 65%);
+  }
+  
+  /* Hero Gradient Text - Teal emphasis */
   .ziba-gradient-text {
-    background: linear-gradient(135deg, #1ABC9C 0%, #38BDF8 100%);
+    background: linear-gradient(135deg, var(--ziba-teal) 0%, #38BDF8 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  /* Premium Card Styling */
+  .ziba-card-premium {
+    background-color: var(--ziba-surface);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
   }
 
   /* Accent Glow Effects */

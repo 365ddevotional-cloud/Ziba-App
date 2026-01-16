@@ -54,8 +54,8 @@ export default function Landing() {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <section className="min-h-screen pt-16 flex items-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-ziba-primary/20 via-ziba-accent/5 to-transparent"></div>
+      <section className="min-h-screen pt-16 flex items-center relative overflow-hidden ziba-hero-gradient">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0A3D62] via-[#0A3D62]/50 to-transparent opacity-40"></div>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 grid lg:grid-cols-2 gap-12 items-center relative z-10">
           <div className="space-y-8">
             <div className="space-y-4">

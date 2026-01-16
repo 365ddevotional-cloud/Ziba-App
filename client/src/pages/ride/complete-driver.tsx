@@ -54,8 +54,11 @@ export default function DriverRideComplete() {
   });
 
   useEffect(() => {
-    if (error && (error as any)?.message?.includes("401")) {
-      navigate("/driver/pending-verification");
+    if (error) {
+      const errorMessage = (error as any)?.message || "";
+      if (errorMessage.includes("401") || errorMessage.includes("Not authenticated")) {
+        navigate("/driver/login");
+      }
     }
   }, [error, navigate]);
 

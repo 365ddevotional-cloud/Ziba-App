@@ -90,6 +90,8 @@ function Router() {
       <Route path="/director/pending-approval" component={DirectorPendingApproval} />
       <Route path="/ride/complete/rider" component={RiderRideComplete} />
       <Route path="/ride/complete/driver" component={DriverRideComplete} />
+      <Route path="/rider/ride-complete" component={RiderRideComplete} />
+      <Route path="/driver/ride-complete" component={DriverRideComplete} />
       <Route path="/rider/:rest*" component={RiderApp} />
       <Route component={NotFound} />
     </Switch>

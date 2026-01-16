@@ -60,8 +60,11 @@ export default function RiderRideComplete() {
   });
 
   useEffect(() => {
-    if (error && (error as any)?.message?.includes("401")) {
-      navigate("/rider/login");
+    if (error) {
+      const errorMessage = (error as any)?.message || "";
+      if (errorMessage.includes("401") || errorMessage.includes("Not authenticated")) {
+        navigate("/rider/login");
+      }
     }
   }, [error, navigate]);
 
