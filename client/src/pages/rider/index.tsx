@@ -1,4 +1,4 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { useRiderAuth } from "@/lib/rider-auth";
 import { useDriverAuth } from "@/lib/driver-auth";
 import RiderHome from "./home";
@@ -17,6 +17,7 @@ import WalletAddFunds from "./wallet-add-funds";
 import WalletAddCard from "./wallet-add-card";
 import WalletPaymentMethods from "./wallet-payment-methods";
 import WalletTransactionDetail from "./wallet-transaction-detail";
+import CoordinatorHome from "../coordinator/home";
 import { Loader2 } from "lucide-react";
 
 function RiderAuthGuard({ children }: { children: React.ReactNode }) {
@@ -162,6 +163,11 @@ export default function RiderApp() {
       <Route path="/rider/support">
         <RiderAuthGuard>
           <RiderSupport />
+        </RiderAuthGuard>
+      </Route>
+      <Route path="/coordinator/home">
+        <RiderAuthGuard>
+          <CoordinatorHome />
         </RiderAuthGuard>
       </Route>
       <Route path="/rider/home">

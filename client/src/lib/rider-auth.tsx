@@ -11,6 +11,8 @@ interface RiderUser {
   status: string;
   averageRating: number;
   role: string;
+  userType?: "RIDER" | "TRIP_COORDINATOR";
+  phoneVerified?: boolean;
   isTestAccount?: boolean;
 }
 
@@ -31,6 +33,7 @@ interface RegisterData {
   password: string;
   phone?: string;
   city?: string;
+  userType?: "RIDER" | "TRIP_COORDINATOR";
 }
 
 const RiderAuthContext = createContext<RiderAuthContextType | null>(null);

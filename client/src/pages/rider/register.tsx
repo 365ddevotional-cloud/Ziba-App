@@ -19,6 +19,7 @@ export default function RiderRegister() {
     confirmPassword: "",
     phone: "",
     city: "",
+    userType: "RIDER" as "RIDER" | "TRIP_COORDINATOR",
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -52,12 +53,17 @@ export default function RiderRegister() {
         password: formData.password,
         phone: formData.phone || undefined,
         city: formData.city || undefined,
+        userType: formData.userType,
       });
       toast({
         title: "Welcome to Ziba!",
         description: "Your account has been created",
       });
-      navigate("/rider/home");
+      if (formData.userType === "TRIP_COORDINATOR") {
+        navigate("/coordinator/home");
+      } else {
+        navigate("/rider/home");
+      }
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -182,6 +188,33 @@ export default function RiderRegister() {
                     required
                     data-testid="input-confirm-password"
                   />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Account Type</Label>
+                <div className="flex gap-4">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="userType"
+                      value="RIDER"
+                      checked={formData.userType === "RIDER"}
+                      onChange={(e) => updateField("userType", e.target.value as "RIDER" | "TRIP_COORDINATOR")}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">Regular Rider</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="userType"
+                      value="TRIP_COORDINATOR"
+                      checked={formData.userType === "TRIP_COORDINATOR"}
+                      onChange={(e) => updateField("userType", e.target.value as "RIDER" | "TRIP_COORDINATOR")}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">Book rides for others (Trip Coordinator)</span>
+                  </label>
                 </div>
               </div>
               <Button

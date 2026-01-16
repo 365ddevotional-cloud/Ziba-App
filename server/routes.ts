@@ -3710,7 +3710,7 @@ export async function registerRoutes(
   // Rider registration
   app.post("/api/rider/register", async (req, res) => {
     try {
-      const { fullName, email, password, phone, city } = req.body;
+      const { fullName, email, password, phone, city, userType } = req.body;
       
       if (!fullName || !email || !password) {
         return res.status(400).json({ message: "Full name, email, and password are required" });
@@ -3736,6 +3736,8 @@ export async function registerRoutes(
           phone: phone || null,
           city: city || null,
           status: "ACTIVE",
+          userType: userType || "RIDER",
+          phoneVerified: TEST_MODE, // Auto-verify in test mode
           isTestAccount: TEST_MODE
         }
       });
@@ -4951,6 +4953,248 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error calculating fare:", error);
       res.status(500).json({ message: "Failed to calculate fare" });
+    }
+  });
+
+  // ==================== TRIP COORDINATOR ENDPOINTS ====================
+  
+  // Phone verification (dev-only for now)
+  app.post("/api/auth/verify-phone", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      // Dev-only: Just set phoneVerified to true
+      // TODO: Replace with real OTP verification
+      const user = await prisma.user.update({
+        where: { id: req.session.userId },
+        data: { phoneVerified: true },
+        select: { id: true, phoneVerified: true }
+      });
+
+      res.json({ message: "Phone verified", phoneVerified: user.phoneVerified });
+    } catch (error) {
+      console.error("Error verifying phone:", error);
+      res.status(500).json({ message: "Failed to verify phone" });
+    }
+  });
+
+  // Get coordinator's passengers
+  app.get("/api/coordinator/passengers", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider/coordinator" });
+    }
+
+    try {
+      // Verify user is a trip coordinator
+      const user = await prisma.user.findUnique({
+        where: { id: req.session.userId },
+        select: { userType: true }
+      });
+
+      if (!user || user.userType !== "TRIP_COORDINATOR") {
+        return res.status(403).json({ message: "Only trip coordinators can access this endpoint" });
+      }
+
+      const passengers = await prisma.tripPassenger.findMany({
+        where: { createdByUserId: req.session.userId },
+        orderBy: { createdAt: "desc" }
+      });
+
+      res.json(passengers);
+    } catch (error) {
+      console.error("Error fetching passengers:", error);
+      res.status(500).json({ message: "Failed to fetch passengers" });
+    }
+  });
+
+  // Create passenger
+  app.post("/api/coordinator/passengers", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider/coordinator" });
+    }
+
+    try {
+      const { fullName, phone, email, notes } = req.body;
+
+      if (!fullName || !phone) {
+        return res.status(400).json({ message: "Full name and phone are required" });
+      }
+
+      // Verify user is a trip coordinator
+      const user = await prisma.user.findUnique({
+        where: { id: req.session.userId },
+        select: { userType: true }
+      });
+
+      if (!user || user.userType !== "TRIP_COORDINATOR") {
+        return res.status(403).json({ message: "Only trip coordinators can create passengers" });
+      }
+
+      const passenger = await prisma.tripPassenger.create({
+        data: {
+          fullName,
+          phone,
+          email: email || null,
+          notes: notes || null,
+          createdByUserId: req.session.userId
+        }
+      });
+
+      res.status(201).json(passenger);
+    } catch (error) {
+      console.error("Error creating passenger:", error);
+      res.status(500).json({ message: "Failed to create passenger" });
+    }
+  });
+
+  // Book ride for passenger
+  app.post("/api/coordinator/request-ride", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider/coordinator" });
+    }
+
+    try {
+      const { pickupLocation, dropoffLocation, fareEstimate, passengerId } = req.body;
+
+      if (!pickupLocation || !dropoffLocation) {
+        return res.status(400).json({ message: "Pickup and dropoff locations are required" });
+      }
+
+      // Verify user is a trip coordinator and phone is verified
+      const user = await prisma.user.findUnique({
+        where: { id: req.session.userId },
+        select: { userType: true, phoneVerified: true }
+      });
+
+      if (!user || user.userType !== "TRIP_COORDINATOR") {
+        return res.status(403).json({ message: "Only trip coordinators can book rides for passengers" });
+      }
+
+      if (!user.phoneVerified) {
+        return res.status(400).json({ message: "Phone must be verified before booking rides. Please verify your phone number." });
+      }
+
+      // Verify passenger belongs to this coordinator
+      if (passengerId) {
+        const passenger = await prisma.tripPassenger.findFirst({
+          where: { id: passengerId, createdByUserId: req.session.userId }
+        });
+
+        if (!passenger) {
+          return res.status(404).json({ message: "Passenger not found or does not belong to you" });
+        }
+      }
+
+      // Check for existing active ride
+      const existingRide = await prisma.ride.findFirst({
+        where: {
+          bookedByUserId: req.session.userId,
+          status: { in: ["REQUESTED", "ASSIGNED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "IN_PROGRESS"] }
+        }
+      });
+
+      if (existingRide) {
+        return res.status(400).json({ message: "You already have an active ride" });
+      }
+
+      // Create ride
+      // userId = coordinator's id (for backward compatibility)
+      // bookedByUserId = coordinator's id (who booked/paid)
+      // passengerId = passenger if booking for someone else
+      let ride = await prisma.ride.create({
+        data: {
+          userId: req.session.userId, // Keep for backward compatibility
+          bookedByUserId: req.session.userId, // Coordinator who booked
+          passengerId: passengerId || null,
+          pickupLocation,
+          dropoffLocation,
+          fareEstimate: fareEstimate || null,
+          status: "REQUESTED"
+        },
+        include: {
+          user: {
+            select: { id: true, fullName: true, email: true }
+          },
+          passenger: true,
+          driver: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              vehicleType: true,
+              vehiclePlate: true,
+              averageRating: true
+            }
+          }
+        }
+      });
+
+      // Use trip matching engine if not in test mode
+      if (!TEST_MODE) {
+        const matchResult = await matchDriverToRide(ride.id);
+        if (matchResult.success && matchResult.driverId) {
+          // Reload ride with driver information
+          ride = await prisma.ride.findUnique({
+            where: { id: ride.id },
+            include: {
+              user: {
+                select: { id: true, fullName: true, email: true }
+              },
+              passenger: true,
+              driver: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  phone: true,
+                  vehicleType: true,
+                  vehiclePlate: true,
+                  averageRating: true
+                }
+              }
+            }
+          }) || ride;
+
+          // Send notifications
+          if (ride.driver) {
+            // Notify driver
+            await createNotification(
+              ride.driver.id,
+              "driver",
+              `You have been assigned a ride from ${ride.pickupLocation} to ${ride.dropoffLocation}`,
+              "RIDE_ASSIGNED"
+            );
+
+            // Notify coordinator
+            await createNotification(
+              req.session.userId!,
+              "rider",
+              `Driver ${ride.driver.fullName} has been assigned to your ride${ride.passenger ? ` for ${ride.passenger.fullName}` : ""}`,
+              "RIDE_ASSIGNED"
+            );
+
+            // Notify passenger if applicable (via in-app notification - SMS later)
+            if (ride.passenger) {
+              // For now, create notification record (will be shown to passenger if they have account)
+              // TODO: Send SMS to passenger phone
+            }
+          }
+        } else {
+          // No driver available
+          await createNotification(
+            req.session.userId!,
+            "rider",
+            "Your ride request has been received. We're searching for an available driver...",
+            "RIDE_REQUESTED"
+          );
+        }
+      }
+
+      res.status(201).json(ride);
+    } catch (error) {
+      console.error("Error requesting ride:", error);
+      res.status(500).json({ message: "Failed to request ride" });
     }
   });
 
