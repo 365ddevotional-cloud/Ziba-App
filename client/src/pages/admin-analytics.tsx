@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, BarChart3, ArrowLeft, Users, Car, MapPin, DollarSign, TrendingUp, Wallet, Star, Briefcase } from "lucide-react";
+import { Loader2, BarChart3, ArrowLeft, Users, Car, MapPin, DollarSign, TrendingUp, Wallet, Star, Briefcase, Map, Shield, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,39 @@ interface Analytics {
   rides: { total: number; completed: number };
   revenue: { total: number; commissions: number; commissionRate: number };
   wallets: { userBalance: number; driverBalance: number; totalPayouts: number };
+}
+
+interface MapCostStatus {
+  metrics: {
+    date: string;
+    mapCost: number;
+    completedTrips: number;
+    zibaRevenue: number;
+    paidMapRequests: number;
+    totalMapRequests: number;
+  };
+  computed: {
+    mapCostPerTrip: number;
+    paidUsageRate: number;
+    mapCostRatio: number;
+  };
+  protection: {
+    gpsFrequencyReduced: boolean;
+    autocompleteDisabled: boolean;
+    cachedOnly: boolean;
+    reason: string | null;
+  };
+  targets: {
+    MAX_COST_PER_TRIP: number;
+    MAX_PAID_USAGE_RATE: number;
+    MAX_MAP_COST_RATIO: number;
+    CRITICAL_MAP_COST_RATIO: number;
+  };
+  gpsIntervals: {
+    idle: number;
+    enRoute: number;
+    inProgress: number;
+  };
 }
 
 function adminApiRequest(method: string, url: string) {
@@ -60,6 +93,12 @@ export default function AdminAnalyticsPage() {
   const { data: analytics, isLoading } = useQuery<Analytics>({
     queryKey: ["/api/analytics"],
     queryFn: () => adminApiRequest("GET", "/api/analytics"),
+  });
+
+  const { data: mapCostStatus } = useQuery<MapCostStatus>({
+    queryKey: ["/api/map-cost/protection-status"],
+    queryFn: () => adminApiRequest("GET", "/api/map-cost/protection-status"),
+    staleTime: 1000 * 60,
   });
 
   if (isLoading) {
@@ -225,6 +264,103 @@ export default function AdminAnalyticsPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Map className="h-5 w-5 text-primary" />
+                <CardTitle>Map Cost Protection</CardTitle>
+              </div>
+              {mapCostStatus?.protection.gpsFrequencyReduced && (
+                <Badge variant="destructive" className="flex items-center gap-1">
+                  <Shield className="h-3 w-3" />
+                  Protection Active
+                </Badge>
+              )}
+            </div>
+            <CardDescription>Daily map API usage and cost protection status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Map Cost Ratio</span>
+                  <span className={`font-bold ${(mapCostStatus?.computed.mapCostRatio || 0) > 0.02 ? 'text-red-500' : (mapCostStatus?.computed.mapCostRatio || 0) > 0.015 ? 'text-yellow-500' : 'text-green-500'}`} data-testid="text-map-cost-ratio">
+                    {((mapCostStatus?.computed.mapCostRatio || 0) * 100).toFixed(2)}%
+                  </span>
+                </div>
+                <Progress 
+                  value={Math.min((mapCostStatus?.computed.mapCostRatio || 0) * 100 / 0.02 * 100, 100)} 
+                  className={`h-2 ${(mapCostStatus?.computed.mapCostRatio || 0) > 0.02 ? '[&>div]:bg-red-500' : (mapCostStatus?.computed.mapCostRatio || 0) > 0.015 ? '[&>div]:bg-yellow-500' : ''}`}
+                />
+                <p className="text-xs text-muted-foreground">Target: ≤1.5% | Critical: 2%</p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Cost Per Trip</span>
+                  <span className={`font-bold ${(mapCostStatus?.computed.mapCostPerTrip || 0) > 0.03 ? 'text-red-500' : 'text-green-500'}`} data-testid="text-cost-per-trip">
+                    ${(mapCostStatus?.computed.mapCostPerTrip || 0).toFixed(3)}
+                  </span>
+                </div>
+                <Progress 
+                  value={Math.min((mapCostStatus?.computed.mapCostPerTrip || 0) / 0.03 * 100, 100)}
+                  className={`h-2 ${(mapCostStatus?.computed.mapCostPerTrip || 0) > 0.03 ? '[&>div]:bg-red-500' : ''}`}
+                />
+                <p className="text-xs text-muted-foreground">Target: ≤$0.03</p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Paid Usage Rate</span>
+                  <span className={`font-bold ${(mapCostStatus?.computed.paidUsageRate || 0) > 0.2 ? 'text-red-500' : 'text-green-500'}`} data-testid="text-paid-usage-rate">
+                    {((mapCostStatus?.computed.paidUsageRate || 0) * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <Progress 
+                  value={Math.min((mapCostStatus?.computed.paidUsageRate || 0) * 100 / 20 * 100, 100)}
+                  className={`h-2 ${(mapCostStatus?.computed.paidUsageRate || 0) > 0.2 ? '[&>div]:bg-red-500' : ''}`}
+                />
+                <p className="text-xs text-muted-foreground">Target: &lt;20%</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t">
+              <div className="text-center">
+                <div className="text-lg font-bold" data-testid="text-completed-trips">{mapCostStatus?.metrics.completedTrips || 0}</div>
+                <div className="text-xs text-muted-foreground">Trips Today</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold">${(mapCostStatus?.metrics.mapCost || 0).toFixed(2)}</div>
+                <div className="text-xs text-muted-foreground">Map Cost</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold">${(mapCostStatus?.metrics.zibaRevenue || 0).toFixed(2)}</div>
+                <div className="text-xs text-muted-foreground">Ziba Revenue</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold">{mapCostStatus?.metrics.paidMapRequests || 0}</div>
+                <div className="text-xs text-muted-foreground">Paid Requests</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold">{mapCostStatus?.metrics.totalMapRequests || 0}</div>
+                <div className="text-xs text-muted-foreground">Total Requests</div>
+              </div>
+            </div>
+
+            {mapCostStatus?.protection.gpsFrequencyReduced && (
+              <div className="mt-4 p-3 rounded-md bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-destructive">Cost Protection Active</p>
+                  <p className="text-muted-foreground">{mapCostStatus.protection.reason}</p>
+                  <p className="text-muted-foreground mt-1">GPS intervals: Idle {mapCostStatus.gpsIntervals.idle/1000}s, En Route {mapCostStatus.gpsIntervals.enRoute/1000}s, In Progress {mapCostStatus.gpsIntervals.inProgress/1000}s</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
