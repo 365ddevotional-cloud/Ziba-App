@@ -442,7 +442,7 @@ export async function registerRoutes(
           fareEstimate: fareEstimate ? parseFloat(fareEstimate) : null,
           userId,
           driverId,
-          status: driverId ? "ACCEPTED" : "REQUESTED"
+          status: driverId ? "ASSIGNED" : "REQUESTED"
         },
         include: { user: true, driver: true },
       });
@@ -990,7 +990,7 @@ export async function registerRoutes(
         prisma.driver.count({ where: { status: "ACTIVE", isOnline: true } }),
         prisma.ride.count(),
         prisma.ride.count({ where: { status: "REQUESTED" } }),
-        prisma.ride.count({ where: { status: { in: ["ACCEPTED", "DRIVER_EN_ROUTE"] } } }),
+        prisma.ride.count({ where: { status: { in: ["ASSIGNED", "ACCEPTED", "DRIVER_EN_ROUTE"] } } }),
         prisma.ride.count({ where: { status: "IN_PROGRESS" } }),
         prisma.ride.count({ where: { status: "COMPLETED" } }),
         prisma.ride.count({ where: { status: "CANCELLED" } }),
@@ -1521,7 +1521,7 @@ export async function registerRoutes(
           },
           data: { 
             driverId,
-            status: "DRIVER_EN_ROUTE"
+            status: "ASSIGNED"
           },
           include: { user: true, driver: true },
         });
@@ -1576,12 +1576,23 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "ACCEPTED" && ride.status !== "DRIVER_EN_ROUTE" && ride.status !== "ARRIVED") {
-        return res.status(400).json({ message: `Cannot start ride. Status is ${ride.status}, expected DRIVER_EN_ROUTE or ARRIVED` });
-      }
+      const isAdmin = currentUser.role === "admin" || currentUser.role === "director";
 
       if (!ride.driverId) {
         return res.status(400).json({ message: "No driver assigned to this ride" });
+      }
+
+      // Validate state transition
+      const transitionCheck = validateTransition(ride.status, "IN_PROGRESS", isAdmin);
+      if (!transitionCheck.valid) {
+        // Allow transition from ASSIGNED or ARRIVED for backward compatibility and admin override
+        if (isAdmin && ["ASSIGNED", "DRIVER_EN_ROUTE", "ACCEPTED", "ARRIVED"].includes(ride.status)) {
+          // Admin can force start from ASSIGNED or ARRIVED
+        } else if (!isAdmin && !["ARRIVED"].includes(ride.status)) {
+          return res.status(400).json({ 
+            message: transitionCheck.error || `Cannot start ride. Status is ${ride.status}, expected ARRIVED. Driver must arrive before starting.` 
+          });
+        }
       }
 
       const updatedRide = await prisma.ride.update({
@@ -1596,11 +1607,66 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to start ride" });
     }
   });
+  
+  // Driver arrives at pickup (ASSIGNED → ARRIVED)
+  // Driver cannot arrive before being assigned
+  app.post("/api/rides/:id/arrive", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+      const isAdmin = currentUser.role === "admin" || currentUser.role === "director";
 
-  // Complete ride (IN_PROGRESS → COMPLETED)
+      const ride = await prisma.ride.findUnique({ 
+        where: { id },
+        include: { driver: true }
+      });
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (!ride.driverId) {
+        return res.status(400).json({ message: "No driver assigned to this ride" });
+      }
+
+      // Validate state transition - driver cannot arrive before ASSIGNED
+      const transitionCheck = validateTransition(ride.status, "ARRIVED", isAdmin);
+      if (!transitionCheck.valid) {
+        // Allow backward compatibility with old states
+        if (!["ASSIGNED", "DRIVER_EN_ROUTE", "ACCEPTED"].includes(ride.status)) {
+          return res.status(400).json({ 
+            message: transitionCheck.error || `Cannot mark as arrived. Status is ${ride.status}, expected ASSIGNED. Driver must be assigned before arriving.` 
+          });
+        }
+      }
+
+      const updatedRide = await prisma.ride.update({
+        where: { id },
+        data: { status: "ARRIVED" },
+        include: { user: true, driver: true },
+      });
+
+      // Notify rider that driver has arrived
+      await createNotification(
+        ride.userId,
+        "rider",
+        `Driver ${ride.driver?.fullName || "has"} has arrived at pickup location`,
+        "RIDE_ASSIGNED"
+      );
+
+      res.json(updatedRide);
+    } catch (error) {
+      console.error("Error marking ride as arrived:", error);
+      res.status(500).json({ message: "Failed to mark ride as arrived" });
+    }
+  });
+
+  // Complete ride (IN_PROGRESS → COMPLETED → SETTLED)
+  // Wallet settlement occurs at COMPLETED, then ride marked as SETTLED
   app.post("/api/rides/:id/complete", async (req, res) => {
     try {
       const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+      const isAdmin = currentUser.role === "admin" || currentUser.role === "director";
 
       const ride = await prisma.ride.findUnique({ 
         where: { id },
@@ -1610,8 +1676,12 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "IN_PROGRESS") {
-        return res.status(400).json({ message: `Cannot complete ride. Status is ${ride.status}, expected IN_PROGRESS` });
+      // Validate state transition
+      const transitionCheck = validateTransition(ride.status, "COMPLETED", isAdmin);
+      if (!transitionCheck.valid) {
+        return res.status(400).json({ 
+          message: transitionCheck.error || `Cannot complete ride. Status is ${ride.status}, expected IN_PROGRESS` 
+        });
       }
 
       // Get platform config for commission rate
@@ -1627,10 +1697,14 @@ export async function registerRoutes(
       const driverEarnings = fareAmount - commissionAmount;
 
       // Use transaction for atomic wallet operations
+      // State: IN_PROGRESS → COMPLETED → SETTLED (all in one transaction)
       const result = await prisma.$transaction(async (tx) => {
-        // Update ride status
+        // First transition: IN_PROGRESS → COMPLETED
         const updatedRide = await tx.ride.update({
-          where: { id },
+          where: { 
+            id,
+            status: "IN_PROGRESS", // Only update if still IN_PROGRESS (atomic check)
+          },
           data: { status: "COMPLETED" },
           include: { user: true, driver: true, payment: true },
         });
@@ -1727,7 +1801,14 @@ export async function registerRoutes(
           });
         }
 
-        return updatedRide;
+        // Final transition: COMPLETED → SETTLED (after wallet settlement)
+        const settledRide = await tx.ride.update({
+          where: { id },
+          data: { status: "SETTLED" },
+          include: { user: true, driver: true, payment: true },
+        });
+
+        return settledRide;
       });
 
       // Fetch the updated ride with payment
@@ -1743,14 +1824,17 @@ export async function registerRoutes(
     }
   });
 
-  // Cancel ride (REQUESTED or ACCEPTED → CANCELLED)
+  // Cancel ride with state machine validation
+  // Admin override: Can cancel at any state except SETTLED
+  // Non-admin: Can only cancel before IN_PROGRESS
   app.post("/api/rides/:id/cancel", async (req, res) => {
     try {
       const { id } = req.params;
       const currentUser = getCurrentUser(req);
+      const isAdmin = currentUser.role === "admin" || currentUser.role === "director";
 
-      if (currentUser.role !== "admin" && currentUser.role !== "director") {
-        return res.status(403).json({ message: "Only admins and directors can cancel rides" });
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Only admins and directors can cancel rides via this endpoint" });
       }
 
       const ride = await prisma.ride.findUnique({ where: { id } });
@@ -1758,16 +1842,23 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
+      if (isTerminalState(ride.status)) {
+        if (ride.status === "SETTLED") {
+          return res.status(400).json({ message: "Cannot cancel a settled ride" });
+        }
+        return res.status(400).json({ message: `Ride is already ${ride.status.toLowerCase()}` });
+      }
+
+      // Admin override: Allow cancellation at any non-terminal state
+      // But check if already completed (settled would be terminal, but COMPLETED needs settlement first)
       if (ride.status === "COMPLETED") {
-        return res.status(400).json({ message: "Cannot cancel a completed ride" });
+        return res.status(400).json({ message: "Cannot cancel a completed ride. It must be settled first or marked as failed." });
       }
 
-      if (ride.status === "CANCELLED") {
-        return res.status(400).json({ message: "Ride is already cancelled" });
-      }
-
-      if (ride.status === "IN_PROGRESS") {
-        return res.status(400).json({ message: "Cannot cancel a ride in progress" });
+      // Validate transition
+      const transitionCheck = validateTransition(ride.status, "CANCELLED", isAdmin);
+      if (!transitionCheck.valid) {
+        return res.status(400).json({ message: transitionCheck.error || "Cannot cancel ride in current state" });
       }
 
       const updatedRide = await prisma.ride.update({
@@ -2013,6 +2104,84 @@ export async function registerRoutes(
     });
   }
 
+  // ==================== TRIP STATE MACHINE ====================
+  
+  /**
+   * Authoritative trip states:
+   * REQUESTED → ASSIGNED → ARRIVED → IN_PROGRESS → COMPLETED → SETTLED
+   * Plus terminal states: CANCELLED, FAILED
+   */
+  
+  type TripState = "REQUESTED" | "ASSIGNED" | "ARRIVED" | "IN_PROGRESS" | "COMPLETED" | "SETTLED" | "CANCELLED" | "FAILED";
+  
+  /**
+   * Valid state transitions
+   */
+  const VALID_TRANSITIONS: Record<TripState, TripState[]> = {
+    REQUESTED: ["ASSIGNED", "CANCELLED", "FAILED"],
+    ASSIGNED: ["ARRIVED", "CANCELLED", "FAILED"],
+    ARRIVED: ["IN_PROGRESS", "CANCELLED", "FAILED"],
+    IN_PROGRESS: ["COMPLETED", "FAILED"],
+    COMPLETED: ["SETTLED", "FAILED"],
+    SETTLED: [], // Terminal state
+    CANCELLED: [], // Terminal state
+    FAILED: [], // Terminal state
+  };
+  
+  /**
+   * Check if state transition is valid
+   */
+  function isValidTransition(currentState: string, newState: TripState): boolean {
+    const validNextStates = VALID_TRANSITIONS[currentState as TripState];
+    if (!validNextStates) {
+      return false; // Unknown current state
+    }
+    return validNextStates.includes(newState);
+  }
+  
+  /**
+   * Check if state is terminal (no further transitions allowed)
+   */
+  function isTerminalState(state: string): boolean {
+    return ["SETTLED", "CANCELLED", "FAILED"].includes(state);
+  }
+  
+  /**
+   * Check if ride can be cancelled (before IN_PROGRESS, or by admin)
+   */
+  function canCancel(rideState: string, isAdmin: boolean): boolean {
+    if (isAdmin) {
+      // Admin can cancel at any state except SETTLED
+      return rideState !== "SETTLED";
+    }
+    // Rider can only cancel before IN_PROGRESS
+    return ["REQUESTED", "ASSIGNED", "ARRIVED"].includes(rideState);
+  }
+  
+  /**
+   * Validate state transition with clear error message
+   */
+  function validateTransition(currentState: string, newState: TripState, isAdmin: boolean = false): { valid: boolean; error?: string } {
+    if (isTerminalState(currentState)) {
+      return { valid: false, error: `Cannot transition from terminal state: ${currentState}` };
+    }
+    
+    // Admin override: Allow any transition (except to/from SETTLED unless appropriate)
+    if (isAdmin && newState !== "SETTLED") {
+      return { valid: true };
+    }
+    
+    if (!isValidTransition(currentState, newState)) {
+      const validNextStates = VALID_TRANSITIONS[currentState as TripState] || [];
+      return {
+        valid: false,
+        error: `Invalid transition from ${currentState} to ${newState}. Valid next states: ${validNextStates.join(", ")}`,
+      };
+    }
+    
+    return { valid: true };
+  }
+
   // ==================== TRIP MATCHING ENGINE ====================
   
   /**
@@ -2116,7 +2285,7 @@ export async function registerRoutes(
             },
             data: {
               driverId: driver.id,
-              status: "DRIVER_EN_ROUTE", // Transition to next state
+              status: "ASSIGNED", // Transition to ASSIGNED state
             },
             include: {
               user: {
@@ -3666,7 +3835,7 @@ export async function registerRoutes(
       const activeRide = await prisma.ride.findFirst({
         where: {
           userId: req.session.userId,
-          status: { in: ["REQUESTED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "IN_PROGRESS"] }
+          status: { in: ["REQUESTED", "ASSIGNED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "IN_PROGRESS"] }
         },
         include: {
           driver: {
@@ -3707,7 +3876,7 @@ export async function registerRoutes(
       const existingRide = await prisma.ride.findFirst({
         where: {
           userId: req.session.userId,
-          status: { in: ["REQUESTED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "IN_PROGRESS"] }
+          status: { in: ["REQUESTED", "ASSIGNED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "IN_PROGRESS"] }
         }
       });
 
@@ -3749,7 +3918,7 @@ export async function registerRoutes(
             where: { id: ride.id },
             data: {
               driverId: testDriver.id,
-              status: "DRIVER_EN_ROUTE"
+              status: "ASSIGNED"
             },
             include: {
               user: {
@@ -3831,7 +4000,8 @@ export async function registerRoutes(
     }
   });
 
-  // Cancel ride (rider can only cancel REQUESTED rides)
+  // Cancel ride (rider can only cancel before IN_PROGRESS)
+  // Rider cannot cancel after IN_PROGRESS starts
   app.post("/api/rider/rides/:id/cancel", async (req, res) => {
     if (!req.session.userId || req.session.userRole !== "rider") {
       return res.status(401).json({ message: "Not authenticated as rider" });
@@ -3848,8 +4018,17 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (!["REQUESTED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED"].includes(ride.status)) {
-        return res.status(400).json({ message: "Can only cancel rides that haven't started yet" });
+      // Check if ride can be cancelled (rider cannot cancel after IN_PROGRESS)
+      if (!canCancel(ride.status, false)) {
+        return res.status(400).json({ 
+          message: `Cannot cancel ride. Status is ${ride.status}. Rides can only be cancelled before they start (IN_PROGRESS).` 
+        });
+      }
+
+      // Validate transition
+      const transitionCheck = validateTransition(ride.status, "CANCELLED", false);
+      if (!transitionCheck.valid) {
+        return res.status(400).json({ message: transitionCheck.error || "Cannot cancel ride in current state" });
       }
 
       const updatedRide = await prisma.ride.update({
@@ -3887,8 +4066,11 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "DRIVER_EN_ROUTE" && ride.status !== "ACCEPTED") {
-        return res.status(400).json({ message: "Driver can only arrive when en route to pickup" });
+      // Validate state transition for test arrive
+      if (!["ASSIGNED", "DRIVER_EN_ROUTE", "ACCEPTED"].includes(ride.status)) {
+        return res.status(400).json({ 
+          message: `Cannot mark as arrived. Status is ${ride.status}, expected ASSIGNED. Driver must be assigned before arriving.` 
+        });
       }
 
       const updatedRide = await prisma.ride.update({
