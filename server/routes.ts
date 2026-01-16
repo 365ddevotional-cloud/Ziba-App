@@ -2789,6 +2789,147 @@ export async function registerRoutes(
     }
   });
 
+  // Driver registration
+  app.post("/api/driver/register", async (req, res) => {
+    try {
+      const { fullName, email, password, phone, vehicleType, vehiclePlate } = req.body;
+      
+      if (!fullName || !email || !password || !phone || !vehicleType || !vehiclePlate) {
+        return res.status(400).json({ message: "Full name, email, password, phone, vehicle type, and vehicle plate are required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const validVehicleTypes = ["CAR", "BIKE", "VAN"];
+      if (!validVehicleTypes.includes(vehicleType)) {
+        return res.status(400).json({ message: "Invalid vehicle type. Must be CAR, BIKE, or VAN" });
+      }
+
+      const existingDriver = await prisma.driver.findUnique({ where: { email } });
+      if (existingDriver) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      const passwordHash = await hashPassword(password);
+      
+      const driver = await prisma.driver.create({
+        data: {
+          fullName,
+          email,
+          passwordHash,
+          phone,
+          vehicleType: vehicleType as "CAR" | "BIKE" | "VAN",
+          vehiclePlate,
+          status: "PENDING",
+          isVerified: false,
+          isTestAccount: TEST_MODE
+        }
+      });
+
+      // Create wallet for new driver
+      await prisma.wallet.create({
+        data: {
+          ownerId: driver.id,
+          ownerType: "DRIVER",
+          balance: 0
+        }
+      });
+
+      // Set session
+      req.session.userId = driver.id;
+      req.session.userRole = "driver" as UserRole;
+      req.session.userEmail = driver.email;
+
+      res.status(201).json({
+        message: "Registration successful. Your account is pending verification.",
+        user: {
+          id: driver.id,
+          fullName: driver.fullName,
+          email: driver.email,
+          phone: driver.phone,
+          vehicleType: driver.vehicleType,
+          vehiclePlate: driver.vehiclePlate,
+          status: driver.status,
+          role: "driver",
+          isVerified: driver.isVerified,
+          isTestAccount: driver.isTestAccount
+        }
+      });
+    } catch (error: any) {
+      console.error("Driver registration error:", error);
+      if (error.code === "P2002") {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  // Director registration
+  app.post("/api/director/register", async (req, res) => {
+    try {
+      const { fullName, email, password, phone, role, region } = req.body;
+      
+      if (!fullName || !email || !password) {
+        return res.status(400).json({ message: "Full name, email, and password are required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const existingDirector = await prisma.director.findUnique({ where: { email } });
+      if (existingDirector) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      const passwordHash = await hashPassword(password);
+      
+      const director = await prisma.director.create({
+        data: {
+          fullName,
+          email,
+          passwordHash,
+          phone: phone || null,
+          role: role || "OPERATIONS",
+          region: region || "Default",
+          status: "PENDING",
+          isVerified: false,
+          isApproved: false,
+          isTestAccount: TEST_MODE
+        }
+      });
+
+      // Set session
+      req.session.userId = director.id;
+      req.session.userRole = "director" as UserRole;
+      req.session.userEmail = director.email;
+
+      res.status(201).json({
+        message: "Registration successful. Your account is pending admin approval.",
+        user: {
+          id: director.id,
+          fullName: director.fullName,
+          email: director.email,
+          role: director.role,
+          region: director.region,
+          status: director.status,
+          accountRole: "director",
+          isVerified: director.isVerified,
+          isApproved: director.isApproved,
+          isTestAccount: director.isTestAccount
+        }
+      });
+    } catch (error: any) {
+      console.error("Director registration error:", error);
+      if (error.code === "P2002") {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
   // Rider login
   app.post("/api/rider/login", async (req, res) => {
     try {
