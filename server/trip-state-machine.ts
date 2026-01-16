@@ -1,6 +1,14 @@
-import { PrismaClient, TripStatus } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
+
+export type TripStatus = 
+  | "REQUESTED"
+  | "DRIVER_ASSIGNED"
+  | "DRIVER_ARRIVED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "SETTLED";
 
 export const TRIP_STATUS_ORDER: TripStatus[] = [
   "REQUESTED",
@@ -68,7 +76,7 @@ export async function transitionTripStatus(
       };
     }
 
-    const currentStatus = ride.status;
+    const currentStatus = ride.status as TripStatus;
 
     if (isTripImmutable(currentStatus)) {
       console.error(
@@ -103,7 +111,7 @@ export async function transitionTripStatus(
       };
     }
 
-    const statusHistory = (ride.statusHistory as StatusHistoryEntry[]) || [];
+    const statusHistory = ((ride as any).statusHistory as StatusHistoryEntry[]) || [];
     const newHistoryEntry: StatusHistoryEntry = {
       status: nextStatus,
       timestamp: new Date().toISOString(),
@@ -163,16 +171,16 @@ export async function getTripStatus(tripId: string): Promise<{
 } | null> {
   const ride = await prisma.ride.findUnique({
     where: { id: tripId },
-    select: { status: true, statusHistory: true },
   });
 
   if (!ride) return null;
 
+  const status = ride.status as TripStatus;
   return {
-    status: ride.status,
-    history: (ride.statusHistory as StatusHistoryEntry[]) || [],
-    nextAllowed: getNextAllowedStatus(ride.status),
-    isImmutable: isTripImmutable(ride.status),
+    status,
+    history: ((ride as any).statusHistory as StatusHistoryEntry[]) || [],
+    nextAllowed: getNextAllowedStatus(status),
+    isImmutable: isTripImmutable(status),
   };
 }
 
@@ -180,7 +188,7 @@ export function validateRoleForTransition(
   nextStatus: TripStatus,
   role: "rider" | "driver" | "admin"
 ): { allowed: boolean; reason?: string } {
-  const rolePermissions: Record<TripStatus, ("rider" | "driver" | "admin")[]> = {
+  const rolePermissions: Partial<Record<TripStatus, ("rider" | "driver" | "admin")[]>> = {
     DRIVER_ASSIGNED: ["admin", "driver"],
     DRIVER_ARRIVED: ["driver"],
     IN_PROGRESS: ["driver"],
@@ -189,7 +197,7 @@ export function validateRoleForTransition(
   };
 
   const allowed = rolePermissions[nextStatus];
-  if (!allowed) {
+  if (!allowed || allowed.length === 0) {
     return { allowed: false, reason: "Invalid status transition" };
   }
 

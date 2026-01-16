@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword, requireAuth, getCurrentUser, UserRole } f
 import { analyzeFraud } from "./fraud-detection";
 import { enforceMinimumFare, validateFare, MINIMUM_ZIBA_TAKE, COST_PER_TRIP, SAFETY_FACTOR } from "./minimum-fare";
 import { computeMapMetrics, getProtectionStatus, getGpsInterval, formatMetricsReport, MAP_COST_TARGETS, type DailyMapMetrics } from "./map-cost-protection";
+import { transitionTripStatus, getTripStatus, validateRoleForTransition, isTripImmutable, isTripCompleted, TripStatus, TRIP_STATUS_ORDER } from "./trip-state-machine";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1487,6 +1488,244 @@ export async function registerRoutes(
       console.error("Error rating user:", error);
       res.status(500).json({ message: "Failed to rate user" });
     }
+  });
+
+  // ==================== TRIP STATE MACHINE ====================
+  // Strict, forward-only trip lifecycle with server-enforced state transitions
+
+  // Get trip status and allowed next transition
+  app.get("/api/trips/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const status = await getTripStatus(id);
+      
+      if (!status) {
+        return res.status(404).json({ message: "Trip not found" });
+      }
+
+      res.json(status);
+    } catch (error) {
+      console.error("Error getting trip status:", error);
+      res.status(500).json({ message: "Failed to get trip status" });
+    }
+  });
+
+  // Assign driver to trip (REQUESTED → DRIVER_ASSIGNED)
+  app.post("/api/trips/:id/assign-driver", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { driverId } = req.body;
+      const currentUser = getCurrentUser(req);
+
+      // Role check - only admins and drivers can assign
+      const roleCheck = validateRoleForTransition("DRIVER_ASSIGNED", 
+        currentUser.role === "admin" ? "admin" : "driver");
+      if (!roleCheck.allowed) {
+        return res.status(403).json({ message: roleCheck.reason });
+      }
+
+      if (!driverId) {
+        return res.status(400).json({ message: "driverId is required" });
+      }
+
+      // Validate driver exists and is available
+      const driver = await prisma.driver.findUnique({
+        where: { id: driverId },
+        include: { rides: { where: { status: "IN_PROGRESS" } } }
+      });
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+      if (driver.status !== "ACTIVE") {
+        return res.status(400).json({ message: "Driver must be ACTIVE to be assigned" });
+      }
+      if (!driver.isOnline) {
+        return res.status(400).json({ message: "Driver must be ONLINE to be assigned" });
+      }
+      if (driver.rides.length > 0) {
+        return res.status(400).json({ message: "Driver is currently on another ride" });
+      }
+
+      // First update driverId, then transition status
+      await prisma.ride.update({
+        where: { id },
+        data: { driverId }
+      });
+
+      const result = await transitionTripStatus(id, "DRIVER_ASSIGNED", `driver:${driverId}`);
+      
+      if (!result.success) {
+        return res.status(result.code || 500).json({ message: result.error });
+      }
+
+      res.json(result.ride);
+    } catch (error) {
+      console.error("Error assigning driver:", error);
+      res.status(500).json({ message: "Failed to assign driver" });
+    }
+  });
+
+  // Driver arrived at pickup (DRIVER_ASSIGNED → DRIVER_ARRIVED)
+  app.post("/api/trips/:id/driver-arrived", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      // Role check - only driver can mark arrival
+      const roleCheck = validateRoleForTransition("DRIVER_ARRIVED", "driver");
+      if (currentUser.role !== "driver" && currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only driver can mark arrival" });
+      }
+
+      const result = await transitionTripStatus(id, "DRIVER_ARRIVED", 
+        `driver:${currentUser.id}`);
+      
+      if (!result.success) {
+        return res.status(result.code || 500).json({ message: result.error });
+      }
+
+      res.json(result.ride);
+    } catch (error) {
+      console.error("Error marking driver arrived:", error);
+      res.status(500).json({ message: "Failed to mark driver arrived" });
+    }
+  });
+
+  // Start trip (DRIVER_ARRIVED → IN_PROGRESS) - Locks fare
+  app.post("/api/trips/:id/start", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      // Role check - only driver can start trip
+      if (currentUser.role !== "driver" && currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only driver can start trip" });
+      }
+
+      const result = await transitionTripStatus(id, "IN_PROGRESS", 
+        `driver:${currentUser.id}`);
+      
+      if (!result.success) {
+        return res.status(result.code || 500).json({ message: result.error });
+      }
+
+      // Verify fare was locked
+      if (!result.ride?.lockedFare) {
+        console.warn(`[TRIP-STATE-WARNING] Trip ${id} started without lockedFare`);
+      }
+
+      res.json(result.ride);
+    } catch (error) {
+      console.error("Error starting trip:", error);
+      res.status(500).json({ message: "Failed to start trip" });
+    }
+  });
+
+  // Complete trip (IN_PROGRESS → COMPLETED) - Prevents GPS/route updates
+  app.post("/api/trips/:id/complete", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      // Role check - only driver can complete trip
+      if (currentUser.role !== "driver" && currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only driver can complete trip" });
+      }
+
+      // Get the ride for fraud analysis
+      const ride = await prisma.ride.findUnique({
+        where: { id },
+        include: { gpsLogs: true }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Trip not found" });
+      }
+
+      const result = await transitionTripStatus(id, "COMPLETED", 
+        `driver:${currentUser.id}`);
+      
+      if (!result.success) {
+        return res.status(result.code || 500).json({ message: result.error });
+      }
+
+      // Run fraud detection
+      const gpsPoints = ride.gpsLogs.map(log => ({
+        lat: log.lat,
+        lng: log.lng,
+        createdAt: log.createdAt
+      }));
+      
+      const fraudResult = analyzeFraud(
+        ride.estimatedDistance || 0,
+        ride.actualDistance || 0,
+        ride.estimatedDuration || 0,
+        ride.actualDuration || 0,
+        gpsPoints
+      );
+
+      // Update ride with fraud results
+      if (fraudResult.fraudScore > 0) {
+        await prisma.ride.update({
+          where: { id },
+          data: {
+            fraudScore: fraudResult.fraudScore,
+            isFlagged: fraudResult.isFlagged,
+            payoutHeld: fraudResult.fraudScore >= 4,
+            fraudReasons: JSON.stringify(fraudResult.reasons)
+          }
+        });
+      }
+
+      res.json(result.ride);
+    } catch (error) {
+      console.error("Error completing trip:", error);
+      res.status(500).json({ message: "Failed to complete trip" });
+    }
+  });
+
+  // Settle trip (COMPLETED → SETTLED) - Makes trip immutable
+  app.post("/api/trips/:id/settle", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      // Role check - only admin can settle trip
+      if (currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admin can settle trip" });
+      }
+
+      const result = await transitionTripStatus(id, "SETTLED", 
+        `admin:${currentUser.id}`);
+      
+      if (!result.success) {
+        return res.status(result.code || 500).json({ message: result.error });
+      }
+
+      res.json(result.ride);
+    } catch (error) {
+      console.error("Error settling trip:", error);
+      res.status(500).json({ message: "Failed to settle trip" });
+    }
+  });
+
+  // Failsafe: Block all mutations on COMPLETED/SETTLED trips
+  app.use("/api/trips/:id", async (req, res, next) => {
+    if (req.method === "GET") {
+      return next();
+    }
+
+    const { id } = req.params;
+    const tripStatus = await getTripStatus(id);
+
+    if (tripStatus && isTripImmutable(tripStatus.status)) {
+      console.error(`[TRIP-MUTATION-BLOCKED] tripId=${id} status=SETTLED`);
+      return res.status(403).json({ 
+        message: "Trip is settled and immutable. No modifications allowed." 
+      });
+    }
+
+    next();
   });
 
   // ==================== WALLETS ====================
