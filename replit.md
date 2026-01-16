@@ -1,6 +1,6 @@
 # Ziba - Ride-Hailing Platform
 
-## Stage 17 Complete - Payments, Wallet, Tips + Safe Test Mode
+## Stage 18 Complete - Hybrid Maps System + Driver App
 
 ## Overview
 Ziba is a ride-hailing and logistics platform, similar to Uber, designed to connect users with drivers for transportation services. The project is now production-ready, featuring a dynamic fare control system, advanced authentication with role-based access control, and comprehensive production hardening. Ziba aims to provide a robust, scalable, and user-friendly platform for ride-hailing operations across multiple countries, with a focus on efficient logistics, fair pricing, and comprehensive administrative oversight. The platform supports various user roles including users, drivers, directors, and administrators, each with tailored functionalities and access levels.
@@ -58,6 +58,21 @@ The Ziba platform is built with a modern web development stack:
     - TEST_MODE toggle in Admin UI - controls test account behavior
     - Test accounts only work when Test Mode is ON
     - No real money moves in SANDBOX mode
+- **Hybrid Maps System (Stage 18)**:
+    - **Locked Fare**: Fare is calculated ONCE at ride request and locked at trip start via `lockedFare` field - never recalculated mid-trip
+    - **No Turn-by-Turn Navigation**: Ziba does NOT implement in-app navigation or call Google routing APIs after trip start
+    - **External Navigation**: "Navigate" button in Driver App opens external Google Maps using deep links:
+      - Android: `google.navigation:q=LAT,LNG&mode=d`
+      - iOS: `comgooglemaps://?daddr=LAT,LNG&directionsmode=driving`
+      - Fallback to browser-based Google Maps if app unavailable
+    - **Light GPS Tracking**: GPS logged every 5-8 seconds during IN_PROGRESS rides for safety and fraud detection only
+    - **Database Fields**: Ride model extended with `pickupLat/Lng`, `dropoffLat/Lng`, `lockedFare`, `estimatedDistance`, `estimatedDuration`, `startedAt`, `completedAt`
+    - **GpsLog Model**: Stores safety tracking data with `rideId`, `driverId`, `lat`, `lng`, `speed`, `bearing`, `createdAt`
+- **Driver App (Stage 18)**:
+    - Driver Home (`/driver/home`): Dashboard with online/offline toggle, today's earnings/trips, rating, waiting for requests state
+    - Driver Active Ride (`/driver/ride/:id`): Full ride details, rider info, pickup/dropoff locations, Navigate button, status update buttons (Arrived, Start Trip, Complete Trip)
+    - Proper authentication guard with redirect to signup for unauthenticated users
+    - Pending verification handling for unverified drivers
 - **Core Features**:
     - **User and Driver Management**: Comprehensive CRUD operations for users and drivers, including status management, online/offline toggling for drivers, and rating systems.
     - **Ride Management**: End-to-end ride lifecycle management from request to completion, including driver assignment, ride status tracking, and automatic wallet transactions upon ride completion.

@@ -44,7 +44,7 @@ import LegalTerms from "@/pages/info/legal-terms";
 import LegalPrivacy from "@/pages/info/legal-privacy";
 import LegalCookies from "@/pages/info/legal-cookies";
 import SignupPage from "@/pages/signup";
-import DriverPendingVerification from "@/pages/driver/pending-verification";
+import DriverApp from "@/pages/driver";
 import DirectorPendingApproval from "@/pages/director/pending-approval";
 import RiderRideComplete from "@/pages/ride/complete-rider";
 import DriverRideComplete from "@/pages/ride/complete-driver";
@@ -86,13 +86,13 @@ function Router() {
       <Route path="/legal/privacy" component={LegalPrivacy} />
       <Route path="/legal/cookies" component={LegalCookies} />
       <Route path="/signup" component={SignupPage} />
-      <Route path="/driver/pending-verification" component={DriverPendingVerification} />
       <Route path="/director/pending-approval" component={DirectorPendingApproval} />
       <Route path="/ride/complete/rider" component={RiderRideComplete} />
       <Route path="/ride/complete/driver" component={DriverRideComplete} />
       <Route path="/rider/ride-complete" component={RiderRideComplete} />
       <Route path="/driver/ride-complete" component={DriverRideComplete} />
       <Route path="/rider/:rest*" component={RiderApp} />
+      <Route path="/driver/:rest*" component={DriverApp} />
       <Route component={NotFound} />
     </Switch>
   );

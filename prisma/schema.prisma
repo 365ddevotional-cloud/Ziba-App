@@ -84,15 +84,38 @@ model Ride {
   pickupLocation  String
   dropoffLocation String
   fareEstimate    Float?
+  lockedFare      Float?        // Fare locked at trip start - never recalculated
+  estimatedDistance Float?      // Distance in km calculated at trip start
+  estimatedDuration Float?      // Duration in minutes calculated at trip start
+  pickupLat       Float?        // Pickup latitude for navigation
+  pickupLng       Float?        // Pickup longitude for navigation
+  dropoffLat      Float?        // Dropoff latitude for navigation
+  dropoffLng      Float?        // Dropoff longitude for navigation
   status          RideStatus    @default(REQUESTED)
   userId          String
   driverId        String?
+  startedAt       DateTime?     // When trip actually started
+  completedAt     DateTime?     // When trip actually completed
   createdAt       DateTime      @default(now())
   user            User          @relation(fields: [userId], references: [id])
   driver          Driver?       @relation(fields: [driverId], references: [id])
   payment         Payment?
   driverRating    DriverRating?
   userRating      UserRating?
+  gpsLogs         GpsLog[]      // GPS tracking for safety/fraud detection
+}
+
+// GPS tracking for safety and fraud detection (every 5-8 seconds)
+model GpsLog {
+  id        String   @id @default(uuid())
+  rideId    String
+  driverId  String
+  lat       Float
+  lng       Float
+  speed     Float?   // Speed in km/h
+  bearing   Float?   // Heading direction
+  createdAt DateTime @default(now())
+  ride      Ride     @relation(fields: [rideId], references: [id])
 }
 
 model Admin {
