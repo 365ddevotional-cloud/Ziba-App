@@ -1365,7 +1365,7 @@ export async function registerRoutes(
   // Rate a driver (after completed ride)
   app.post("/api/ratings/driver", async (req, res) => {
     try {
-      const { rideId, rating } = req.body;
+      const { rideId, rating, feedback } = req.body;
 
       if (!rideId || rating === undefined) {
         return res.status(400).json({ message: "rideId and rating are required" });
@@ -1383,7 +1383,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "COMPLETED") {
+      if (ride.status !== "COMPLETED" && ride.status !== "SETTLED") {
         return res.status(400).json({ message: "Can only rate completed rides" });
       }
 
@@ -1399,6 +1399,7 @@ export async function registerRoutes(
       const driverRating = await prisma.driverRating.create({
         data: {
           rating,
+          feedback: feedback || null,
           rideId,
           driverId: ride.driverId,
           userId: ride.userId,
@@ -1429,7 +1430,7 @@ export async function registerRoutes(
   // Rate a user (after completed ride)
   app.post("/api/ratings/user", async (req, res) => {
     try {
-      const { rideId, rating } = req.body;
+      const { rideId, rating, feedback } = req.body;
 
       if (!rideId || rating === undefined) {
         return res.status(400).json({ message: "rideId and rating are required" });
@@ -1447,7 +1448,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "COMPLETED") {
+      if (ride.status !== "COMPLETED" && ride.status !== "SETTLED") {
         return res.status(400).json({ message: "Can only rate completed rides" });
       }
 
@@ -1463,6 +1464,7 @@ export async function registerRoutes(
       const userRating = await prisma.userRating.create({
         data: {
           rating,
+          feedback: feedback || null,
           rideId,
           userId: ride.userId,
           driverId: ride.driverId,
@@ -5882,6 +5884,352 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching commission audit log:", error);
       res.status(500).json({ message: "Failed to fetch audit log" });
+    }
+  });
+
+  // ==================== TRUST & SAFETY SYSTEM ====================
+
+  // Submit a report (rider or driver)
+  app.post("/api/report", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { reportedUserId, reportedRole, tripId, category, description } = req.body;
+
+      if (!reportedUserId || !reportedRole || !category || !description) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const validCategories = [
+        "UNSAFE_DRIVING",
+        "RUDE_BEHAVIOR",
+        "PAYMENT_ISSUE",
+        "FRAUD",
+        "HARASSMENT",
+        "VEHICLE_ISSUE",
+        "ROUTE_DEVIATION",
+        "OTHER"
+      ];
+
+      if (!validCategories.includes(category)) {
+        return res.status(400).json({ message: "Invalid report category" });
+      }
+
+      // Verify trip exists and user was part of it (if tripId provided)
+      if (tripId) {
+        const trip = await prisma.ride.findUnique({ where: { id: tripId } });
+        if (!trip) {
+          return res.status(404).json({ message: "Trip not found" });
+        }
+
+        const isParticipant = 
+          (currentUser.role === "rider" && trip.userId === currentUser.id) ||
+          (currentUser.role === "driver" && trip.driverId === currentUser.id);
+
+        if (!isParticipant) {
+          return res.status(403).json({ message: "You were not part of this trip" });
+        }
+      }
+
+      const report = await prisma.userReport.create({
+        data: {
+          reporterId: currentUser.id,
+          reporterRole: currentUser.role,
+          reportedUserId,
+          reportedRole,
+          tripId,
+          category,
+          description,
+        },
+      });
+
+      console.log(`[Report] Created report ${report.id} by ${currentUser.role}:${currentUser.id} against ${reportedRole}:${reportedUserId}`);
+
+      res.status(201).json({ 
+        id: report.id, 
+        message: "Report submitted successfully" 
+      });
+    } catch (error) {
+      console.error("Error creating report:", error);
+      res.status(500).json({ message: "Failed to submit report" });
+    }
+  });
+
+  // Get user's own reports (rider or driver)
+  app.get("/api/my-reports", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const reports = await prisma.userReport.findMany({
+        where: { reporterId: currentUser.id },
+        orderBy: { createdAt: "desc" },
+      });
+
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      res.status(500).json({ message: "Failed to fetch reports" });
+    }
+  });
+
+  // Admin: Get all reports
+  app.get("/api/admin/reports", requireAuth("admin"), async (req, res) => {
+    try {
+      const { status, category } = req.query;
+
+      const where: any = {};
+      if (status && status !== "ALL") {
+        where.status = status;
+      }
+      if (category && category !== "ALL") {
+        where.category = category;
+      }
+
+      const reports = await prisma.userReport.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+      });
+
+      // Enrich with user/driver details
+      const enrichedReports = await Promise.all(
+        reports.map(async (report) => {
+          let reporter = null;
+          let reported = null;
+
+          if (report.reporterRole === "rider") {
+            reporter = await prisma.user.findUnique({
+              where: { id: report.reporterId },
+              select: { id: true, fullName: true, email: true },
+            });
+          } else if (report.reporterRole === "driver") {
+            reporter = await prisma.driver.findUnique({
+              where: { id: report.reporterId },
+              select: { id: true, fullName: true, email: true },
+            });
+          }
+
+          if (report.reportedRole === "rider") {
+            reported = await prisma.user.findUnique({
+              where: { id: report.reportedUserId },
+              select: { id: true, fullName: true, email: true, status: true, averageRating: true },
+            });
+          } else if (report.reportedRole === "driver") {
+            reported = await prisma.driver.findUnique({
+              where: { id: report.reportedUserId },
+              select: { id: true, fullName: true, email: true, status: true, averageRating: true },
+            });
+          }
+
+          return {
+            ...report,
+            reporter,
+            reported,
+          };
+        })
+      );
+
+      res.json(enrichedReports);
+    } catch (error) {
+      console.error("Error fetching admin reports:", error);
+      res.status(500).json({ message: "Failed to fetch reports" });
+    }
+  });
+
+  // Admin: Review a report
+  app.post("/api/admin/reports/:id/review", requireAuth("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, actionTaken } = req.body;
+      const adminId = (req.session as any).adminId;
+
+      if (!status || !["REVIEWED", "ACTION_TAKEN", "DISMISSED"].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      const report = await prisma.userReport.findUnique({ where: { id } });
+      if (!report) {
+        return res.status(404).json({ message: "Report not found" });
+      }
+
+      const updatedReport = await prisma.userReport.update({
+        where: { id },
+        data: {
+          status,
+          actionTaken,
+          reviewedAt: new Date(),
+          reviewedBy: adminId,
+        },
+      });
+
+      console.log(`[Report] Report ${id} reviewed by admin ${adminId}: ${status}`);
+
+      res.json(updatedReport);
+    } catch (error) {
+      console.error("Error reviewing report:", error);
+      res.status(500).json({ message: "Failed to review report" });
+    }
+  });
+
+  // Admin: Suspend a user or driver
+  app.post("/api/admin/suspend-user", requireAuth("admin"), async (req, res) => {
+    try {
+      const { userId, role, reason } = req.body;
+      const adminId = (req.session as any).adminId;
+
+      if (!userId || !role || !reason) {
+        return res.status(400).json({ message: "userId, role, and reason are required" });
+      }
+
+      if (role === "rider") {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        await prisma.user.update({
+          where: { id: userId },
+          data: { status: "SUSPENDED" },
+        });
+
+        console.log(`[TrustSafety] User ${userId} suspended by admin ${adminId}: ${reason}`);
+      } else if (role === "driver") {
+        const driver = await prisma.driver.findUnique({ where: { id: userId } });
+        if (!driver) {
+          return res.status(404).json({ message: "Driver not found" });
+        }
+
+        await prisma.driver.update({
+          where: { id: userId },
+          data: { status: "SUSPENDED", isOnline: false },
+        });
+
+        console.log(`[TrustSafety] Driver ${userId} suspended by admin ${adminId}: ${reason}`);
+      } else {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      res.json({ message: `${role} suspended successfully` });
+    } catch (error) {
+      console.error("Error suspending user:", error);
+      res.status(500).json({ message: "Failed to suspend user" });
+    }
+  });
+
+  // Admin: Unsuspend a user or driver
+  app.post("/api/admin/unsuspend-user", requireAuth("admin"), async (req, res) => {
+    try {
+      const { userId, role } = req.body;
+      const adminId = (req.session as any).adminId;
+
+      if (!userId || !role) {
+        return res.status(400).json({ message: "userId and role are required" });
+      }
+
+      if (role === "rider") {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        await prisma.user.update({
+          where: { id: userId },
+          data: { status: "ACTIVE" },
+        });
+
+        console.log(`[TrustSafety] User ${userId} unsuspended by admin ${adminId}`);
+      } else if (role === "driver") {
+        const driver = await prisma.driver.findUnique({ where: { id: userId } });
+        if (!driver) {
+          return res.status(404).json({ message: "Driver not found" });
+        }
+
+        await prisma.driver.update({
+          where: { id: userId },
+          data: { status: "ACTIVE" },
+        });
+
+        console.log(`[TrustSafety] Driver ${userId} unsuspended by admin ${adminId}`);
+      } else {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      res.json({ message: `${role} unsuspended successfully` });
+    } catch (error) {
+      console.error("Error unsuspending user:", error);
+      res.status(500).json({ message: "Failed to unsuspend user" });
+    }
+  });
+
+  // Admin: Get trust & safety stats
+  app.get("/api/admin/trust-safety/stats", requireAuth("admin"), async (req, res) => {
+    try {
+      const [
+        openReports,
+        reviewedReports,
+        suspendedUsers,
+        suspendedDrivers,
+        lowRatedDrivers,
+      ] = await Promise.all([
+        prisma.userReport.count({ where: { status: "OPEN" } }),
+        prisma.userReport.count({ where: { status: { in: ["REVIEWED", "ACTION_TAKEN"] } } }),
+        prisma.user.count({ where: { status: "SUSPENDED" } }),
+        prisma.driver.count({ where: { status: "SUSPENDED" } }),
+        prisma.driver.count({ where: { averageRating: { lt: 4.0, gt: 0 } } }),
+      ]);
+
+      res.json({
+        openReports,
+        reviewedReports,
+        suspendedUsers,
+        suspendedDrivers,
+        lowRatedDrivers,
+      });
+    } catch (error) {
+      console.error("Error fetching trust & safety stats:", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  // Admin: Get all ratings
+  app.get("/api/admin/ratings", requireAuth("admin"), async (req, res) => {
+    try {
+      const driverRatings = await prisma.driverRating.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          driver: { select: { id: true, fullName: true, email: true } },
+          ride: { select: { id: true, pickupLocation: true, dropoffLocation: true } },
+        },
+      });
+
+      const userRatings = await prisma.userRating.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          user: { select: { id: true, fullName: true, email: true } },
+          ride: { select: { id: true, pickupLocation: true, dropoffLocation: true } },
+        },
+      });
+
+      res.json({
+        driverRatings: driverRatings.map(r => ({
+          ...r,
+          type: "RIDER_TO_DRIVER",
+        })),
+        userRatings: userRatings.map(r => ({
+          ...r,
+          type: "DRIVER_TO_RIDER",
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching ratings:", error);
+      res.status(500).json({ message: "Failed to fetch ratings" });
     }
   });
 

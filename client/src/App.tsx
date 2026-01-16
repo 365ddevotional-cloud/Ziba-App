@@ -28,6 +28,7 @@ import AdminPlatformSettingsPage from "@/pages/admin-platform-settings";
 import AdminPayoutsPage from "@/pages/admin-payouts";
 import AdminTestAccountsPage from "@/pages/admin-test-accounts";
 import AdminPlayStoreChecklistPage from "@/pages/admin-playstore-checklist";
+import AdminTrustSafetyPage from "@/pages/admin-trust-safety";
 import AdminLoginPage from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
 import WhySafeAndSecure from "@/pages/info/why-safe-and-secure";
@@ -74,6 +75,7 @@ function Router() {
       <Route path="/admin/payouts" component={AdminPayoutsPage} />
       <Route path="/admin/test-accounts" component={AdminTestAccountsPage} />
       <Route path="/admin/playstore-checklist" component={AdminPlayStoreChecklistPage} />
+      <Route path="/admin/trust-safety" component={AdminTrustSafetyPage} />
       <Route path="/why/safe-and-secure" component={WhySafeAndSecure} />
       <Route path="/why/always-available" component={WhyAlwaysAvailable} />
       <Route path="/why/city-wide-coverage" component={WhyCityWideCoverage} />

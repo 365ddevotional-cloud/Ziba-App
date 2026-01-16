@@ -1,0 +1,140 @@
+You are implementing the Ratings, Reports, and Trust & Safety system for the Ziba ride-hailing platform.
+
+GOAL:
+Create a two-way rating system (rider ↔ driver), abuse reporting, admin moderation tools, and automatic trust enforcement.
+
+STRICT RULES:
+- Ratings can only happen AFTER a trip is COMPLETED
+- One rating per trip per user
+- Ratings affect driver visibility and rider trust
+- Reports are private and admin-only
+- Admin has final authority on suspensions
+
+--------------------------------
+1. DATABASE MODELS
+--------------------------------
+
+TripRating:
+- id
+- tripId
+- fromUserId
+- toUserId
+- role: RIDER_TO_DRIVER | DRIVER_TO_RIDER
+- rating (1–5)
+- feedback (optional)
+- createdAt
+
+UserReport:
+- id
+- tripId (optional)
+- reporterId
+- reportedUserId
+- category:
+  - Unsafe driving
+  - Rude behavior
+  - Payment issue
+  - Fraud
+  - Harassment
+  - Other
+- description
+- status: OPEN | REVIEWED | ACTION_TAKEN
+- createdAt
+- reviewedBy (adminId)
+
+UserTrust:
+- userId
+- role (RIDER | DRIVER)
+- averageRating
+- totalRatings
+- reportCount
+- isSuspended (boolean)
+- suspensionReason (nullable)
+
+--------------------------------
+2. RATING FLOW
+--------------------------------
+
+POST /api/rating
+- Body: { tripId, rating, feedback }
+- Validate:
+  - trip exists
+  - trip status = COMPLETED
+  - user participated in trip
+  - rating not already submitted
+- Save rating
+- Update UserTrust averages
+
+--------------------------------
+3. REPORT FLOW
+--------------------------------
+
+POST /api/report
+- Body: { reportedUserId, tripId?, category, description }
+- Save report
+- Increment reportCount
+
+--------------------------------
+4. AUTOMATIC TRUST RULES
+--------------------------------
+
+Apply server-side rules:
+
+DRIVER:
+- avg rating < 4.2 → deprioritize in matching
+- avg rating < 3.8 → temporary suspension
+- 3+ serious reports → admin review required
+
+RIDER:
+- excessive cancellations → deprioritize matching
+- repeated abuse reports → suspension
+
+--------------------------------
+5. ADMIN CONTROLS
+--------------------------------
+
+Admin APIs:
+GET /api/admin/reports
+GET /api/admin/ratings
+POST /api/admin/suspend-user
+POST /api/admin/unsuspend-user
+
+Admin Dashboard:
+- View ratings per user
+- View reports with filters
+- Suspend / Unsuspend users
+- Add suspension reasons
+
+--------------------------------
+6. UI REQUIREMENTS
+--------------------------------
+
+Rider:
+- Rate driver screen (already exists — wire it properly)
+- Report driver option in trip history
+
+Driver:
+- Rate rider after trip
+- Report rider option
+
+Admin:
+- Trust & Safety dashboard
+
+--------------------------------
+7. SECURITY
+--------------------------------
+
+- Ratings immutable after submission
+- Reports hidden from reported user
+- Admin actions logged
+- No client-side trust enforcement
+
+--------------------------------
+END RESULT
+--------------------------------
+
+Ziba now has:
+- Two-way ratings
+- Abuse reporting
+- Trust enforcement
+- Admin moderation
+- Safer marketplace

@@ -404,6 +404,21 @@ export default function AdminPage() {
                 </Link>
               </Card>
 
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover cursor-pointer">
+                <Link href="/admin/trust-safety">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Shield className="h-5 w-5 text-ziba-accent" />
+                        <CardTitle className="text-ziba-text-primary">Trust & Safety</CardTitle>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
+                    </div>
+                    <CardDescription className="text-ziba-text-secondary">Manage reports, ratings, and user suspensions</CardDescription>
+                  </CardHeader>
+                </Link>
+              </Card>
+
               <Card className="bg-ziba-card border-dashed border-amber-500/50 ziba-card-hover cursor-pointer">
                 <Link href="/admin/test-accounts">
                   <CardHeader>

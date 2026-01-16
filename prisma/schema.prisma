@@ -167,6 +167,7 @@ model Director {
 model DriverRating {
   id        String   @id @default(uuid())
   rating    Int
+  feedback  String?
   rideId    String   @unique
   driverId  String
   userId    String
@@ -178,6 +179,7 @@ model DriverRating {
 model UserRating {
   id        String   @id @default(uuid())
   rating    Int
+  feedback  String?
   rideId    String   @unique
   userId    String
   driverId  String
@@ -454,4 +456,40 @@ enum PayoutStatus {
   APPROVED
   REJECTED
   PAID
+}
+
+// ==================== TRUST & SAFETY SYSTEM ====================
+
+model UserReport {
+  id              String       @id @default(uuid())
+  tripId          String?
+  reporterId      String
+  reporterRole    String
+  reportedUserId  String
+  reportedRole    String
+  category        ReportCategory
+  description     String
+  status          ReportStatus @default(OPEN)
+  createdAt       DateTime     @default(now())
+  reviewedAt      DateTime?
+  reviewedBy      String?
+  actionTaken     String?
+}
+
+enum ReportCategory {
+  UNSAFE_DRIVING
+  RUDE_BEHAVIOR
+  PAYMENT_ISSUE
+  FRAUD
+  HARASSMENT
+  VEHICLE_ISSUE
+  ROUTE_DEVIATION
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWED
+  ACTION_TAKEN
+  DISMISSED
 }
