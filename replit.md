@@ -15,7 +15,15 @@ The Ziba platform is built with a modern web development stack:
 - **Database**: PostgreSQL is used as the primary data store, with Prisma ORM facilitating seamless database interactions and schema management.
 - **Authentication**: Features `bcrypt` for secure password hashing and `express-session` with a PostgreSQL store for session management. 
     - **Admin Login**: Available at `/api/auth/login` with role="admin". Founder admin account: `founder@ziba.app` with password `admin-ziba-2013` (auto-created on server start if no admins exist, idempotent).
-    - **Rider Login**: Available at `/api/rider/login` and `/api/rider/register` for rider authentication.
+    - **Multi-Role Signup System** (Stage 18):
+      - Unified signup page at `/signup` with role tabs (Rider, Driver, Director)
+      - **Rider Signup**: Instant activation via `/api/rider/register` - accounts are immediately active
+      - **Driver Signup**: Pending verification via `/api/driver/register` - accounts created with `status=PENDING`, `isVerified=false`; login blocked until admin verifies
+      - **Director Signup**: Pending approval via `/api/director/register` - accounts created with `status=PENDING`, `isVerified=false`, `isApproved=false`; login blocked until admin verifies AND approves
+    - **Role-Aware Login**:
+      - Rider login: `/api/rider/login` - standard authentication
+      - Driver login: `/api/driver/login` - returns 403 with redirect to `/driver/pending-verification` if unverified
+      - Director login: `/api/director/login` - returns 403 with redirect to `/director/pending-approval` if unverified or unapproved
     - All `/api/admin/*` routes require ADMIN role (401 if not authenticated as admin).
     - All `/api/rider/*` routes require RIDER role with active session.
     - Test account impersonation system allows admin to login as any test account for development testing.
