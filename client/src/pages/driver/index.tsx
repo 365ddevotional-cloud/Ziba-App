@@ -2,6 +2,7 @@ import { Switch, Route, Redirect } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import DriverHome from "./home";
 import DriverActiveRide from "./active-ride";
+import DriverWallet from "./wallet";
 import DriverPendingVerification from "./pending-verification";
 import { Loader2 } from "lucide-react";
 
@@ -47,6 +48,11 @@ export default function DriverApp() {
       <Route path="/driver/ride/:id">
         <DriverAuthGuard>
           <DriverActiveRide />
+        </DriverAuthGuard>
+      </Route>
+      <Route path="/driver/wallet">
+        <DriverAuthGuard>
+          <DriverWallet />
         </DriverAuthGuard>
       </Route>
       <Route path="/driver/home">

@@ -1,18 +1,17 @@
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { RiderBottomNav } from "@/components/rider-bottom-nav";
 import {
   Wallet as WalletIcon,
   ChevronLeft,
   ChevronRight,
   Loader2,
-  Plus,
   ArrowUpRight,
   ArrowDownLeft,
-  CreditCard,
   DollarSign,
+  CreditCard,
+  TrendingUp,
 } from "lucide-react";
 
 interface Transaction {
@@ -32,11 +31,9 @@ interface WalletData {
   transactions: Transaction[];
 }
 
-export default function RiderWallet() {
-  const [, navigate] = useLocation();
-
+export default function DriverWallet() {
   const { data: wallet, isLoading } = useQuery<WalletData>({
-    queryKey: ["/api/rider/wallet"],
+    queryKey: ["/api/driver/wallet"],
     staleTime: 1000 * 60,
   });
 
@@ -55,7 +52,6 @@ export default function RiderWallet() {
       case "CREDIT":
         return <ArrowDownLeft className="w-4 h-4 text-green-500" />;
       case "DEBIT":
-      case "RIDE_PAYMENT":
         return <ArrowUpRight className="w-4 h-4 text-red-500" />;
       case "TIP":
         return <DollarSign className="w-4 h-4 text-yellow-500" />;
@@ -63,6 +59,8 @@ export default function RiderWallet() {
         return <WalletIcon className="w-4 h-4 text-amber-500" />;
       case "RELEASE":
         return <WalletIcon className="w-4 h-4 text-blue-500" />;
+      case "COMMISSION":
+        return <TrendingUp className="w-4 h-4 text-purple-500" />;
       default:
         return <CreditCard className="w-4 h-4 text-muted-foreground" />;
     }
@@ -72,34 +70,62 @@ export default function RiderWallet() {
     if (description) return description;
     switch (type) {
       case "CREDIT":
-        return "Added to wallet";
+        return "Earnings credited";
       case "DEBIT":
         return "Withdrawal";
-      case "RIDE_PAYMENT":
-        return "Ride payment";
       case "TIP":
-        return "Tip to driver";
+        return "Tip received";
       case "HOLD":
-        return "Funds held for trip";
+        return "Funds on hold";
       case "RELEASE":
         return "Funds released";
+      case "COMMISSION":
+        return "Platform commission";
       default:
         return type.replace(/_/g, " ");
+    }
+  };
+
+  const getTransactionColor = (type: string) => {
+    switch (type) {
+      case "CREDIT":
+      case "TIP":
+        return "text-green-500";
+      case "DEBIT":
+      case "COMMISSION":
+        return "text-red-500";
+      default:
+        return "text-foreground";
+    }
+  };
+
+  const getTransactionPrefix = (type: string) => {
+    switch (type) {
+      case "CREDIT":
+      case "TIP":
+      case "RELEASE":
+        return "+";
+      case "DEBIT":
+      case "HOLD":
+      case "COMMISSION":
+        return "-";
+      default:
+        return "";
     }
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="p-4 flex items-center gap-3 border-b border-border">
-        <Link href="/rider/home">
+        <Link href="/driver/home">
           <Button size="icon" variant="ghost" data-testid="button-back">
             <ChevronLeft className="w-5 h-5" />
           </Button>
         </Link>
-        <h1 className="font-semibold text-foreground">Wallet</h1>
+        <h1 className="font-semibold text-foreground">Earnings</h1>
       </header>
 
-      <main className="flex-1 p-4 space-y-4 pb-20">
+      <main className="flex-1 p-4 space-y-4 pb-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -113,62 +139,56 @@ export default function RiderWallet() {
           </div>
         ) : (
           <>
-            <Card className="bg-gradient-to-br from-primary to-primary/80">
+            <Card className="bg-gradient-to-br from-accent to-accent/80">
               <CardContent className="p-6 text-center">
-                <p className="text-sm text-primary-foreground/80 mb-2">Available Balance</p>
-                <p className="text-4xl font-bold text-primary-foreground" data-testid="text-balance">
+                <p className="text-sm text-accent-foreground/80 mb-2">Available Balance</p>
+                <p className="text-4xl font-bold text-accent-foreground" data-testid="text-balance">
                   {wallet.currency} {wallet.balance.toLocaleString()}
                 </p>
                 {wallet.lockedBalance > 0 && (
-                  <p className="text-sm text-primary-foreground/70 mt-2" data-testid="text-locked-balance">
-                    {wallet.currency} {wallet.lockedBalance.toLocaleString()} held for active trip
+                  <p className="text-sm text-accent-foreground/70 mt-2" data-testid="text-locked-balance">
+                    {wallet.currency} {wallet.lockedBalance.toLocaleString()} pending settlement
                   </p>
                 )}
-                <div className="flex justify-center gap-3 mt-6">
-                  <Link href="/rider/wallet/add-funds">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="gap-2"
-                      data-testid="button-add-funds"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add Funds
-                    </Button>
-                  </Link>
-                </div>
               </CardContent>
             </Card>
 
             <div className="grid grid-cols-2 gap-3">
-              <Card 
-                className="hover-elevate cursor-pointer" 
-                onClick={() => navigate("/rider/wallet/add-card")}
-                data-testid="card-add-card"
-              >
+              <Card className="hover-elevate">
                 <CardContent className="p-4 text-center">
-                  <CreditCard className="w-6 h-6 text-primary mx-auto mb-2" />
-                  <p className="text-sm font-medium text-foreground">Add Card</p>
+                  <TrendingUp className="w-6 h-6 text-green-500 mx-auto mb-2" />
+                  <p className="text-lg font-semibold text-foreground" data-testid="text-total-earned">
+                    {wallet.currency} {wallet.transactions
+                      .filter(tx => tx.type === "CREDIT")
+                      .reduce((sum, tx) => sum + tx.amount, 0)
+                      .toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Total Earned</p>
                 </CardContent>
               </Card>
-              <Card 
-                className="hover-elevate cursor-pointer" 
-                onClick={() => navigate("/rider/wallet/payment-methods")}
-                data-testid="card-payment-methods"
-              >
+              <Card className="hover-elevate">
                 <CardContent className="p-4 text-center">
-                  <WalletIcon className="w-6 h-6 text-primary mx-auto mb-2" />
-                  <p className="text-sm font-medium text-foreground">Payment Methods</p>
+                  <DollarSign className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
+                  <p className="text-lg font-semibold text-foreground" data-testid="text-tips-earned">
+                    {wallet.currency} {wallet.transactions
+                      .filter(tx => tx.type === "TIP")
+                      .reduce((sum, tx) => sum + tx.amount, 0)
+                      .toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Tips Received</p>
                 </CardContent>
               </Card>
             </div>
 
             <div>
-              <h2 className="font-semibold text-foreground mb-3">Recent Transactions</h2>
+              <h2 className="font-semibold text-foreground mb-3">Transaction History</h2>
               {wallet.transactions.length === 0 ? (
                 <Card>
                   <CardContent className="p-6 text-center">
                     <p className="text-muted-foreground">No transactions yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Complete trips to start earning
+                    </p>
                   </CardContent>
                 </Card>
               ) : (
@@ -176,17 +196,16 @@ export default function RiderWallet() {
                   {wallet.transactions.map((tx) => (
                     <Card 
                       key={tx.id} 
-                      className="hover-elevate cursor-pointer"
-                      onClick={() => navigate(`/rider/wallet/transaction/${tx.id}`)}
+                      className="hover-elevate"
                       data-testid={`card-transaction-${tx.id}`}
                     >
-                      <CardContent className="p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                      <CardContent className="p-3 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
                             {getTransactionIcon(tx.type)}
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-foreground">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">
                               {getTransactionLabel(tx.type, tx.description)}
                             </p>
                             <p className="text-xs text-muted-foreground">
@@ -194,11 +213,9 @@ export default function RiderWallet() {
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`font-semibold ${
-                            tx.type === "CREDIT" ? "text-green-500" : "text-foreground"
-                          }`}>
-                            {tx.type === "CREDIT" ? "+" : "-"}NGN {tx.amount.toLocaleString()}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`font-semibold ${getTransactionColor(tx.type)}`}>
+                            {getTransactionPrefix(tx.type)}{wallet.currency} {tx.amount.toLocaleString()}
                           </span>
                           <ChevronRight className="w-4 h-4 text-muted-foreground" />
                         </div>
@@ -211,8 +228,6 @@ export default function RiderWallet() {
           </>
         )}
       </main>
-
-      <RiderBottomNav activeTab="wallet" />
     </div>
   );
 }
