@@ -19,7 +19,7 @@ import {
   Navigation,
 } from "lucide-react";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface CompletedRide {
   id: string;
@@ -47,10 +47,17 @@ export default function DriverRideComplete() {
   const [selectedRating, setSelectedRating] = useState(0);
   const [showReportIssue, setShowReportIssue] = useState(false);
 
-  const { data: ride, isLoading, isError } = useQuery<CompletedRide>({
+  const { data: ride, isLoading, isError, error } = useQuery<CompletedRide>({
     queryKey: ["/api/driver/last-completed-ride"],
     staleTime: 1000 * 60,
+    retry: false,
   });
+
+  useEffect(() => {
+    if (error && (error as any)?.message?.includes("401")) {
+      navigate("/driver/pending-verification");
+    }
+  }, [error, navigate]);
 
   const rateMutation = useMutation({
     mutationFn: async ({ rideId, rating }: { rideId: string; rating: number }) => {

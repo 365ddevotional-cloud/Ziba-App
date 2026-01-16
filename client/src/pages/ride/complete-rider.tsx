@@ -20,7 +20,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface CompletedRide {
   id: string;
@@ -53,10 +53,17 @@ export default function RiderRideComplete() {
   const [feedback, setFeedback] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
 
-  const { data: ride, isLoading, isError } = useQuery<CompletedRide>({
+  const { data: ride, isLoading, isError, error } = useQuery<CompletedRide>({
     queryKey: ["/api/rider/last-completed-ride"],
     staleTime: 1000 * 60,
+    retry: false,
   });
+
+  useEffect(() => {
+    if (error && (error as any)?.message?.includes("401")) {
+      navigate("/rider/login");
+    }
+  }, [error, navigate]);
 
   const rateMutation = useMutation({
     mutationFn: async ({ rideId, rating }: { rideId: string; rating: number }) => {
