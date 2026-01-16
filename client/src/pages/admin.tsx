@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog, Wifi, DollarSign, Gift, Wallet, BarChart3, Calculator, KeyRound, FlaskConical, Smartphone, Settings, Percent, Send } from "lucide-react";
+import { Loader2, Users, Car, MapPin, Shield, ArrowRight, CheckCircle, Clock, Activity, XCircle, UserCog, Wifi, DollarSign, Gift, Wallet, BarChart3, Calculator, KeyRound, FlaskConical, Smartphone, Settings, Percent, Send, Megaphone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
@@ -415,6 +415,21 @@ export default function AdminPage() {
                       <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
                     </div>
                     <CardDescription className="text-ziba-text-secondary">Manage reports, ratings, and user suspensions</CardDescription>
+                  </CardHeader>
+                </Link>
+              </Card>
+
+              <Card className="bg-ziba-card border-ziba-border ziba-card-hover cursor-pointer">
+                <Link href="/admin/announcements">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Megaphone className="h-5 w-5 text-ziba-accent" />
+                        <CardTitle className="text-ziba-text-primary">Announcements</CardTitle>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-ziba-text-secondary" />
+                    </div>
+                    <CardDescription className="text-ziba-text-secondary">Send notifications to riders and drivers</CardDescription>
                   </CardHeader>
                 </Link>
               </Card>

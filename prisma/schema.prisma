@@ -218,9 +218,11 @@ model Notification {
   id        String           @id @default(uuid())
   userId    String
   role      String
+  title     String
   message   String
   type      NotificationType
   read      Boolean          @default(false)
+  metadata  Json?
   createdAt DateTime         @default(now())
 }
 
@@ -390,9 +392,18 @@ enum TransactionType {
 enum NotificationType {
   RIDE_REQUESTED
   RIDE_ASSIGNED
+  DRIVER_ASSIGNED
+  TRIP_STARTED
+  TRIP_COMPLETED
   RIDE_COMPLETED
+  PAYMENT_HELD
+  PAYMENT_RELEASED
+  PAYOUT_SENT
+  RATING_RECEIVED
+  REPORT_STATUS
   WALLET_UPDATED
   STATUS_CHANGE
+  ADMIN_ANNOUNCEMENT
   SYSTEM
 }
 

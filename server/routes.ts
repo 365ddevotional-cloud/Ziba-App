@@ -2203,6 +2203,86 @@ export async function registerRoutes(
     }
   });
 
+  // Admin send announcement
+  app.post("/api/admin/announcement", requireAuth("admin"), async (req, res) => {
+    try {
+      const { title, message, targetAudience } = req.body;
+      const adminId = (req.session as any).adminId;
+
+      if (!title || !message || !targetAudience) {
+        return res.status(400).json({ message: "Title, message, and targetAudience are required" });
+      }
+
+      if (!["all", "riders", "drivers"].includes(targetAudience)) {
+        return res.status(400).json({ message: "Invalid target audience" });
+      }
+
+      const notifications: any[] = [];
+
+      if (targetAudience === "all" || targetAudience === "riders") {
+        const riders = await prisma.user.findMany({
+          where: { status: "ACTIVE" },
+          select: { id: true },
+        });
+        riders.forEach((rider) => {
+          notifications.push({
+            userId: rider.id,
+            role: "rider",
+            title,
+            message,
+            type: "ADMIN_ANNOUNCEMENT",
+            metadata: { adminId, targetAudience },
+          });
+        });
+      }
+
+      if (targetAudience === "all" || targetAudience === "drivers") {
+        const drivers = await prisma.driver.findMany({
+          where: { status: "ACTIVE" },
+          select: { id: true },
+        });
+        drivers.forEach((driver) => {
+          notifications.push({
+            userId: driver.id,
+            role: "driver",
+            title,
+            message,
+            type: "ADMIN_ANNOUNCEMENT",
+            metadata: { adminId, targetAudience },
+          });
+        });
+      }
+
+      if (notifications.length > 0) {
+        await prisma.notification.createMany({
+          data: notifications,
+        });
+      }
+
+      console.log(`[Admin] Announcement sent to ${notifications.length} users by admin ${adminId}`);
+      res.json({ success: true, count: notifications.length });
+    } catch (error) {
+      console.error("Error sending announcement:", error);
+      res.status(500).json({ message: "Failed to send announcement" });
+    }
+  });
+
+  // Get announcement history (admin only)
+  app.get("/api/admin/announcements", requireAuth("admin"), async (req, res) => {
+    try {
+      const announcements = await prisma.notification.findMany({
+        where: { type: "ADMIN_ANNOUNCEMENT" },
+        orderBy: { createdAt: "desc" },
+        distinct: ["title", "message"],
+        take: 50,
+      });
+      res.json(announcements);
+    } catch (error) {
+      console.error("Error fetching announcements:", error);
+      res.status(500).json({ message: "Failed to fetch announcements" });
+    }
+  });
+
   // ==================== FARE CONFIG ====================
 
   // Get all fare configs (admin only)
