@@ -6,8 +6,11 @@ import { calculateFare } from "@/lib/pricing";
 import { useTrip } from "@/lib/trip-context";
 import { useDriverStore } from "@/lib/driver-store";
 import { useWallet } from "@/lib/wallet-context";
+import { useRiderAuth } from "@/lib/rider-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { RiderBottomNav } from "@/components/rider-bottom-nav";
 import {
@@ -32,6 +35,7 @@ export default function RiderConfirm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const { user } = useRiderAuth();
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
   const pickup = params.get("pickup") || "";
@@ -44,6 +48,9 @@ export default function RiderConfirm() {
   const { canAfford, updateRiderBalance } = useWallet();
   const [selectedPayment, setSelectedPayment] = useState("wallet");
   const [rideMode, setRideMode] = useState<"PRIVATE" | "SHARE">("PRIVATE");
+  const [passengerName, setPassengerName] = useState("");
+  const [passengerPhone, setPassengerPhone] = useState("");
+  const [passengerNotes, setPassengerNotes] = useState("");
   const [routeData, setRouteData] = useState<{ distance: number; duration: number } | null>(
     distanceParam && durationParam
       ? { distance: parseFloat(distanceParam), duration: parseInt(durationParam, 10) }
@@ -80,19 +87,33 @@ export default function RiderConfirm() {
       const destLng = 3.3792 + (Math.random() - 0.5) * 0.1;
 
       // Make API call to request ride
+      const requestBody: any = {
+        pickupLocation: pickup,
+        dropoffLocation: destination,
+        fareEstimate: fareEstimate.fare,
+        rideMode: rideMode,
+        pickupLat,
+        pickupLng,
+        destLat,
+        destLng,
+      };
+
+      // Add passenger fields if coordinator
+      if (user?.isTripCoordinator) {
+        if (!passengerName || !passengerPhone) {
+          throw new Error("Passenger name and phone are required when booking as a trip coordinator");
+        }
+        requestBody.passengerName = passengerName;
+        requestBody.passengerPhone = passengerPhone;
+        if (passengerNotes) {
+          requestBody.passengerNotes = passengerNotes;
+        }
+      }
+
       const response = await fetch("/api/rider/request-ride", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pickupLocation: pickup,
-          dropoffLocation: destination,
-          fareEstimate: fareEstimate.fare,
-          rideMode: rideMode,
-          pickupLat,
-          pickupLng,
-          destLat,
-          destLng,
-        }),
+        body: JSON.stringify(requestBody),
         credentials: "include",
       });
 
@@ -224,6 +245,51 @@ export default function RiderConfirm() {
             )}
           </CardContent>
         </Card>
+
+        {/* Passenger Info (if coordinator) */}
+        {user?.isTripCoordinator && (
+          <Card>
+            <CardContent className="p-4 space-y-4">
+              <div>
+                <h2 className="text-sm font-medium text-foreground mb-3">Passenger Information</h2>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="passengerName">Passenger Name *</Label>
+                    <Input
+                      id="passengerName"
+                      type="text"
+                      placeholder="John Doe"
+                      value={passengerName}
+                      onChange={(e) => setPassengerName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="passengerPhone">Passenger Phone *</Label>
+                    <Input
+                      id="passengerPhone"
+                      type="tel"
+                      placeholder="+2348012345678"
+                      value={passengerPhone}
+                      onChange={(e) => setPassengerPhone(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="passengerNotes">Notes (Optional)</Label>
+                    <Input
+                      id="passengerNotes"
+                      type="text"
+                      placeholder="Prefers front seat, special needs, etc."
+                      value={passengerNotes}
+                      onChange={(e) => setPassengerNotes(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div>
           <h2 className="text-sm font-medium text-muted-foreground mb-3">Payment Method</h2>

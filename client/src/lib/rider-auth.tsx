@@ -14,6 +14,10 @@ interface RiderUser {
   userType?: "RIDER" | "TRIP_COORDINATOR";
   phoneVerified?: boolean;
   isTestAccount?: boolean;
+  isTripCoordinator?: boolean;
+  coordinatorName?: string | null;
+  coordinatorPhone?: string | null;
+  organizationName?: string | null;
 }
 
 interface RiderAuthContextType {
@@ -34,6 +38,10 @@ interface RegisterData {
   phone?: string;
   city?: string;
   userType?: "RIDER" | "TRIP_COORDINATOR";
+  isTripCoordinator?: boolean;
+  coordinatorName?: string;
+  coordinatorPhone?: string;
+  organizationName?: string;
 }
 
 const RiderAuthContext = createContext<RiderAuthContextType | null>(null);

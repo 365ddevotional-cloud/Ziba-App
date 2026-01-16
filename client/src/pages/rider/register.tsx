@@ -20,6 +20,10 @@ export default function RiderRegister() {
     phone: "",
     city: "",
     userType: "RIDER" as "RIDER" | "TRIP_COORDINATOR",
+    isTripCoordinator: false,
+    coordinatorName: "",
+    coordinatorPhone: "",
+    organizationName: "",
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -75,7 +79,7 @@ export default function RiderRegister() {
     }
   };
 
-  const updateField = (field: string, value: string) => {
+  const updateField = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -191,32 +195,54 @@ export default function RiderRegister() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Account Type</Label>
-                <div className="flex gap-4">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="userType"
-                      value="RIDER"
-                      checked={formData.userType === "RIDER"}
-                      onChange={(e) => updateField("userType", e.target.value as "RIDER" | "TRIP_COORDINATOR")}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm">Regular Rider</span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="userType"
-                      value="TRIP_COORDINATOR"
-                      checked={formData.userType === "TRIP_COORDINATOR"}
-                      onChange={(e) => updateField("userType", e.target.value as "RIDER" | "TRIP_COORDINATOR")}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm">Book rides for others (Trip Coordinator)</span>
-                  </label>
-                </div>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isTripCoordinator}
+                    onChange={(e) => updateField("isTripCoordinator", e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">I am booking rides for someone else (Trip Coordinator)</span>
+                </label>
               </div>
+              
+              {formData.isTripCoordinator && (
+                <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/30">
+                  <div className="space-y-2">
+                    <Label htmlFor="coordinatorName">Your Name (Coordinator) *</Label>
+                    <Input
+                      id="coordinatorName"
+                      type="text"
+                      placeholder="John Doe"
+                      value={formData.coordinatorName}
+                      onChange={(e) => updateField("coordinatorName", e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="coordinatorPhone">Your Phone (Coordinator) *</Label>
+                    <Input
+                      id="coordinatorPhone"
+                      type="tel"
+                      placeholder="+2348012345678"
+                      value={formData.coordinatorPhone}
+                      onChange={(e) => updateField("coordinatorPhone", e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="organizationName">Organization Name (Optional)</Label>
+                    <Input
+                      id="organizationName"
+                      type="text"
+                      placeholder="ABC School / Company Name"
+                      value={formData.organizationName}
+                      onChange={(e) => updateField("organizationName", e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+              
               <Button
                 type="submit"
                 className="w-full"

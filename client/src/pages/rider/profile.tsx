@@ -28,10 +28,22 @@ export default function RiderProfile() {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    fullName: string;
+    phone: string;
+    city: string;
+    isTripCoordinator?: boolean;
+    coordinatorName?: string;
+    coordinatorPhone?: string;
+    organizationName?: string;
+  }>({
     fullName: user?.fullName || "",
     phone: user?.phone || "",
     city: user?.city || "",
+    isTripCoordinator: user?.isTripCoordinator || false,
+    coordinatorName: user?.coordinatorName || "",
+    coordinatorPhone: user?.coordinatorPhone || "",
+    organizationName: user?.organizationName || "",
   });
 
   const handleLogout = async () => {
@@ -79,6 +91,10 @@ export default function RiderProfile() {
       fullName: user?.fullName || "",
       phone: user?.phone || "",
       city: user?.city || "",
+      isTripCoordinator: user?.isTripCoordinator || false,
+      coordinatorName: user?.coordinatorName || "",
+      coordinatorPhone: user?.coordinatorPhone || "",
+      organizationName: user?.organizationName || "",
     });
     setIsEditing(false);
   };
@@ -216,6 +232,97 @@ export default function RiderProfile() {
                 )}
               </div>
             </div>
+
+            {!isEditing && user?.isTripCoordinator && (
+              <div className="p-4 flex items-center gap-3 border-t border-border">
+                <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                  <User className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground">Trip Coordinator</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {user.coordinatorName || "Not set"}
+                  </p>
+                  {user.organizationName && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {user.organizationName}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {isEditing && (
+              <>
+                <div className="p-4 flex items-center gap-3 border-t border-border">
+                  <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                    <User className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.isTripCoordinator || false}
+                        onChange={(e) => setFormData({ ...formData, isTripCoordinator: e.target.checked })}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm text-foreground">I am booking rides for someone else (Trip Coordinator)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {formData.isTripCoordinator && (
+                  <>
+                    <div className="p-4 flex items-center gap-3 border-t border-border">
+                      <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                        <User className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground mb-1">Your Name (Coordinator) *</p>
+                        <Input
+                          value={formData.coordinatorName || ""}
+                          onChange={(e) => setFormData({ ...formData, coordinatorName: e.target.value })}
+                          placeholder="John Doe"
+                          className="mt-1"
+                          required={formData.isTripCoordinator}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-4 flex items-center gap-3 border-t border-border">
+                      <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                        <Phone className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground mb-1">Your Phone (Coordinator) *</p>
+                        <Input
+                          value={formData.coordinatorPhone || ""}
+                          onChange={(e) => setFormData({ ...formData, coordinatorPhone: e.target.value })}
+                          placeholder="+2348012345678"
+                          className="mt-1"
+                          required={formData.isTripCoordinator}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-4 flex items-center gap-3 border-t border-border">
+                      <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                        <MapPin className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground mb-1">Organization Name (Optional)</p>
+                        <Input
+                          value={formData.organizationName || ""}
+                          onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
+                          placeholder="ABC School / Company Name"
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
 

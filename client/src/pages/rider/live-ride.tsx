@@ -29,6 +29,9 @@ interface Ride {
   dropoffLocation: string;
   fareEstimate: number | null;
   status: string;
+  passengerName?: string | null;
+  passengerPhone?: string | null;
+  passengerNotes?: string | null;
   driver?: {
     id: string;
     fullName: string;
@@ -466,6 +469,33 @@ export default function RiderLiveRide() {
                       <Phone className="w-5 h-5" />
                     </Button>
                   </a>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Passenger Info (if coordinator booking) */}
+        {(activeRide?.passengerName || activeRide?.passengerPhone) && (
+          <Card className="ziba-card">
+            <CardContent className="p-4 space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Passenger</p>
+              <div className="space-y-2">
+                <p className="font-semibold text-foreground">
+                  {activeRide.passengerName}
+                </p>
+                {activeRide.passengerPhone && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Phone className="w-3.5 h-3.5" />
+                    <a href={`tel:${activeRide.passengerPhone}`} className="hover:text-primary">
+                      {activeRide.passengerPhone}
+                    </a>
+                  </div>
+                )}
+                {activeRide.passengerNotes && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {activeRide.passengerNotes}
+                  </p>
                 )}
               </div>
             </CardContent>

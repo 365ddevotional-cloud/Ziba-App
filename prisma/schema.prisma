@@ -95,6 +95,10 @@ model User {
   totalRatings  Int             @default(0)
   isTestAccount Boolean         @default(false)
   testDisabled  Boolean         @default(false)
+  isTripCoordinator Boolean     @default(false)
+  coordinatorName String?
+  coordinatorPhone String?
+  organizationName String?
   createdAt     DateTime        @default(now())
   rides         Ride[]
   bookedRides   Ride[]          @relation("BookedRides")
@@ -174,6 +178,9 @@ model Ride {
   userId          String
   bookedByUserId  String?       // Trip Coordinator or Rider who booked/paid
   passengerId     String?       // Trip Passenger (if booked for someone else)
+  passengerName   String?       // Passenger name (if coordinator booking)
+  passengerPhone  String?       // Passenger phone (if coordinator booking)
+  passengerNotes  String?       // Passenger notes (if coordinator booking)
   driverId        String?
   createdAt       DateTime      @default(now())
   user            User          @relation(fields: [userId], references: [id])

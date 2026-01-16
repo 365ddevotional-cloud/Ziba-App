@@ -3812,9 +3812,10 @@ export async function registerRoutes(
   }
 
   // Rider registration
+  // Rider registration
   app.post("/api/rider/register", async (req, res) => {
     try {
-      const { fullName, email, password, phone, city, userType } = req.body;
+      const { fullName, email, password, phone, city, userType, isTripCoordinator, coordinatorName, coordinatorPhone, organizationName } = req.body;
       
       if (!fullName || !email || !password) {
         return res.status(400).json({ message: "Full name, email, and password are required" });
@@ -3822,6 +3823,13 @@ export async function registerRoutes(
 
       if (password.length < 6) {
         return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      // Validate coordinator fields if enabled
+      if (isTripCoordinator) {
+        if (!coordinatorName || !coordinatorPhone) {
+          return res.status(400).json({ message: "Coordinator name and phone are required when booking for others" });
+        }
       }
 
       const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -3841,6 +3849,10 @@ export async function registerRoutes(
           city: city || null,
           status: "ACTIVE",
           userType: userType || "RIDER",
+          isTripCoordinator: isTripCoordinator || false,
+          coordinatorName: isTripCoordinator ? coordinatorName : null,
+          coordinatorPhone: isTripCoordinator ? coordinatorPhone : null,
+          organizationName: isTripCoordinator ? (organizationName || null) : null,
           phoneVerified: TEST_MODE, // Auto-verify in test mode
           isTestAccount: TEST_MODE
         }
@@ -3948,7 +3960,11 @@ export async function registerRoutes(
           city: true,
           status: true,
           averageRating: true,
-          isTestAccount: true
+          isTestAccount: true,
+          isTripCoordinator: true,
+          coordinatorName: true,
+          coordinatorPhone: true,
+          organizationName: true
         }
       });
 
@@ -4018,7 +4034,16 @@ export async function registerRoutes(
       const { id } = req.params;
       const ride = await prisma.ride.findFirst({
         where: { id, userId: req.session.userId },
-        include: {
+        select: {
+          id: true,
+          pickupLocation: true,
+          dropoffLocation: true,
+          fareEstimate: true,
+          status: true,
+          rideMode: true,
+          passengerName: true,
+          passengerPhone: true,
+          passengerNotes: true,
           driver: {
             select: {
               id: true,
@@ -4089,7 +4114,18 @@ export async function registerRoutes(
           userId: req.session.userId,
           status: { in: ["REQUESTED", "ASSIGNED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "IN_PROGRESS"] }
         },
-        include: {
+        select: {
+          id: true,
+          pickupLocation: true,
+          dropoffLocation: true,
+          fareEstimate: true,
+          status: true,
+          rideMode: true,
+          shareGroupId: true,
+          maxPassengers: true,
+          passengerName: true,
+          passengerPhone: true,
+          passengerNotes: true,
           driver: {
             select: {
               id: true,
@@ -4135,10 +4171,23 @@ export async function registerRoutes(
     }
 
     try {
-      const { pickupLocation, dropoffLocation, fareEstimate } = req.body;
+      const { pickupLocation, dropoffLocation, fareEstimate, passengerName, passengerPhone, passengerNotes } = req.body;
 
       if (!pickupLocation || !dropoffLocation) {
         return res.status(400).json({ message: "Pickup and dropoff locations are required" });
+      }
+
+      // Get user to check if they're a coordinator
+      const user = await prisma.user.findUnique({
+        where: { id: req.session.userId },
+        select: { isTripCoordinator: true }
+      });
+
+      // Validate passenger fields if coordinator
+      if (user?.isTripCoordinator) {
+        if (!passengerName || !passengerPhone) {
+          return res.status(400).json({ message: "Passenger name and phone are required when booking as a trip coordinator" });
+        }
       }
 
       // Check for existing active ride
@@ -4342,6 +4391,9 @@ export async function registerRoutes(
           rideMode: mode,
           shareGroupId: shareGroupId,
           maxPassengers: isShareMode ? 2 : 1,
+          passengerName: passengerName || null,
+          passengerPhone: passengerPhone || null,
+          passengerNotes: passengerNotes || null,
           status: "REQUESTED"
         },
         include: {
