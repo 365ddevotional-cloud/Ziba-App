@@ -3025,6 +3025,232 @@ export async function registerRoutes(
     });
   });
 
+  // Driver login
+  app.post("/api/driver/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const driver = await prisma.driver.findUnique({ where: { email } });
+      if (!driver) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (!driver.passwordHash) {
+        return res.status(401).json({ message: "Account not configured for login" });
+      }
+
+      const isValid = await verifyPassword(password, driver.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Check verification status
+      if (!driver.isVerified) {
+        return res.status(403).json({ 
+          message: "Account pending verification", 
+          status: "PENDING_VERIFICATION",
+          redirect: "/driver/pending-verification"
+        });
+      }
+
+      if (driver.status === "SUSPENDED") {
+        return res.status(403).json({ message: "Account suspended" });
+      }
+
+      // Set session
+      req.session.userId = driver.id;
+      req.session.userRole = "driver" as UserRole;
+      req.session.userEmail = driver.email;
+
+      res.json({
+        message: "Login successful",
+        user: {
+          id: driver.id,
+          fullName: driver.fullName,
+          email: driver.email,
+          phone: driver.phone,
+          vehicleType: driver.vehicleType,
+          vehiclePlate: driver.vehiclePlate,
+          status: driver.status,
+          role: "driver",
+          isVerified: driver.isVerified,
+          isTestAccount: driver.isTestAccount
+        }
+      });
+    } catch (error) {
+      console.error("Driver login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Driver auth check
+  app.get("/api/driver/me", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const driver = await prisma.driver.findUnique({
+        where: { id: req.session.userId },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          phone: true,
+          vehicleType: true,
+          vehiclePlate: true,
+          status: true,
+          isOnline: true,
+          averageRating: true,
+          isVerified: true,
+          isTestAccount: true
+        }
+      });
+
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      res.json({
+        ...driver,
+        role: "driver"
+      });
+    } catch (error) {
+      console.error("Error fetching driver:", error);
+      res.status(500).json({ message: "Failed to fetch driver data" });
+    }
+  });
+
+  // Driver logout
+  app.post("/api/driver/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  // Director login
+  app.post("/api/director/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const director = await prisma.director.findUnique({ where: { email } });
+      if (!director) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (!director.passwordHash) {
+        return res.status(401).json({ message: "Account not configured for login" });
+      }
+
+      const isValid = await verifyPassword(password, director.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Check verification status first
+      if (!director.isVerified) {
+        return res.status(403).json({ 
+          message: "Account pending verification", 
+          status: "PENDING_VERIFICATION",
+          redirect: "/director/pending-approval"
+        });
+      }
+
+      // Check approval status
+      if (!director.isApproved) {
+        return res.status(403).json({ 
+          message: "Account pending admin approval", 
+          status: "PENDING_APPROVAL",
+          redirect: "/director/pending-approval"
+        });
+      }
+
+      if (director.status === "SUSPENDED") {
+        return res.status(403).json({ message: "Account suspended" });
+      }
+
+      // Set session
+      req.session.userId = director.id;
+      req.session.userRole = "director" as UserRole;
+      req.session.userEmail = director.email;
+
+      res.json({
+        message: "Login successful",
+        user: {
+          id: director.id,
+          fullName: director.fullName,
+          email: director.email,
+          role: director.role,
+          region: director.region,
+          status: director.status,
+          accountRole: "director",
+          isApproved: director.isApproved,
+          isTestAccount: director.isTestAccount
+        }
+      });
+    } catch (error) {
+      console.error("Director login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Director auth check
+  app.get("/api/director/me", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "director") {
+      return res.status(401).json({ message: "Not authenticated as director" });
+    }
+
+    try {
+      const director = await prisma.director.findUnique({
+        where: { id: req.session.userId },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          phone: true,
+          role: true,
+          region: true,
+          status: true,
+          isApproved: true,
+          isTestAccount: true
+        }
+      });
+
+      if (!director) {
+        return res.status(404).json({ message: "Director not found" });
+      }
+
+      res.json({
+        ...director,
+        accountRole: "director"
+      });
+    } catch (error) {
+      console.error("Error fetching director:", error);
+      res.status(500).json({ message: "Failed to fetch director data" });
+    }
+  });
+
+  // Director logout
+  app.post("/api/director/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
   // Rider profile update
   app.patch("/api/rider/profile", async (req, res) => {
     if (!req.session.userId || req.session.userRole !== "rider") {
