@@ -1657,11 +1657,11 @@ export async function registerRoutes(
       }));
       
       const fraudResult = analyzeFraud(
-        ride.estimatedDistance || 0,
-        ride.actualDistance || 0,
-        ride.estimatedDuration || 0,
-        ride.actualDuration || 0,
-        gpsPoints
+        gpsPoints,
+        ride.estimatedDistance,
+        ride.estimatedDuration,
+        ride.startedAt,
+        ride.completedAt || new Date()
       );
 
       // Update ride with fraud results

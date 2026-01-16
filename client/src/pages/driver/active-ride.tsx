@@ -64,7 +64,7 @@ export default function DriverActiveRide() {
   const getGpsIntervalMs = (status: string): number => {
     const intervals = protectionStatus?.gpsIntervals || { enRoute: 10000, inProgress: 6000 };
     switch (status) {
-      case "DRIVER_EN_ROUTE":
+      case "DRIVER_ASSIGNED":
         return intervals.enRoute;
       case "IN_PROGRESS":
         return intervals.inProgress;
@@ -143,7 +143,7 @@ export default function DriverActiveRide() {
       setGpsInterval(null);
     }
 
-    if (ride.status === "COMPLETED" || ride.status === "CANCELLED") {
+    if (ride.status === "COMPLETED" || ride.status === "SETTLED") {
       return;
     }
 
@@ -185,14 +185,13 @@ export default function DriverActiveRide() {
 
   const getStatusAction = () => {
     switch (ride.status) {
-      case "ACCEPTED":
-      case "DRIVER_EN_ROUTE":
+      case "DRIVER_ASSIGNED":
         return {
           label: "I've Arrived",
-          nextStatus: "ARRIVED",
+          nextStatus: "DRIVER_ARRIVED",
           icon: MapPin,
         };
-      case "ARRIVED":
+      case "DRIVER_ARRIVED":
         return {
           label: "Start Trip",
           nextStatus: "IN_PROGRESS",
@@ -212,7 +211,7 @@ export default function DriverActiveRide() {
   const statusAction = getStatusAction();
 
   const handleNavigate = () => {
-    const isNavigatingToPickup = ["ACCEPTED", "DRIVER_EN_ROUTE"].includes(ride.status);
+    const isNavigatingToPickup = ["DRIVER_ASSIGNED"].includes(ride.status);
     let lat: number | null;
     let lng: number | null;
     let address: string;
@@ -263,7 +262,7 @@ export default function DriverActiveRide() {
     }
   };
 
-  const isNavigating = ["ACCEPTED", "DRIVER_EN_ROUTE", "IN_PROGRESS"].includes(ride.status);
+  const isNavigating = ["DRIVER_ASSIGNED", "DRIVER_ARRIVED", "IN_PROGRESS"].includes(ride.status);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

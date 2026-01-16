@@ -374,9 +374,9 @@ function NavigateButton({
   pickupLocation: string;
   dropoffLocation: string;
 }) {
-  const isNavigatingToPickup = ["ACCEPTED", "DRIVER_EN_ROUTE"].includes(status);
+  const isNavigatingToPickup = ["DRIVER_ASSIGNED"].includes(status);
   const isNavigatingToDropoff = ["IN_PROGRESS"].includes(status);
-  const hasArrived = status === "ARRIVED";
+  const hasArrived = status === "DRIVER_ARRIVED";
 
   const getNavigationUrl = () => {
     let lat: number | null = null;
