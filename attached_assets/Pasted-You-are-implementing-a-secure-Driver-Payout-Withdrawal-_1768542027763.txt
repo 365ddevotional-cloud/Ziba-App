@@ -1,0 +1,139 @@
+You are implementing a secure Driver Payout & Withdrawal system for the Ziba platform.
+
+GOAL:
+Allow drivers to withdraw earnings, while enforcing admin control, fraud prevention, payout states, and platform safety.
+
+STRICT RULES:
+- Only DRIVERS can request withdrawals
+- Only ADMIN can approve/reject payouts
+- Riders cannot withdraw
+- Platform wallet is NOT withdrawable
+- Withdrawals apply ONLY to AVAILABLE driver balance (not locked funds)
+- All operations must be server-side enforced
+
+--------------------------------
+1. DATABASE MODELS
+--------------------------------
+
+Create/extend tables:
+
+DriverWallet:
+- driverId
+- availableBalance
+- lockedBalance
+- totalEarned
+- updatedAt
+
+DriverBankAccount:
+- id
+- driverId
+- bankName
+- accountNumber (encrypted)
+- accountName
+- country
+- verified (boolean)
+- createdAt
+
+PayoutRequest:
+- id
+- driverId
+- amount
+- status: PENDING | APPROVED | REJECTED | PAID
+- requestedAt
+- processedAt
+- processedBy (adminId)
+- rejectionReason (nullable)
+
+--------------------------------
+2. DRIVER API ENDPOINTS
+--------------------------------
+
+POST /api/driver/bank-account
+- Add or update bank details
+- One active account per driver
+- Mask account number in responses
+
+POST /api/driver/withdraw
+- Body: { amount }
+- Validate:
+  - amount > 0
+  - amount <= availableBalance
+  - bank account exists & verified
+- Create PayoutRequest (PENDING)
+- Move amount from availableBalance → lockedBalance
+
+GET /api/driver/payouts
+- List payout history
+
+--------------------------------
+3. ADMIN API ENDPOINTS
+--------------------------------
+
+GET /api/admin/payouts
+- View all payout requests
+- Filter by status
+
+POST /api/admin/payouts/{id}/approve
+- Marks payout APPROVED
+- Triggers payout processing (manual or provider hook)
+
+POST /api/admin/payouts/{id}/reject
+- Requires rejectionReason
+- Unlock funds back to driver availableBalance
+
+POST /api/admin/payouts/{id}/mark-paid
+- Finalize payout
+- Deduct lockedBalance permanently
+- Status → PAID
+
+--------------------------------
+4. WALLET & TRANSACTION SAFETY
+--------------------------------
+
+- All balance changes must be atomic
+- If payout fails:
+  - Funds remain locked
+- If rejected:
+  - Funds return to availableBalance
+- Prevent duplicate payout processing
+
+--------------------------------
+5. ADMIN UI
+--------------------------------
+
+Admin → Payouts Dashboard:
+- List pending withdrawals
+- View driver details
+- Approve / Reject buttons
+- Status badges (PENDING / PAID / REJECTED)
+
+--------------------------------
+6. DRIVER UI
+--------------------------------
+
+Driver Wallet Page:
+- Available Balance
+- Locked Balance
+- Withdraw Button
+- Add / Edit Bank Account
+- Payout History
+
+--------------------------------
+7. SECURITY
+--------------------------------
+
+- Admin-only middleware on payout approvals
+- Rate-limit withdrawal requests
+- Log all payout actions
+- Never expose full bank details
+
+--------------------------------
+END RESULT
+--------------------------------
+
+Ziba now supports secure driver withdrawals with:
+- Admin oversight
+- Fraud protection
+- Locked funds
+- Audit trail
+- Production-grade payout flow

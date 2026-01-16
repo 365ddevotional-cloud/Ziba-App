@@ -52,6 +52,8 @@ model Driver {
   incentives            Incentive[]
   rides                 Ride[]
   tips                  Tip[]
+  bankAccount           DriverBankAccount?
+  payoutRequests        PayoutRequest[]
 }
 
 model Ride {
@@ -418,4 +420,38 @@ enum TestAccountRole {
 enum TestAccountStatus {
   ACTIVE
   SUSPENDED
+}
+
+// ==================== DRIVER PAYOUT SYSTEM ====================
+
+model DriverBankAccount {
+  id            String   @id @default(uuid())
+  driverId      String   @unique
+  driver        Driver   @relation(fields: [driverId], references: [id])
+  bankName      String
+  accountNumber String
+  accountName   String
+  country       String   @default("NG")
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model PayoutRequest {
+  id              String        @id @default(uuid())
+  driverId        String
+  driver          Driver        @relation(fields: [driverId], references: [id])
+  amount          Float
+  status          PayoutStatus  @default(PENDING)
+  requestedAt     DateTime      @default(now())
+  processedAt     DateTime?
+  processedBy     String?
+  rejectionReason String?
+}
+
+enum PayoutStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
 }
