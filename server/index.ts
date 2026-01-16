@@ -152,14 +152,25 @@ app.use((req, res, next) => {
     // this serves both the API and the client.
     // It is the only port that is not firewalled.
     const port = parseInt(process.env.PORT || "5000", 10);
+    
+    // Determine host binding: use 127.0.0.1 on Windows in development, 0.0.0.0 otherwise
+    const isWindows = process.platform === "win32";
+    const isLocalDev = process.env.NODE_ENV !== "production";
+    const host = (isWindows && isLocalDev) ? "127.0.0.1" : "0.0.0.0";
+    
+    // reusePort is not supported on Windows, so only enable it on non-Windows platforms
+    const listenOptions: any = {
+      port,
+      host,
+    };
+    if (!isWindows) {
+      listenOptions.reusePort = true;
+    }
+    
     httpServer.listen(
-      {
-        port,
-        host: "0.0.0.0",
-        reusePort: true,
-      },
+      listenOptions,
       () => {
-        log(`serving on port ${port}`);
+        log(`serving on ${host}:${port}`);
       },
     );
   } catch (error) {
