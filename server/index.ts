@@ -179,9 +179,14 @@ app.use((req, res, next) => {
     // doesn't interfere with the other routes
     if (process.env.NODE_ENV === "production") {
       serveStatic(app);
-    } else {
+    } else if (process.env.REPL_ID !== undefined) {
+      // Replit: Use Vite middleware mode (integrated into Express)
       const { setupVite } = await import("./vite");
       await setupVite(httpServer, app);
+    } else {
+      // Local dev: Vite runs as standalone server, backend only serves API
+      // No Vite middleware setup needed
+      log("Local dev mode: Vite running as standalone server");
     }
 
     // ALWAYS serve the app on the port specified in the environment variable PORT
@@ -214,9 +219,12 @@ app.use((req, res, next) => {
       listenOptions,
       () => {
         const url = `http://${host === "0.0.0.0" ? "localhost" : host}:${port}`;
-        log(`Server running at ${url}`);
+        log(`Backend API running at ${url}/api/health`);
         if (!isProduction && port !== preferred) {
           log(`Port ${preferred} was in use, using port ${port} instead`);
+        }
+        if (!isProduction && !process.env.REPL_ID) {
+          log(`UI will be available at http://127.0.0.1:5173 (or next available port)`);
         }
       },
     );
