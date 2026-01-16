@@ -57,7 +57,7 @@ export default function DriverRideComplete() {
     if (error) {
       const errorMessage = (error as any)?.message || "";
       if (errorMessage.includes("401") || errorMessage.includes("Not authenticated")) {
-        navigate("/driver/login");
+        navigate("/signup");
       }
     }
   }, [error, navigate]);
