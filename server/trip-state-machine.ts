@@ -1,0 +1,204 @@
+import { PrismaClient, TripStatus } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+export const TRIP_STATUS_ORDER: TripStatus[] = [
+  "REQUESTED",
+  "DRIVER_ASSIGNED",
+  "DRIVER_ARRIVED",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "SETTLED",
+];
+
+const VALID_TRANSITIONS: Record<TripStatus, TripStatus | null> = {
+  REQUESTED: "DRIVER_ASSIGNED",
+  DRIVER_ASSIGNED: "DRIVER_ARRIVED",
+  DRIVER_ARRIVED: "IN_PROGRESS",
+  IN_PROGRESS: "COMPLETED",
+  COMPLETED: "SETTLED",
+  SETTLED: null,
+};
+
+interface StatusHistoryEntry {
+  status: TripStatus;
+  timestamp: string;
+  actor: string;
+}
+
+interface TransitionResult {
+  success: boolean;
+  error?: string;
+  code?: number;
+  ride?: any;
+}
+
+export function getNextAllowedStatus(current: TripStatus): TripStatus | null {
+  return VALID_TRANSITIONS[current];
+}
+
+export function isValidTransition(from: TripStatus, to: TripStatus): boolean {
+  return VALID_TRANSITIONS[from] === to;
+}
+
+export function isTripImmutable(status: TripStatus): boolean {
+  return status === "SETTLED";
+}
+
+export function isTripCompleted(status: TripStatus): boolean {
+  return status === "COMPLETED" || status === "SETTLED";
+}
+
+export async function transitionTripStatus(
+  tripId: string,
+  nextStatus: TripStatus,
+  actor: string
+): Promise<TransitionResult> {
+  try {
+    const ride = await prisma.ride.findUnique({
+      where: { id: tripId },
+      include: { user: true, driver: true },
+    });
+
+    if (!ride) {
+      return {
+        success: false,
+        error: "Trip not found",
+        code: 404,
+      };
+    }
+
+    const currentStatus = ride.status;
+
+    if (isTripImmutable(currentStatus)) {
+      console.error(
+        `[TRIP-STATE-ERROR] tripId=${tripId} actor=${actor} attempted transition on SETTLED trip`
+      );
+      return {
+        success: false,
+        error: "Trip is settled and immutable. No changes allowed.",
+        code: 403,
+      };
+    }
+
+    if (currentStatus === "COMPLETED" && nextStatus !== "SETTLED") {
+      console.error(
+        `[TRIP-STATE-ERROR] tripId=${tripId} actor=${actor} attempted invalid transition from COMPLETED to ${nextStatus}`
+      );
+      return {
+        success: false,
+        error: "Trip is completed. Only settlement is allowed.",
+        code: 403,
+      };
+    }
+
+    if (!isValidTransition(currentStatus, nextStatus)) {
+      console.error(
+        `[TRIP-STATE-ERROR] tripId=${tripId} actor=${actor} invalid transition ${currentStatus} → ${nextStatus}`
+      );
+      return {
+        success: false,
+        error: `Invalid state transition: ${currentStatus} → ${nextStatus}. Expected next state: ${getNextAllowedStatus(currentStatus) || "none"}`,
+        code: 409,
+      };
+    }
+
+    const statusHistory = (ride.statusHistory as StatusHistoryEntry[]) || [];
+    const newHistoryEntry: StatusHistoryEntry = {
+      status: nextStatus,
+      timestamp: new Date().toISOString(),
+      actor,
+    };
+    statusHistory.push(newHistoryEntry);
+
+    const updateData: any = {
+      status: nextStatus,
+      statusHistory,
+    };
+
+    if (nextStatus === "IN_PROGRESS") {
+      if (!ride.lockedFare && ride.fareEstimate) {
+        updateData.lockedFare = ride.fareEstimate;
+      }
+      updateData.startedAt = new Date();
+    }
+
+    if (nextStatus === "COMPLETED") {
+      updateData.completedAt = new Date();
+    }
+
+    if (nextStatus === "SETTLED") {
+      updateData.settledAt = new Date();
+    }
+
+    const updatedRide = await prisma.ride.update({
+      where: { id: tripId },
+      data: updateData,
+      include: { user: true, driver: true },
+    });
+
+    console.log(
+      `[TRIP-STATE] tripId=${tripId} actor=${actor} transitioned ${currentStatus} → ${nextStatus}`
+    );
+
+    return {
+      success: true,
+      ride: updatedRide,
+    };
+  } catch (error) {
+    console.error(`[TRIP-STATE-ERROR] tripId=${tripId} error:`, error);
+    return {
+      success: false,
+      error: "Internal server error during state transition",
+      code: 500,
+    };
+  }
+}
+
+export async function getTripStatus(tripId: string): Promise<{
+  status: TripStatus;
+  history: StatusHistoryEntry[];
+  nextAllowed: TripStatus | null;
+  isImmutable: boolean;
+} | null> {
+  const ride = await prisma.ride.findUnique({
+    where: { id: tripId },
+    select: { status: true, statusHistory: true },
+  });
+
+  if (!ride) return null;
+
+  return {
+    status: ride.status,
+    history: (ride.statusHistory as StatusHistoryEntry[]) || [],
+    nextAllowed: getNextAllowedStatus(ride.status),
+    isImmutable: isTripImmutable(ride.status),
+  };
+}
+
+export function validateRoleForTransition(
+  nextStatus: TripStatus,
+  role: "rider" | "driver" | "admin"
+): { allowed: boolean; reason?: string } {
+  const rolePermissions: Record<TripStatus, ("rider" | "driver" | "admin")[]> = {
+    DRIVER_ASSIGNED: ["admin", "driver"],
+    DRIVER_ARRIVED: ["driver"],
+    IN_PROGRESS: ["driver"],
+    COMPLETED: ["driver"],
+    SETTLED: ["admin"],
+  };
+
+  const allowed = rolePermissions[nextStatus];
+  if (!allowed) {
+    return { allowed: false, reason: "Invalid status transition" };
+  }
+
+  if (!allowed.includes(role)) {
+    return {
+      allowed: false,
+      reason: `Role '${role}' cannot perform transition to '${nextStatus}'`,
+    };
+  }
+
+  return { allowed: true };
+}

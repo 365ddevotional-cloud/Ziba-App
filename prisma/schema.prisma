@@ -25,14 +25,13 @@ enum VehicleType {
   VAN
 }
 
-enum RideStatus {
+enum TripStatus {
   REQUESTED
-  ACCEPTED
-  DRIVER_EN_ROUTE
-  ARRIVED
+  DRIVER_ASSIGNED
+  DRIVER_ARRIVED
   IN_PROGRESS
   COMPLETED
-  CANCELLED
+  SETTLED
 }
 
 model User {
@@ -94,11 +93,13 @@ model Ride {
   pickupLng         Float?        // Pickup longitude for navigation
   dropoffLat        Float?        // Dropoff latitude for navigation
   dropoffLng        Float?        // Dropoff longitude for navigation
-  status            RideStatus    @default(REQUESTED)
+  status            TripStatus    @default(REQUESTED)
+  statusHistory     Json          @default("[]") // Array of {status, timestamp, actor}
   userId            String
   driverId          String?
   startedAt         DateTime?     // When trip actually started
   completedAt       DateTime?     // When trip actually completed
+  settledAt         DateTime?     // When trip was settled (immutable after this)
   actualDistance    Float?        // Actual GPS distance traveled in km
   actualDuration    Float?        // Actual trip duration in minutes
   fraudScore        Int           @default(0)    // Cumulative fraud score
