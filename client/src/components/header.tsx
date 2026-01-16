@@ -198,13 +198,13 @@ export function Header() {
   const { user, logout } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 h-16 border-b border-ziba-border bg-ziba-primary">
       <div className="max-w-6xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-lg">Z</span>
+          <div className="w-8 h-8 rounded-lg bg-ziba-accent flex items-center justify-center">
+            <span className="text-ziba-primary font-bold text-lg">Z</span>
           </div>
-          <span className="text-xl font-bold text-foreground" data-testid="text-logo">Ziba</span>
+          <span className="text-xl font-bold text-ziba-text-primary" data-testid="text-logo">Ziba</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
@@ -214,8 +214,9 @@ export function Header() {
             return (
               <Link key={link.href} href={link.href}>
                 <Button 
-                  variant={isActive ? "secondary" : "ghost"} 
+                  variant="ghost" 
                   size="sm"
+                  className={isActive ? "text-ziba-accent border-b-2 border-ziba-accent rounded-none" : "text-ziba-text-primary hover:text-ziba-accent"}
                   data-testid={`nav-${link.label.toLowerCase()}`}
                 >
                   <Icon className="h-4 w-4 mr-1" />
@@ -229,16 +230,16 @@ export function Header() {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" data-testid="button-user-menu">
+                  <Button variant="outline" size="sm" className="border-ziba-accent text-ziba-accent hover:bg-ziba-accent/10" data-testid="button-user-menu">
                     {user.email}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem disabled className="text-muted-foreground">
+                <DropdownMenuContent align="end" className="bg-ziba-card border-ziba-border">
+                  <DropdownMenuItem disabled className="text-ziba-text-secondary">
                     Logged in as {user.role}
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => logout()} data-testid="button-logout">
+                  <DropdownMenuSeparator className="bg-ziba-border" />
+                  <DropdownMenuItem onClick={() => logout()} className="text-ziba-text-primary hover:text-ziba-accent" data-testid="button-logout">
                     <LogOut className="h-4 w-4 mr-2" />
                     Log Out
                   </DropdownMenuItem>
@@ -246,7 +247,7 @@ export function Header() {
               </DropdownMenu>
             ) : (
               <Link href="/admin/login">
-                <Button variant="outline" size="sm" data-testid="button-admin-login">
+                <Button size="sm" className="ziba-btn-primary" data-testid="button-admin-login">
                   <Shield className="h-4 w-4 mr-1" />
                   Admin Login
                 </Button>
@@ -262,6 +263,7 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
+            className="text-ziba-text-primary"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             data-testid="button-mobile-menu"
           >
@@ -271,7 +273,7 @@ export function Header() {
       </div>
 
       {mobileMenuOpen && (
-        <div className="md:hidden absolute top-16 left-0 right-0 bg-background border-b border-border p-4 flex flex-col gap-2">
+        <div className="md:hidden absolute top-16 left-0 right-0 bg-ziba-card border-b border-ziba-border p-4 flex flex-col gap-2">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const isActive = location === link.href || location.startsWith(link.href + "/");
@@ -282,8 +284,8 @@ export function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <Button 
-                  variant={isActive ? "secondary" : "ghost"} 
-                  className="w-full justify-start"
+                  variant="ghost" 
+                  className={`w-full justify-start ${isActive ? "text-ziba-accent bg-ziba-accent/10" : "text-ziba-text-primary hover:text-ziba-accent"}`}
                   data-testid={`nav-mobile-${link.label.toLowerCase()}`}
                 >
                   <Icon className="h-4 w-4 mr-2" />

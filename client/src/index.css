@@ -91,42 +91,43 @@
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
   --opaque-button-border-intensity: 9;
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
-  --background: 220 20% 6%;
-  --foreground: 0 0% 98%;
-  --border: 220 15% 16%;
-  --card: 220 18% 9%;
-  --card-foreground: 0 0% 98%;
-  --card-border: 220 15% 14%;
-  --sidebar: 220 20% 5%;
-  --sidebar-foreground: 0 0% 98%;
-  --sidebar-border: 220 15% 12%;
-  --sidebar-primary: 215 85% 45%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 220 15% 14%;
-  --sidebar-accent-foreground: 0 0% 90%;
-  --sidebar-ring: 215 85% 45%;
-  --popover: 220 18% 10%;
-  --popover-foreground: 0 0% 98%;
-  --popover-border: 220 15% 18%;
-  --primary: 215 85% 45%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 220 12% 18%;
-  --secondary-foreground: 0 0% 92%;
-  --muted: 220 10% 16%;
-  --muted-foreground: 220 8% 60%;
-  --accent: 220 12% 16%;
-  --accent-foreground: 0 0% 92%;
+  --elevate-1: rgba(26,188,156, .08);
+  --elevate-2: rgba(26,188,156, .15);
+  /* Ziba Brand Colors */
+  --background: 222 47% 11%;
+  --foreground: 220 14% 91%;
+  --border: 217 33% 17%;
+  --card: 220 40% 11%;
+  --card-foreground: 220 14% 91%;
+  --card-border: 217 33% 17%;
+  --sidebar: 203 80% 21%;
+  --sidebar-foreground: 220 14% 91%;
+  --sidebar-border: 217 33% 17%;
+  --sidebar-primary: 168 76% 42%;
+  --sidebar-primary-foreground: 203 80% 21%;
+  --sidebar-accent: 168 76% 42%;
+  --sidebar-accent-foreground: 203 80% 21%;
+  --sidebar-ring: 168 76% 42%;
+  --popover: 220 40% 11%;
+  --popover-foreground: 220 14% 91%;
+  --popover-border: 217 33% 17%;
+  --primary: 168 76% 42%;
+  --primary-foreground: 203 80% 21%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 220 14% 91%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 218 11% 65%;
+  --accent: 168 76% 42%;
+  --accent-foreground: 203 80% 21%;
   --destructive: 0 72% 50%;
   --destructive-foreground: 0 0% 100%;
-  --input: 220 12% 25%;
-  --ring: 215 85% 45%;
-  --chart-1: 215 85% 75%;
-  --chart-2: 200 75% 70%;
-  --chart-3: 230 70% 72%;
-  --chart-4: 190 65% 68%;
-  --chart-5: 210 80% 73%;
+  --input: 217 33% 20%;
+  --ring: 168 76% 42%;
+  --chart-1: 199 89% 60%;
+  --chart-2: 168 76% 50%;
+  --chart-3: 203 80% 45%;
+  --chart-4: 180 70% 45%;
+  --chart-5: 168 76% 35%;
   --shadow-2xs: 0px 2px 0px 0px hsl(215 85% 35% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(215 85% 35% / 0.00);
   --shadow-sm: 0px 2px 0px 0px hsl(215 85% 35% / 0.00), 0px 1px 2px -1px hsl(215 85% 35% / 0.00);
@@ -175,8 +176,95 @@
   }
 }
 
-/* Ziba Design System - Rider App Specific */
+/* Ziba Design System - Brand Colors */
 @layer utilities {
+  /* Brand Color Utilities */
+  .ziba-primary {
+    color: #0A3D62;
+  }
+  .ziba-accent {
+    color: #1ABC9C;
+  }
+  .ziba-bg-primary {
+    background-color: #0A3D62;
+  }
+  .ziba-bg-accent {
+    background-color: #1ABC9C;
+  }
+  .ziba-bg-dark {
+    background-color: #0F172A;
+  }
+  .ziba-bg-card {
+    background-color: #111827;
+  }
+  .ziba-border {
+    border-color: #1F2937;
+  }
+  .ziba-text-primary {
+    color: #E5E7EB;
+  }
+  .ziba-text-secondary {
+    color: #9CA3AF;
+  }
+
+  /* Hero Gradient Text */
+  .ziba-gradient-text {
+    background: linear-gradient(135deg, #1ABC9C 0%, #38BDF8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Accent Glow Effects */
+  .ziba-glow {
+    box-shadow: 0 0 20px rgba(26, 188, 156, 0.15), 0 0 40px rgba(26, 188, 156, 0.1);
+  }
+  .ziba-glow-border {
+    border: 1px solid rgba(26, 188, 156, 0.2);
+    box-shadow: 0 0 20px rgba(26, 188, 156, 0.15);
+  }
+  .ziba-glow-strong {
+    box-shadow: 0 0 30px rgba(26, 188, 156, 0.25), 0 0 60px rgba(26, 188, 156, 0.15);
+  }
+
+  /* Stat Numbers */
+  .ziba-stat {
+    color: #38BDF8;
+  }
+
+  /* Button Styles */
+  .ziba-btn-primary {
+    background-color: #1ABC9C;
+    color: #0A3D62;
+    font-weight: 600;
+  }
+  .ziba-btn-primary:hover {
+    background-color: #16A085;
+  }
+  .ziba-btn-secondary {
+    background-color: transparent;
+    border: 1px solid #1ABC9C;
+    color: #1ABC9C;
+  }
+  .ziba-btn-secondary:hover {
+    background-color: rgba(26, 188, 156, 0.1);
+  }
+
+  /* Navbar Active State */
+  .ziba-nav-active {
+    color: #1ABC9C;
+    border-bottom: 2px solid #1ABC9C;
+  }
+
+  /* Card Hover Effect */
+  .ziba-card-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .ziba-card-hover:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(26, 188, 156, 0.15);
+  }
+
   /* Status Colors - Calm, Professional Palette */
   .ziba-status-searching {
     @apply text-amber-600 dark:text-amber-400;

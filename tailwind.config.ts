@@ -81,6 +81,17 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
+        ziba: {
+          primary: "#0A3D62",
+          accent: "#1ABC9C",
+          "accent-hover": "#16A085",
+          cyan: "#38BDF8",
+          dark: "#0F172A",
+          card: "#111827",
+          border: "#1F2937",
+          "text-primary": "#E5E7EB",
+          "text-secondary": "#9CA3AF",
+        },
       },
       fontFamily: {
         sans: ["var(--font-sans)"],

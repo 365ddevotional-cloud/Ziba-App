@@ -146,36 +146,36 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col pt-2">
+    <div className="min-h-screen bg-ziba-dark flex flex-col pt-2">
       <div className="flex-1 flex items-center justify-center p-4 pb-8">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md bg-ziba-card border-ziba-border ziba-glow">
           <CardHeader className="text-center space-y-4">
-            <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center">
-              <Car className="w-8 h-8 text-primary-foreground" />
+            <div className="mx-auto w-16 h-16 bg-ziba-accent rounded-2xl flex items-center justify-center">
+              <Car className="w-8 h-8 text-ziba-primary" />
             </div>
             <div>
-              <CardTitle className="text-2xl">Join Ziba</CardTitle>
-              <CardDescription>Choose your role to get started</CardDescription>
+              <CardTitle className="text-2xl text-ziba-text-primary">Join Ziba</CardTitle>
+              <CardDescription className="text-ziba-text-secondary">Choose your role to get started</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
             <Tabs value={activeRole} onValueChange={(v) => setActiveRole(v as Role)}>
-              <TabsList className="grid w-full grid-cols-3 mb-6">
-                <TabsTrigger value="rider" data-testid="tab-rider" className="flex items-center gap-1">
+              <TabsList className="grid w-full grid-cols-3 mb-6 bg-ziba-dark">
+                <TabsTrigger value="rider" data-testid="tab-rider" className="flex items-center gap-1 data-[state=active]:bg-ziba-accent data-[state=active]:text-ziba-primary">
                   <User className="w-4 h-4" />
                   <span className="hidden sm:inline">Rider</span>
                 </TabsTrigger>
-                <TabsTrigger value="driver" data-testid="tab-driver" className="flex items-center gap-1">
+                <TabsTrigger value="driver" data-testid="tab-driver" className="flex items-center gap-1 data-[state=active]:bg-ziba-accent data-[state=active]:text-ziba-primary">
                   <Truck className="w-4 h-4" />
                   <span className="hidden sm:inline">Driver</span>
                 </TabsTrigger>
-                <TabsTrigger value="director" data-testid="tab-director" className="flex items-center gap-1">
+                <TabsTrigger value="director" data-testid="tab-director" className="flex items-center gap-1 data-[state=active]:bg-ziba-accent data-[state=active]:text-ziba-primary">
                   <Briefcase className="w-4 h-4" />
                   <span className="hidden sm:inline">Director</span>
                 </TabsTrigger>
               </TabsList>
 
-              <p className="text-sm text-center text-muted-foreground mb-4">{roleDescriptions[activeRole]}</p>
+              <p className="text-sm text-center text-ziba-text-secondary mb-4">{roleDescriptions[activeRole]}</p>
 
               <TabsContent value="rider">
                 <form onSubmit={handleRiderSubmit} className="space-y-4">
@@ -223,7 +223,7 @@ export default function Signup() {
                       <Input id="rider-confirmPassword" type="password" placeholder="Confirm your password" value={riderForm.confirmPassword} onChange={(e) => setRiderForm({...riderForm, confirmPassword: e.target.value})} className="pl-10" required data-testid="input-rider-confirm-password" />
                     </div>
                   </div>
-                  <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-rider-register">
+                  <Button type="submit" className="w-full ziba-btn-primary" disabled={isLoading} data-testid="button-rider-register">
                     {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating account...</> : "Create Rider Account"}
                   </Button>
                 </form>
@@ -288,10 +288,10 @@ export default function Signup() {
                       <Input id="driver-confirmPassword" type="password" placeholder="Confirm your password" value={driverForm.confirmPassword} onChange={(e) => setDriverForm({...driverForm, confirmPassword: e.target.value})} className="pl-10" required data-testid="input-driver-confirm-password" />
                     </div>
                   </div>
-                  <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-driver-register">
+                  <Button type="submit" className="w-full ziba-btn-primary" disabled={isLoading} data-testid="button-driver-register">
                     {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting application...</> : "Apply as Driver"}
                   </Button>
-                  <p className="text-xs text-center text-muted-foreground">Driver accounts require verification before activation</p>
+                  <p className="text-xs text-center text-ziba-text-secondary">Driver accounts require verification before activation</p>
                 </form>
               </TabsContent>
 
@@ -354,23 +354,23 @@ export default function Signup() {
                       <Input id="director-confirmPassword" type="password" placeholder="Confirm your password" value={directorForm.confirmPassword} onChange={(e) => setDirectorForm({...directorForm, confirmPassword: e.target.value})} className="pl-10" required data-testid="input-director-confirm-password" />
                     </div>
                   </div>
-                  <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-director-register">
+                  <Button type="submit" className="w-full ziba-btn-primary" disabled={isLoading} data-testid="button-director-register">
                     {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting application...</> : "Apply as Director"}
                   </Button>
-                  <p className="text-xs text-center text-muted-foreground">Director accounts require admin approval before activation</p>
+                  <p className="text-xs text-center text-ziba-text-secondary">Director accounts require admin approval before activation</p>
                 </form>
               </TabsContent>
             </Tabs>
 
-            <div className="mt-6 text-center text-sm text-muted-foreground">
+            <div className="mt-6 text-center text-sm text-ziba-text-secondary">
               Already have an account?{" "}
-              <Link href="/login" className="text-primary hover:underline" data-testid="link-login">Sign in</Link>
+              <Link href="/login" className="text-ziba-accent hover:underline" data-testid="link-login">Sign in</Link>
             </div>
-            <p className="mt-4 text-xs text-center text-muted-foreground">
+            <p className="mt-4 text-xs text-center text-ziba-text-secondary">
               By signing up, you agree to our{" "}
-              <Link href="/legal/terms" className="underline">Terms of Service</Link>
+              <Link href="/legal/terms" className="underline text-ziba-accent">Terms of Service</Link>
               {" "}and{" "}
-              <Link href="/legal/privacy" className="underline">Privacy Policy</Link>
+              <Link href="/legal/privacy" className="underline text-ziba-accent">Privacy Policy</Link>
             </p>
           </CardContent>
         </Card>
