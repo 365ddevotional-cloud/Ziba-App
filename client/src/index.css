@@ -93,39 +93,39 @@
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(26,188,156, .08);
   --elevate-2: rgba(26,188,156, .15);
-  /* Ziba Brand Colors */
-  --background: 222 47% 11%;
-  --foreground: 220 14% 91%;
+  /* Ziba Premium Dark Theme - Deep Royal Blue Base */
+  --background: 216 50% 7%;
+  --foreground: 210 40% 98%;
   --border: 217 33% 17%;
-  --card: 220 40% 11%;
-  --card-foreground: 220 14% 91%;
+  --card: 220 42% 9%;
+  --card-foreground: 210 40% 98%;
   --card-border: 217 33% 17%;
-  --sidebar: 203 80% 21%;
-  --sidebar-foreground: 220 14% 91%;
+  --sidebar: 210 80% 14%;
+  --sidebar-foreground: 210 40% 98%;
   --sidebar-border: 217 33% 17%;
   --sidebar-primary: 168 76% 42%;
-  --sidebar-primary-foreground: 203 80% 21%;
+  --sidebar-primary-foreground: 210 80% 14%;
   --sidebar-accent: 168 76% 42%;
-  --sidebar-accent-foreground: 203 80% 21%;
+  --sidebar-accent-foreground: 210 80% 14%;
   --sidebar-ring: 168 76% 42%;
-  --popover: 220 40% 11%;
-  --popover-foreground: 220 14% 91%;
+  --popover: 220 42% 9%;
+  --popover-foreground: 210 40% 98%;
   --popover-border: 217 33% 17%;
   --primary: 168 76% 42%;
-  --primary-foreground: 203 80% 21%;
+  --primary-foreground: 210 80% 14%;
   --secondary: 217 33% 17%;
-  --secondary-foreground: 220 14% 91%;
+  --secondary-foreground: 210 40% 98%;
   --muted: 217 33% 17%;
-  --muted-foreground: 218 11% 65%;
+  --muted-foreground: 215 20% 65%;
   --accent: 168 76% 42%;
-  --accent-foreground: 203 80% 21%;
+  --accent-foreground: 210 80% 14%;
   --destructive: 0 72% 50%;
   --destructive-foreground: 0 0% 100%;
   --input: 217 33% 20%;
   --ring: 168 76% 42%;
   --chart-1: 199 89% 60%;
   --chart-2: 168 76% 50%;
-  --chart-3: 203 80% 45%;
+  --chart-3: 210 80% 45%;
   --chart-4: 180 70% 45%;
   --chart-5: 168 76% 35%;
   --shadow-2xs: 0px 2px 0px 0px hsl(215 85% 35% / 0.00);
@@ -176,129 +176,157 @@
   }
 }
 
-/* Ziba Design System - Brand Colors */
+/* ============================================
+   ZIBA PREMIUM DESIGN SYSTEM
+   Enterprise-Grade Color Palette
+   ============================================ */
 :root {
-  /* Primary Brand Colors */
-  --ziba-blue: #0A3D62;
-  --ziba-teal: #1ABC9C;
+  /* Primary Brand - Deep Royal Blue */
+  --ziba-primary: #0A2540;
+  --ziba-primary-light: #0F3A5C;
   
-  /* Backgrounds */
-  --ziba-dark: #0F172A;
-  --ziba-surface: #111827;
-  --ziba-light: #F7F9FB;
+  /* Accent - Emerald Teal */
+  --ziba-accent: #1ABC9C;
+  --ziba-accent-hover: #16A085;
+  --ziba-accent-glow: rgba(26, 188, 156, 0.4);
   
-  /* Text Colors */
-  --ziba-text-primary: #FFFFFF;
-  --ziba-text-secondary: #CBD5E1;
-  --ziba-text-muted: #94A3B8;
+  /* Backgrounds - High Contrast Dark */
+  --ziba-bg: #0B1220;
+  --ziba-card: #111827;
+  --ziba-surface: #1F2937;
   
-  /* Status Colors */
-  --ziba-success: #22C55E;
+  /* Borders */
+  --ziba-border: #1F2937;
+  --ziba-border-light: #374151;
+  
+  /* Text - High Contrast */
+  --ziba-text-primary: #F9FAFB;
+  --ziba-text-secondary: #9CA3AF;
+  --ziba-text-muted: #6B7280;
+  
+  /* Status Colors - Vibrant */
+  --ziba-success: #16A34A;
+  --ziba-success-bg: rgba(22, 163, 74, 0.15);
   --ziba-warning: #F59E0B;
-  --ziba-error: #EF4444;
+  --ziba-warning-bg: rgba(245, 158, 11, 0.15);
+  --ziba-error: #DC2626;
+  --ziba-error-bg: rgba(220, 38, 38, 0.15);
+  
+  /* Rating Stars */
+  --ziba-gold: #FACC15;
 }
 
 @layer utilities {
   /* Brand Color Utilities */
-  .ziba-primary {
-    color: var(--ziba-blue);
-  }
-  .ziba-accent, .text-ziba-accent {
-    color: var(--ziba-teal);
-  }
-  .ziba-bg-primary, .bg-ziba-primary {
-    background-color: var(--ziba-blue);
-  }
-  .ziba-bg-accent, .bg-ziba-accent {
-    background-color: var(--ziba-teal);
-  }
-  .ziba-bg-dark, .bg-ziba-dark {
-    background-color: var(--ziba-dark);
-  }
-  .ziba-bg-card, .bg-ziba-card {
-    background-color: var(--ziba-surface);
-  }
-  .ziba-bg-surface, .bg-ziba-surface {
-    background-color: var(--ziba-surface);
-  }
-  .ziba-border, .border-ziba-border {
-    border-color: rgba(255, 255, 255, 0.05);
-  }
-  .ziba-text-primary, .text-ziba-text-primary {
-    color: var(--ziba-text-primary);
-  }
-  .ziba-text-secondary, .text-ziba-text-secondary {
-    color: var(--ziba-text-secondary);
-  }
-  .ziba-text-muted, .text-ziba-text-muted {
-    color: var(--ziba-text-muted);
-  }
+  .text-ziba-primary { color: var(--ziba-primary); }
+  .text-ziba-accent { color: var(--ziba-accent); }
+  .text-ziba-text-primary { color: var(--ziba-text-primary); }
+  .text-ziba-text-secondary { color: var(--ziba-text-secondary); }
+  .text-ziba-text-muted { color: var(--ziba-text-muted); }
+  .text-ziba-success { color: var(--ziba-success); }
+  .text-ziba-warning { color: var(--ziba-warning); }
+  .text-ziba-error { color: var(--ziba-error); }
+  .text-ziba-gold { color: var(--ziba-gold); }
   
-  /* Status Colors */
-  .text-ziba-success {
-    color: var(--ziba-success);
-  }
-  .text-ziba-warning {
-    color: var(--ziba-warning);
-  }
-  .text-ziba-error {
-    color: var(--ziba-error);
-  }
+  /* Background Utilities */
+  .bg-ziba-primary { background-color: var(--ziba-primary); }
+  .bg-ziba-accent { background-color: var(--ziba-accent); }
+  .bg-ziba-bg { background-color: var(--ziba-bg); }
+  .bg-ziba-card { background-color: var(--ziba-card); }
+  .bg-ziba-surface { background-color: var(--ziba-surface); }
+  .bg-ziba-success { background-color: var(--ziba-success); }
+  .bg-ziba-success-subtle { background-color: var(--ziba-success-bg); }
+  .bg-ziba-warning-subtle { background-color: var(--ziba-warning-bg); }
+  .bg-ziba-error-subtle { background-color: var(--ziba-error-bg); }
+  
+  /* Border Utilities */
+  .border-ziba { border-color: var(--ziba-border); }
+  .border-ziba-light { border-color: var(--ziba-border-light); }
+  .border-ziba-accent { border-color: var(--ziba-accent); }
 
-  /* Hero Gradient - Premium 135deg */
+  /* Hero Gradient - Deep Royal Blue to Dark */
   .ziba-hero-gradient {
-    background: linear-gradient(135deg, var(--ziba-blue) 0%, var(--ziba-dark) 65%);
+    background: linear-gradient(135deg, #0A2540 0%, #0B1220 100%);
   }
   
-  /* Hero Gradient Text - Teal emphasis */
+  /* Gradient Text - Accent */
   .ziba-gradient-text {
-    background: linear-gradient(135deg, var(--ziba-teal) 0%, #38BDF8 100%);
+    background: linear-gradient(135deg, #1ABC9C 0%, #38BDF8 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
-  /* Premium Card Styling */
+  /* Premium Card with Shadow */
   .ziba-card-premium {
-    background-color: var(--ziba-surface);
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+    background-color: var(--ziba-card);
+    border-radius: 12px;
+    border: 1px solid var(--ziba-border);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
   }
 
-  /* Accent Glow Effects */
+  /* Accent Glow - Teal */
   .ziba-glow {
-    box-shadow: 0 0 20px rgba(26, 188, 156, 0.15), 0 0 40px rgba(26, 188, 156, 0.1);
+    box-shadow: 0 0 20px rgba(26, 188, 156, 0.2), 0 0 40px rgba(26, 188, 156, 0.1);
   }
   .ziba-glow-border {
-    border: 1px solid rgba(26, 188, 156, 0.2);
+    border: 1px solid rgba(26, 188, 156, 0.3);
     box-shadow: 0 0 20px rgba(26, 188, 156, 0.15);
   }
   .ziba-glow-strong {
-    box-shadow: 0 0 30px rgba(26, 188, 156, 0.25), 0 0 60px rgba(26, 188, 156, 0.15);
+    box-shadow: 0 0 30px rgba(26, 188, 156, 0.3), 0 0 60px rgba(26, 188, 156, 0.2);
+  }
+  
+  /* Success Glow - Green */
+  .ziba-success-glow {
+    box-shadow: 0 0 30px rgba(22, 163, 74, 0.3), 0 0 60px rgba(22, 163, 74, 0.2);
   }
 
-  /* Stat Numbers */
+  /* Stat Numbers - Teal */
   .ziba-stat {
-    color: #38BDF8;
+    color: #1ABC9C;
   }
 
-  /* Button Styles */
+  /* Primary Button - Emerald Teal with Glow */
   .ziba-btn-primary {
     background-color: #1ABC9C;
-    color: #0A3D62;
+    color: #0A2540;
     font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 0 rgba(26, 188, 156, 0);
   }
   .ziba-btn-primary:hover {
     background-color: #16A085;
+    box-shadow: 0 0 20px rgba(26, 188, 156, 0.4), 0 4px 12px rgba(26, 188, 156, 0.3);
+    transform: translateY(-1px);
   }
+  .ziba-btn-primary:active {
+    transform: translateY(0);
+  }
+
+  /* Secondary Button - Transparent with Teal Outline */
   .ziba-btn-secondary {
     background-color: transparent;
     border: 1px solid #1ABC9C;
     color: #1ABC9C;
+    font-weight: 500;
+    transition: all 0.2s ease;
   }
   .ziba-btn-secondary:hover {
     background-color: rgba(26, 188, 156, 0.1);
+    box-shadow: 0 0 15px rgba(26, 188, 156, 0.2);
+  }
+
+  /* Success Button - Rich Green */
+  .ziba-btn-success {
+    background-color: #16A34A;
+    color: #FFFFFF;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  .ziba-btn-success:hover {
+    background-color: #15803D;
+    box-shadow: 0 0 20px rgba(22, 163, 74, 0.4);
   }
 
   /* Navbar Active State */
@@ -309,146 +337,117 @@
 
   /* Card Hover Effect */
   .ziba-card-hover {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   }
   .ziba-card-hover:hover {
-    transform: scale(1.02);
-    box-shadow: 0 0 20px rgba(26, 188, 156, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border-color: rgba(26, 188, 156, 0.2);
   }
 
-  /* Status Colors - Calm, Professional Palette */
-  .ziba-status-searching {
-    @apply text-amber-600 dark:text-amber-400;
-  }
-  .ziba-status-searching-bg {
-    @apply bg-amber-50 dark:bg-amber-900/20;
-  }
-  .ziba-status-enroute {
-    @apply text-blue-600 dark:text-blue-400;
-  }
-  .ziba-status-enroute-bg {
-    @apply bg-blue-50 dark:bg-blue-900/20;
-  }
-  .ziba-status-arrived {
-    @apply text-emerald-600 dark:text-emerald-400;
-  }
-  .ziba-status-arrived-bg {
-    @apply bg-emerald-50 dark:bg-emerald-900/20;
-  }
-  .ziba-status-progress {
-    @apply text-primary;
-  }
-  .ziba-status-progress-bg {
-    @apply bg-primary/10;
-  }
-  .ziba-status-complete {
-    @apply text-emerald-600 dark:text-emerald-400;
-  }
-  .ziba-status-complete-bg {
-    @apply bg-emerald-50 dark:bg-emerald-900/20;
-  }
+  /* Status Colors */
+  .ziba-status-searching { @apply text-amber-500; }
+  .ziba-status-searching-bg { background-color: rgba(245, 158, 11, 0.15); }
+  .ziba-status-enroute { @apply text-blue-400; }
+  .ziba-status-enroute-bg { background-color: rgba(59, 130, 246, 0.15); }
+  .ziba-status-arrived { color: #16A34A; }
+  .ziba-status-arrived-bg { background-color: rgba(22, 163, 74, 0.15); }
+  .ziba-status-progress { color: #1ABC9C; }
+  .ziba-status-progress-bg { background-color: rgba(26, 188, 156, 0.15); }
+  .ziba-status-complete { color: #16A34A; }
+  .ziba-status-complete-bg { background-color: rgba(22, 163, 74, 0.15); }
 
-  /* Typography - Clean Hierarchy */
+  /* Typography */
   .ziba-headline {
-    @apply text-2xl font-semibold tracking-tight text-foreground;
+    @apply text-2xl font-semibold tracking-tight;
+    color: var(--ziba-text-primary);
   }
   .ziba-subheadline {
-    @apply text-base font-normal text-muted-foreground;
+    @apply text-base font-normal;
+    color: var(--ziba-text-secondary);
   }
   .ziba-caption {
-    @apply text-xs font-medium text-muted-foreground uppercase tracking-wide;
+    @apply text-xs font-medium uppercase tracking-wide;
+    color: var(--ziba-text-muted);
   }
   .ziba-body {
-    @apply text-sm text-foreground;
+    @apply text-sm;
+    color: var(--ziba-text-primary);
   }
   .ziba-body-muted {
-    @apply text-sm text-muted-foreground;
+    @apply text-sm;
+    color: var(--ziba-text-secondary);
   }
 
-  /* Rider App Card Styles */
+  /* Premium Card Styles */
   .ziba-card {
-    @apply bg-card border border-border rounded-xl;
+    background-color: var(--ziba-card);
+    border: 1px solid var(--ziba-border);
+    @apply rounded-xl;
   }
   .ziba-card-elevated {
-    @apply bg-card border border-border rounded-xl shadow-sm;
+    background-color: var(--ziba-card);
+    border: 1px solid var(--ziba-border);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+    @apply rounded-xl;
   }
 
-  /* Cancel Button - Subtle Danger */
+  /* Cancel Button */
   .ziba-cancel-btn {
-    @apply text-destructive bg-transparent border border-destructive/30 hover:bg-destructive/5;
+    @apply text-destructive bg-transparent border border-destructive/30 hover:bg-destructive/10;
+  }
+
+  /* Input Styles */
+  .ziba-input {
+    background-color: var(--ziba-bg);
+    border: 1px solid var(--ziba-border);
+    color: var(--ziba-text-primary);
+  }
+  .ziba-input:focus {
+    border-color: var(--ziba-accent);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(26, 188, 156, 0.2);
+  }
+  .ziba-input::placeholder {
+    color: var(--ziba-text-muted);
   }
 }
 
 /**
- * Using the elevate system.
- * Automatic contrast adjustment.
- *
- * <element className="hover-elevate" />
- * <element className="active-elevate-2" />
- *
- * // Using the tailwind utility when a data attribute is "on"
- * <element className="toggle-elevate data-[state=on]:toggle-elevated" />
- * // Or manually controlling the toggle state
- * <element className="toggle-elevate toggle-elevated" />
- *
- * Elevation systems have to handle many states.
- * - not-hovered, vs. hovered vs. active  (three mutually exclusive states)
- * - toggled or not
- * - focused or not (this is not handled with these utilities)
- *
- * Even without handling focused or not, this is six possible combinations that
- * need to be distinguished from eachother visually.
+ * Elevation System
  */
 @layer utilities {
-
-  /* Hide ugly search cancel button in Chrome until we can style it properly */
   input[type="search"]::-webkit-search-cancel-button {
     @apply hidden;
   }
 
-  /* Placeholder styling for contentEditable div */
   [contenteditable][data-placeholder]:empty::before {
     content: attr(data-placeholder);
     color: hsl(var(--muted-foreground));
     pointer-events: none;
   }
 
-  /* .no-default-hover-elevate/no-default-active-elevate is an escape hatch so consumers of
-   * buttons/badges can remove the automatic brightness adjustment on interactions
-   * and program their own. */
   .no-default-hover-elevate {}
-
   .no-default-active-elevate {}
 
-
-  /**
-   * Toggleable backgrounds go behind the content. Hoverable/active goes on top.
-   * This way they can stack/compound. Both will overlap the parent's borders!
-   * So borders will be automatically adjusted both on toggle, and hover/active,
-   * and they will be compounded.
-   */
   .toggle-elevate::before,
   .toggle-elevate-2::before {
     content: "";
     pointer-events: none;
     position: absolute;
     inset: 0px;
-    /*border-radius: inherit;   match rounded corners */
     border-radius: inherit;
     z-index: -1;
-    /* sits behind content but above backdrop */
   }
 
   .toggle-elevate.toggle-elevated::before {
     background-color: var(--elevate-2);
   }
 
-  /* If there's a 1px border, adjust the inset so that it covers that parent's border */
   .border.toggle-elevate::before {
     inset: -1px;
   }
 
-  /* Does not work on elements with overflow:hidden! */
   .hover-elevate:not(.no-default-hover-elevate),
   .active-elevate:not(.no-default-active-elevate),
   .hover-elevate-2:not(.no-default-hover-elevate),
@@ -465,10 +464,8 @@
     pointer-events: none;
     position: absolute;
     inset: 0px;
-    /*border-radius: inherit;   match rounded corners */
     border-radius: inherit;
     z-index: 999;
-    /* sits in front of content */
   }
 
   .hover-elevate:hover:not(.no-default-hover-elevate)::after,
@@ -481,7 +478,6 @@
     background-color: var(--elevate-2);
   }
 
-  /* If there's a 1px border, adjust the inset so that it covers that parent's border */
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after,
   .border.active-elevate:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate-2:not(.no-hover-interaction-elevate)::after,

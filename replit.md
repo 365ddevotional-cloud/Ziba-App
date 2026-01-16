@@ -33,12 +33,16 @@ The Ziba platform is built with a modern web development stack:
     - Driver completion page (`/driver/ride-complete`): Success animation, earnings breakdown (85% after 15% commission), 5-star rider rating, "Go Online" and "View Earnings" actions
     - Proper 401/404 error handling with redirects to login/signup pages
     - Automatic redirect to completion page after ride ends
-- **Brand Design System**:
-    - Global CSS variables for consistent styling: --ziba-blue (#0A3D62), --ziba-teal (#1ABC9C), --ziba-dark (#0F172A), --ziba-surface (#111827)
-    - Text colors: --ziba-text-primary (#FFFFFF), --ziba-text-secondary (#CBD5E1), --ziba-text-muted (#94A3B8)
-    - Status colors: --ziba-success (#22C55E), --ziba-warning (#F59E0B), --ziba-error (#EF4444)
-    - Premium hero gradient: linear-gradient(135deg, #0A3D62 0%, #0F172A 65%)
-    - Cards with 16px border radius and subtle rgba(255,255,255,0.05) borders
+- **Brand Design System (Premium Enterprise)**:
+    - Primary: Deep Royal Blue #0A2540 (header, dark backgrounds)
+    - Accent: Emerald Teal #1ABC9C (buttons, highlights, icons)
+    - Backgrounds: #0B1220 (main), #111827 (cards), #1F2937 (surfaces/borders)
+    - Text: #F9FAFB (primary), #9CA3AF (secondary), #6B7280 (muted)
+    - Status: #16A34A (success), #F59E0B (warning), #DC2626 (error)
+    - Rating stars: Gold #FACC15
+    - Hero gradient: linear-gradient(135deg, #0A2540 0%, #0B1220 100%)
+    - Buttons: Teal with glow effect on hover, transparent outline for secondary
+    - Cards: 12px radius, subtle borders, drop shadows
 - **Production Hardening (Stage 16)**: 
     - Admin bootstrap is idempotent - creates founder admin only if no admins exist, with bcrypt-hashed password
     - Authentication relies on stored database credentials with secure bcrypt hashing
