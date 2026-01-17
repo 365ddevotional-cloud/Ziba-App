@@ -118,7 +118,26 @@ export function DriverAuthProvider({ children }: { children: ReactNode }) {
 export function useDriverAuth() {
   const context = useContext(DriverAuthContext);
   if (!context) {
-    throw new Error("useDriverAuth must be used within DriverAuthProvider");
+    // Defensive check: If called outside provider, return safe defaults instead of crashing
+    // This prevents crashes when accidentally used in rider/director contexts
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[useDriverAuth] Called outside DriverAuthProvider - returning safe defaults");
+    }
+    return {
+      user: null,
+      isLoading: false,
+      isAuthenticated: false,
+      isDriver: false,
+      login: async () => {
+        throw new Error("DriverAuthProvider not available");
+      },
+      logout: async () => {
+        throw new Error("DriverAuthProvider not available");
+      },
+      updateProfile: async () => {
+        throw new Error("DriverAuthProvider not available");
+      },
+    };
   }
   return context;
 }

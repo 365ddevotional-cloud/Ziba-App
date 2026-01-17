@@ -1,6 +1,5 @@
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { useRiderAuth } from "@/lib/rider-auth";
-import { useDriverAuth } from "@/lib/driver-auth";
 import RiderHome from "./home";
 import RiderLogin from "./login";
 import RiderRegister from "./register";
@@ -22,7 +21,6 @@ import { Loader2 } from "lucide-react";
 
 function RiderAuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, isRider, user } = useRiderAuth();
-  const { isDriver } = useDriverAuth();
 
   if (isLoading) {
     return (
@@ -32,21 +30,14 @@ function RiderAuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Block drivers from accessing rider routes
-  if (isDriver) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("[RiderAuthGuard] Blocked driver from accessing rider route");
-    }
-    return <RiderAccessDenied />;
-  }
-
   if (!isAuthenticated) {
     if (process.env.NODE_ENV === "development") {
-      console.warn("[RiderAuthGuard] Not authenticated, redirecting to /rider/login");
+      console.warn("[RiderAuthGuard] Not authenticated, redirecting to /login");
     }
-    return <Redirect to="/rider/login" />;
+    return <Redirect to="/login" />;
   }
 
+  // Block non-riders (including drivers) from accessing rider routes
   if (!isRider) {
     if (process.env.NODE_ENV === "development") {
       console.warn("[RiderAuthGuard] User is not a rider, user:", user);
@@ -59,7 +50,6 @@ function RiderAuthGuard({ children }: { children: React.ReactNode }) {
 
 function RiderGuestGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, isRider } = useRiderAuth();
-  const { isDriver } = useDriverAuth();
 
   if (isLoading) {
     return (
@@ -69,15 +59,12 @@ function RiderGuestGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Block drivers from accessing rider routes
-  if (isDriver) {
-    return <RiderAccessDenied />;
-  }
-
+  // If authenticated as rider, redirect to home
   if (isAuthenticated && isRider) {
     return <Redirect to="/rider/home" />;
   }
 
+  // If authenticated but not a rider, block access
   if (isAuthenticated && !isRider) {
     return <RiderAccessDenied />;
   }
