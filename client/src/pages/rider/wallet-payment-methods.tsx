@@ -39,9 +39,10 @@ export default function WalletPaymentMethods() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  const { data, isLoading } = useQuery<PaymentMethodsData>({
+  const { data, isLoading, error } = useQuery<PaymentMethodsData>({
     queryKey: ["/api/rider/payment-methods"],
     staleTime: 1000 * 60,
+    retry: 1,
   });
 
   const setDefaultMutation = useMutation({
@@ -95,6 +96,19 @@ export default function WalletPaymentMethods() {
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-12 space-y-4">
+            <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
+              <CreditCard className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="ziba-headline">Unable to load payment methods</h2>
+              <p className="ziba-subheadline">Please try again later</p>
+            </div>
+            <Button onClick={() => window.location.reload()} variant="outline">
+              Retry
+            </Button>
           </div>
         ) : hasNoMethods ? (
           <div className="text-center py-12 space-y-4">
