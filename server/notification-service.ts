@@ -37,7 +37,7 @@ export async function createNotification(data: NotificationData) {
         title: data.title,
         message: data.message,
         type: data.type as any,
-        metadata: data.metadata || null,
+        metadata: (data.metadata as any) || null,
       },
     });
     console.log(`[Notification] Created ${data.type} for ${data.role} ${data.userId}`);

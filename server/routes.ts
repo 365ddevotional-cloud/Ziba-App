@@ -2044,9 +2044,12 @@ export async function registerRoutes(
   });
 
   // ==================== RATINGS ====================
+  // TEMPORARILY DISABLED - Feature frozen for fast finish
 
-  // Rate a driver (after completed ride)
+  // Rate a driver (after completed ride) - STUB
   app.post("/api/ratings/driver", async (req, res) => {
+    return res.status(501).json({ message: "Ratings feature is temporarily disabled" });
+    /*
     try {
       const { rideId, rating, feedback } = req.body;
 
@@ -2108,10 +2111,13 @@ export async function registerRoutes(
       console.error("Error rating driver:", error);
       res.status(500).json({ message: "Failed to rate driver" });
     }
+    */
   });
 
-  // Rate a user (after completed ride)
+  // Rate a user (after completed ride) - STUB
   app.post("/api/ratings/user", async (req, res) => {
+    return res.status(501).json({ message: "Ratings feature is temporarily disabled" });
+    /*
     try {
       const { rideId, rating, feedback } = req.body;
 
@@ -2173,6 +2179,7 @@ export async function registerRoutes(
       console.error("Error rating user:", error);
       res.status(500).json({ message: "Failed to rate user" });
     }
+    */
   });
 
   // ==================== TRIP STATE MACHINE ====================
@@ -2439,8 +2446,11 @@ export async function registerRoutes(
     return config;
   }
 
-  // Create notification helper
+  // Create notification helper (TEMPORARILY DISABLED - no-op for fast finish)
   async function createNotification(userId: string, role: string, message: string, type: "RIDE_REQUESTED" | "RIDE_ASSIGNED" | "RIDE_COMPLETED" | "WALLET_UPDATED" | "STATUS_CHANGE" | "SYSTEM") {
+    // STUB: Notifications frozen for fast finish
+    // Uncomment below to re-enable:
+    /*
     const titleMap: Record<string, string> = {
       "RIDE_REQUESTED": "Ride Requested",
       "RIDE_ASSIGNED": "Ride Assigned",
@@ -2452,6 +2462,9 @@ export async function registerRoutes(
     return prisma.notification.create({
       data: { userId, role, title: titleMap[type] || "Notification", message, type },
     });
+    */
+    // No-op return (prevents crashes)
+    return Promise.resolve({ id: "stub", userId, role, message, type } as any);
   }
 
   // ==================== RIDESHARE MATCHING HELPERS ====================
@@ -4604,8 +4617,10 @@ export async function registerRoutes(
     }
   });
 
-  // Driver rate rider
+  // Driver rate rider (TEMPORARILY DISABLED)
   app.post("/api/driver/rides/:id/rate-rider", async (req, res) => {
+    return res.status(501).json({ message: "Ratings feature is temporarily disabled" });
+    /* STUB: Frozen for fast finish
     if (!req.session.userId || req.session.userRole !== "driver") {
       return res.status(401).json({ message: "Not authenticated as driver" });
     }
@@ -4675,6 +4690,7 @@ export async function registerRoutes(
       console.error("Error rating rider:", error);
       res.status(500).json({ message: "Failed to submit rating" });
     }
+    */
   });
 
   // Driver go online
@@ -6576,8 +6592,10 @@ export async function registerRoutes(
     res.json({ enabled: TEST_MODE });
   });
 
-  // Rate driver after ride completion
+  // Rate driver after ride completion (TEMPORARILY DISABLED)
   app.post("/api/rider/rides/:id/rate", async (req, res) => {
+    return res.status(501).json({ message: "Ratings feature is temporarily disabled" });
+    /*
     if (!req.session.userId || req.session.userRole !== "rider") {
       return res.status(401).json({ message: "Not authenticated as rider" });
     }
@@ -6644,6 +6662,7 @@ export async function registerRoutes(
       console.error("Error rating driver:", error);
       res.status(500).json({ message: "Failed to submit rating" });
     }
+    */
   });
 
   // ==================== RIDER APP WALLET ====================
@@ -6691,8 +6710,11 @@ export async function registerRoutes(
     }
   });
 
-  // Add tip to driver
+  // Add tip to driver (TEMPORARILY DISABLED)
   app.post("/api/rider/tips", async (req, res) => {
+    return res.status(501).json({ message: "Tips feature is temporarily disabled" });
+    // STUB: Feature frozen for fast finish
+    /* 
     if (!req.session.userId || req.session.userRole !== "rider") {
       return res.status(401).json({ message: "Not authenticated as rider" });
     }
@@ -6768,6 +6790,7 @@ export async function registerRoutes(
       console.error("Error adding tip:", error);
       res.status(500).json({ message: "Failed to send tip" });
     }
+    */
   });
 
   // Add funds to wallet (simulated for now)

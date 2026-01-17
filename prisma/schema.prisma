@@ -8,22 +8,25 @@ datasource db {
 }
 
 model User {
-  id            String       @id @default(uuid())
-  fullName      String
-  email         String       @unique
-  phone         String?
-  city          String?
-  status        UserStatus   @default(ACTIVE)
-  passwordHash  String?
-  averageRating Float        @default(0)
-  totalRatings  Int          @default(0)
-  isTestAccount Boolean      @default(false)
-  testDisabled  Boolean      @default(false)
-  createdAt     DateTime     @default(now())
-  isVerified    Boolean      @default(false)
-  rides         Ride[]
-  tips          Tip[]
-  ratings       UserRating[]
+  id                String       @id @default(uuid())
+  fullName          String
+  email             String       @unique
+  phone             String?
+  city              String?
+  status            UserStatus   @default(ACTIVE)
+  passwordHash      String?
+  averageRating     Float        @default(0)
+  totalRatings      Int          @default(0)
+  isTestAccount     Boolean      @default(false)
+  testDisabled      Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  isVerified        Boolean      @default(false)
+  userType          String?      // Trip coordinator support: "REGULAR" | "TRIP_COORDINATOR"
+  isTripCoordinator Boolean      @default(false) // Compatibility field for trip coordinator feature
+  phoneVerified     Boolean      @default(false) // Phone verification status
+  rides             Ride[]
+  tips              Tip[]
+  ratings           UserRating[]
 }
 
 model Driver {
@@ -85,6 +88,11 @@ model Ride {
   platformCommissionRate   Float?
   platformCommissionAmount Float?
   driverPayoutAmount       Float?
+  rideMode                 String?       // "PRIVATE" | "SHARE" - compatibility for rideshare feature
+  shareGroupId             String?       // TODO: ShareGroup model not in schema - temporarily nullable
+  passengerName            String?       // Trip coordinator passenger info
+  passengerPhone           String?       // Trip coordinator passenger info
+  passengerNotes           String?       // Trip coordinator passenger notes
   driverRating             DriverRating?
   gpsLogs                  GpsLog[]
   payment                  Payment?
@@ -227,15 +235,16 @@ model Notification {
 }
 
 model PlatformConfig {
-  id                 String             @id @default(uuid())
-  commissionRate     Float              @default(0.15)
-  minCommissionRate  Float              @default(0.15)
-  maxCommissionRate  Float              @default(0.18)
-  testModeEnabled    Boolean            @default(true)
-  paymentGateway     PaymentGateway     @default(STRIPE)
-  paymentGatewayMode PaymentGatewayMode @default(SANDBOX)
-  updatedAt          DateTime           @updatedAt
-  updatedBy          String?
+  id                     String             @id @default(uuid())
+  commissionRate         Float              @default(0.15)
+  minCommissionRate      Float              @default(0.15)
+  maxCommissionRate      Float              @default(0.18)
+  cancellationPenaltyRate Float             @default(0.20)
+  testModeEnabled        Boolean            @default(true)
+  paymentGateway         PaymentGateway     @default(STRIPE)
+  paymentGatewayMode     PaymentGatewayMode @default(SANDBOX)
+  updatedAt              DateTime           @updatedAt
+  updatedBy              String?
 }
 
 model CommissionAuditLog {

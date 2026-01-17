@@ -220,15 +220,9 @@ export default function DriverRideComplete() {
               </div>
 
               {selectedRating > 0 && (
-                <Button
-                  className="w-full h-12 ziba-btn-primary text-base"
-                  onClick={() => rateMutation.mutate({ rideId: ride.id, rating: selectedRating })}
-                  disabled={rateMutation.isPending}
-                  data-testid="button-submit-rating"
-                >
-                  {rateMutation.isPending && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
-                  Submit Rating
-                </Button>
+                <div className="text-center p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Ratings feature coming soon</p>
+                </div>
               )}
             </CardContent>
           </Card>

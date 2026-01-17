@@ -89,6 +89,21 @@ function StarDisplay({ rating }: { rating: number }) {
 }
 
 export default function AdminAnalyticsPage() {
+  // TEMPORARILY DISABLED - Feature frozen for fast finish
+  return (
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-4xl mx-auto mt-8">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold mb-2">Analytics Coming Soon</h2>
+            <p className="text-muted-foreground">This feature is temporarily disabled while we finish the core ride flow.</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+  /*
   const { formatCurrency } = useCountry();
   const { data: analytics, isLoading } = useQuery<Analytics>({
     queryKey: ["/api/analytics"],
@@ -416,4 +431,5 @@ export default function AdminAnalyticsPage() {
       </div>
     </AdminGuard>
   );
+  */
 }
