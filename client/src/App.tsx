@@ -9,6 +9,7 @@ import { RiderAuthProvider } from "@/lib/rider-auth";
 import { CountryProvider } from "@/lib/country";
 import { TripProvider } from "@/lib/trip-context";
 import { WalletProvider } from "@/lib/wallet-context";
+import { DriverStoreProvider } from "@/lib/driver-store";
 import { TestBanner } from "@/components/test-banner";
 import { DevBanner } from "@/components/dev-banner";
 import Landing from "@/pages/landing";
@@ -60,13 +61,15 @@ import RiderRideComplete from "@/pages/ride/complete-rider";
 import DriverRideComplete from "@/pages/ride/complete-driver";
 
 // RiderProviders: Wraps authenticated rider routes with required providers
-// Provider order: Wallet → Trip (Wallet must be outer for Trip to access it if needed)
+// Provider order: Wallet → Trip → DriverStore (as specified in requirements)
 // This is the ONLY entry point for authenticated rider routes
 function RiderProviders({ children }: { children: React.ReactNode }) {
   return (
     <WalletProvider>
       <TripProvider>
-        {children}
+        <DriverStoreProvider>
+          {children}
+        </DriverStoreProvider>
       </TripProvider>
     </WalletProvider>
   );
