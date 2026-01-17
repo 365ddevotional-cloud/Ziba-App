@@ -13,7 +13,10 @@ import {
   Loader2,
   Clock,
   Locate,
+  Car,
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface RouteData {
   distance: number;
@@ -27,6 +30,7 @@ export default function RiderRequest() {
   const [destination, setDestination] = useState("");
   const [isLocating, setIsLocating] = useState(false);
   const [routeData, setRouteData] = useState<RouteData | null>(null);
+  const [rideType, setRideType] = useState<"ZIBAX" | "ZIBASHARE" | "ZIBACOMFORT" | "ZIBAXL">("ZIBAX");
 
   const handleUseCurrentLocation = () => {
     setIsLocating(true);
@@ -68,6 +72,7 @@ export default function RiderRequest() {
       destination,
       distance: routeData.distance.toFixed(2),
       duration: routeData.duration.toString(),
+      rideType,
     });
     navigate(`/rider/confirm?${params.toString()}`);
   };
@@ -131,6 +136,30 @@ export default function RiderRequest() {
                 />
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Ride Type Selector */}
+        <Card className="ziba-card">
+          <CardContent className="p-4 space-y-3">
+            <Label htmlFor="ride-type" className="text-sm font-medium">Ride Type</Label>
+            <Select value={rideType} onValueChange={(v) => setRideType(v as typeof rideType)}>
+              <SelectTrigger id="ride-type" data-testid="select-ride-type">
+                <SelectValue placeholder="Select ride type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ZIBAX">ZIBAX - Standard</SelectItem>
+                <SelectItem value="ZIBASHARE">ZIBASHARE - Shared</SelectItem>
+                <SelectItem value="ZIBACOMFORT">ZIBACOMFORT - Comfort</SelectItem>
+                <SelectItem value="ZIBAXL">ZIBAXL - Extra Large</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {rideType === "ZIBAX" && "Standard ride for everyday trips"}
+              {rideType === "ZIBASHARE" && "Share your ride and save"}
+              {rideType === "ZIBACOMFORT" && "Extra comfort and space"}
+              {rideType === "ZIBAXL" && "Larger vehicle for groups"}
+            </p>
           </CardContent>
         </Card>
 

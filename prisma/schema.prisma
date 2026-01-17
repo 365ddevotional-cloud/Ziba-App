@@ -89,6 +89,7 @@ model Ride {
   platformCommissionAmount Float?
   driverPayoutAmount       Float?
   rideMode                 String?       // "PRIVATE" | "SHARE" - compatibility for rideshare feature
+  rideType                 RideType?    @default(ZIBAX) // Ride type: ZIBAX, ZIBASHARE, ZIBACOMFORT, ZIBAXL
   shareGroupId             String?       // TODO: ShareGroup model not in schema - temporarily nullable
   passengerName            String?       // Trip coordinator passenger info
   passengerPhone           String?       // Trip coordinator passenger info
@@ -355,6 +356,13 @@ enum TripStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+enum RideType {
+  ZIBAX
+  ZIBASHARE
+  ZIBACOMFORT
+  ZIBAXL
 }
 
 enum PaymentStatus {

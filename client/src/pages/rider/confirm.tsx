@@ -173,11 +173,14 @@ export default function RiderConfirm() {
       const destLng = 3.3792 + (Math.random() - 0.5) * 0.1;
 
       // Make API call to request ride
+      const rideType = params.get("rideType") || "ZIBAX";
+      
       const requestBody: any = {
         pickupLocation: pickup,
         dropoffLocation: destination,
         fareEstimate: fareEstimate.fare,
         rideMode: rideMode,
+        rideType: rideType,
         pickupLat,
         pickupLng,
         destLat,

@@ -5886,7 +5886,7 @@ export async function registerRoutes(
     }
 
     try {
-      const { pickupLocation, dropoffLocation, fareEstimate, passengerName, passengerPhone, passengerNotes } = req.body;
+      const { pickupLocation, dropoffLocation, fareEstimate, passengerName, passengerPhone, passengerNotes, rideType } = req.body;
 
       if (!pickupLocation || !dropoffLocation) {
         if (process.env.NODE_ENV === "development") {
@@ -5940,6 +5940,13 @@ export async function registerRoutes(
       }
 
       const mode = rideMode || "PRIVATE";
+      
+      // Validate ride type
+      const validRideTypes = ["ZIBAX", "ZIBASHARE", "ZIBACOMFORT", "ZIBAXL"];
+      const selectedRideType = rideType || "ZIBAX";
+      if (!validRideTypes.includes(selectedRideType)) {
+        return res.status(400).json({ message: `Invalid ride type. Must be one of: ${validRideTypes.join(", ")}` });
+      }
 
       // Create ride (PRIVATE mode only)
       // Enforce minimum fare to prevent negative margin (from origin/main)
@@ -5958,6 +5965,7 @@ export async function registerRoutes(
           dropoffLocation,
           fareEstimate: adjustedFare,
           rideMode: mode,
+          rideType: selectedRideType,
           shareGroupId: null,
           passengerName: passengerName || null,
           passengerPhone: passengerPhone || null,

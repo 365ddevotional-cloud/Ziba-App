@@ -40,6 +40,7 @@ interface Ride {
   estimatedDuration: number | null;
   status: string;
   startedAt: string | null;
+  rideType: string | null;
   user: {
     id: string;
     fullName: string;
@@ -264,6 +265,12 @@ export default function DriverActiveRide() {
 
         <Card className="ziba-card">
           <CardContent className="p-4 space-y-3">
+            {ride.rideType && (
+              <div className="mb-2 pb-2 border-b border-border">
+                <p className="text-xs text-muted-foreground">Ride Type</p>
+                <p className="text-sm font-semibold text-foreground">{ride.rideType}</p>
+              </div>
+            )}
             <div className="flex items-start gap-3">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
               <div className="flex-1 min-w-0">
