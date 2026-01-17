@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,9 +44,9 @@ export default function RiderRequest() {
     }, 1000);
   };
 
-  const handleRouteCalculated = (distance: number, duration: number) => {
+  const handleRouteCalculated = useCallback((distance: number, duration: number) => {
     setRouteData({ distance, duration });
-  };
+  }, []);
 
   const handleContinue = () => {
     if (!pickup || !destination) {

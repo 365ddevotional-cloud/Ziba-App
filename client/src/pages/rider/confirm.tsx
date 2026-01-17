@@ -60,9 +60,9 @@ export default function RiderConfirm() {
   const [isPaid, setIsPaid] = useState(false);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
 
-  // Validate required params on mount
+  // Validate required params on mount (only once)
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || hasValidatedParams) return;
     
     if (!pickup || !destination) {
       if (process.env.NODE_ENV === "development") {
@@ -109,7 +109,7 @@ export default function RiderConfirm() {
 
     setRouteData({ distance, duration });
     setHasValidatedParams(true);
-  }, [pickup, destination, distanceParam, durationParam, authLoading, navigate, toast]);
+  }, [pickup, destination, distanceParam, durationParam, authLoading, hasValidatedParams, navigate, toast]);
 
   // Calculate fare locally using pricing logic
   const fareEstimate = useMemo(() => {

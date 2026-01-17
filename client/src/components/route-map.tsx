@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Loader2, MapPin } from "lucide-react";
 
 interface RouteMapProps {
@@ -10,12 +10,28 @@ interface RouteMapProps {
 export function RouteMap({ pickup, destination, onRouteCalculated }: RouteMapProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const callbackRef = useRef(onRouteCalculated);
+  const lastPickupRef = useRef<string>("");
+  const lastDestinationRef = useRef<string>("");
+
+  // Update callback ref when it changes (without triggering effect)
+  useEffect(() => {
+    callbackRef.current = onRouteCalculated;
+  }, [onRouteCalculated]);
 
   useEffect(() => {
     if (!pickup || !destination) {
       setIsLoading(false);
       return;
     }
+
+    // Prevent recalculation if inputs haven't changed
+    if (pickup === lastPickupRef.current && destination === lastDestinationRef.current) {
+      return;
+    }
+
+    lastPickupRef.current = pickup;
+    lastDestinationRef.current = destination;
 
     setIsLoading(true);
     setError(null);
@@ -44,8 +60,8 @@ export function RouteMap({ pickup, destination, onRouteCalculated }: RouteMapPro
         // Estimate duration: ~30 km/h average speed in city
         const duration = Math.round((distance / 30) * 60); // minutes
 
-        if (onRouteCalculated) {
-          onRouteCalculated(distance, duration);
+        if (callbackRef.current) {
+          callbackRef.current(distance, duration);
         }
 
         setIsLoading(false);
@@ -56,7 +72,7 @@ export function RouteMap({ pickup, destination, onRouteCalculated }: RouteMapPro
     };
 
     calculateRoute();
-  }, [pickup, destination, onRouteCalculated]);
+  }, [pickup, destination]);
 
   // Simple geocoding simulation (returns mock coordinates)
   const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
