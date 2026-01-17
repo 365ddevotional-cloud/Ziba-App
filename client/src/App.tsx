@@ -111,7 +111,9 @@ function Router() {
       <Route path="/ride/complete/driver" component={DriverRideComplete} />
       <Route path="/rider/ride-complete" component={RiderRideComplete} />
       <Route path="/driver/ride-complete" component={DriverRideComplete} />
+      <Route path="/rider" component={RiderApp} />
       <Route path="/rider/:rest*" component={RiderApp} />
+      <Route path="/driver" component={DriverApp} />
       <Route path="/driver/:rest*" component={DriverApp} />
       <Route component={NotFound} />
     </Switch>

@@ -47,9 +47,9 @@ export default function Login() {
         description: "Login successful",
       });
       if (process.env.NODE_ENV === "development") {
-        console.log("[Login] Redirecting rider to /rider");
+        console.log("[Login] Redirecting rider to /rider/home");
       }
-      navigate("/rider");
+      navigate("/rider/home");
     } catch (error: any) {
       const errorMessage = error.message || "Invalid email or password";
       setError(errorMessage);
