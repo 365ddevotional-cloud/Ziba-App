@@ -214,38 +214,50 @@ app.use((req, res, next) => {
     // Other ports are firewalled. Default to 5000 if not specified.
     // this serves both the API and the client.
     // It is the only port that is not firewalled.
-    // Auto-fallback to next available port if preferred port is in use (dev only)
+    // In local dev, lock to 127.0.0.1:5000 (no auto-fallback for consistency)
     const preferred = parseInt(process.env.PORT || "5000", 10);
     const isProduction = process.env.NODE_ENV === "production";
     
-    // In production, use the exact PORT env var (no auto-fallback)
-    // In development, auto-fallback to next available port if needed
-    const port = isProduction ? preferred : await getAvailablePort(preferred);
+    // In local dev, use exact port 5000 (fail if unavailable for clarity)
+    // In production, auto-fallback if needed
+    const port = isProduction ? (await getAvailablePort(preferred)) : preferred;
     
-    // Determine host binding: use 127.0.0.1 on Windows in development, 0.0.0.0 otherwise
-    const isWindows = process.platform === "win32";
-    const isLocalDev = !isProduction;
-    const host = (isWindows && isLocalDev) ? "127.0.0.1" : "0.0.0.0";
+    // Determine host binding: use 127.0.0.1 in local dev for consistency, 0.0.0.0 in production
+    const isLocalDev = !isProduction && !process.env.REPL_ID;
+    const host = isLocalDev ? "127.0.0.1" : "0.0.0.0";
     
     // reusePort is not supported on Windows, so only enable it on non-Windows platforms
     const listenOptions: any = {
       port,
       host,
     };
+    const isWindows = process.platform === "win32";
     if (!isWindows) {
       listenOptions.reusePort = true;
     }
+    
+    httpServer.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        console.error(`\n❌ ERROR: Port ${port} is already in use!`);
+        console.error(`   Please stop the process using port ${port} and try again.`);
+        console.error(`   On Windows: netstat -ano | findstr :${port}`);
+        console.error(`   Then kill the process: taskkill /F /PID <PID>\n`);
+        process.exit(1);
+      } else {
+        console.error(`\n❌ ERROR: Failed to start server on ${host}:${port}`);
+        console.error(`   ${err.message}\n`);
+        process.exit(1);
+      }
+    });
     
     httpServer.listen(
       listenOptions,
       () => {
         const url = `http://${host === "0.0.0.0" ? "localhost" : host}:${port}`;
         log(`Backend API running at ${url}/api/health`);
-        if (!isProduction && port !== preferred) {
-          log(`Port ${preferred} was in use, using port ${port} instead`);
-        }
-        if (!isProduction && !process.env.REPL_ID) {
-          log(`UI will be available at http://127.0.0.1:5173 (or next available port)`);
+        if (isLocalDev) {
+          log(`Local dev mode: Backend locked to ${host}:${port}`);
+          log(`Frontend will be available at http://127.0.0.1:5173`);
         }
       },
     );

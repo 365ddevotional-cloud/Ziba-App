@@ -8,6 +8,7 @@ import { AuthProvider } from "@/lib/auth";
 import { RiderAuthProvider } from "@/lib/rider-auth";
 import { CountryProvider } from "@/lib/country";
 import { TestBanner } from "@/components/test-banner";
+import { DevBanner } from "@/components/dev-banner";
 import Landing from "@/pages/landing";
 import RiderApp from "@/pages/rider";
 import UsersPage from "@/pages/users";
@@ -56,6 +57,11 @@ import RiderRideComplete from "@/pages/ride/complete-rider";
 import DriverRideComplete from "@/pages/ride/complete-driver";
 
 function Router() {
+  // Dev-only route mount confirmation
+  if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
+    console.log("[Ziba Router] Routes mounted - /login and /signup are accessible without auth");
+  }
+  
   return (
     <Switch>
       <Route path="/" component={Landing} />
@@ -119,6 +125,7 @@ function App() {
             <CountryProvider>
               <TooltipProvider>
                 <TestBanner />
+                <DevBanner />
                 <Toaster />
                 <Router />
               </TooltipProvider>
