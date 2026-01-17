@@ -244,6 +244,30 @@ export default function RiderConfirm() {
         });
       }
 
+      // Set trip in TripProvider for immediate UI update
+      if (routeData && fareEstimate) {
+        const tripFare = adjustedFare || fareEstimate.fare;
+        const tripData = {
+          id: ride.id,
+          pickupLocation: pickup,
+          dropoffLocation: destination,
+          distance: routeData.distance,
+          duration: routeData.duration,
+          fare: tripFare,
+          status: "CONFIRMED" as const,
+          createdAt: new Date().toISOString(),
+          paymentMethod: selectedPayment,
+          payment: {
+            fare: tripFare,
+            riderPaid: true,
+            driverPaid: false,
+            platformCommission: tripFare * 0.15,
+            escrowHeld: true,
+          },
+        };
+        setCurrentTrip(tripData);
+      }
+
       queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });
       
       if (ride.shareStatus === "SEARCHING") {

@@ -52,6 +52,9 @@ export default function RiderLiveRide() {
   const { data: activeRide, isLoading, refetch, isFetching } = useQuery<Ride | null>({
     queryKey: ["/api/rider/active-ride"],
     staleTime: 1000 * 60,
+    retry: 1,
+    // Don't block UI if API is slow - use trip context as fallback
+    refetchOnWindowFocus: false,
   });
 
   // Use trip context if available, otherwise fall back to API
@@ -60,6 +63,47 @@ export default function RiderLiveRide() {
   
   // Show driver info from trip context if available
   const driverInfo = currentTrip?.driver;
+
+  // Demo auto-progression: Auto-advance trip lifecycle after payment
+  useEffect(() => {
+    if (!currentTrip) return;
+    
+    // Only auto-progress if trip is CONFIRMED and payment is done
+    if (currentTrip.status !== "CONFIRMED" || !currentTrip.payment?.riderPaid) return;
+    
+    // Prevent multiple runs
+    let isActive = true;
+
+    // Auto-progress to IN_PROGRESS after 3 seconds
+    const timer1 = setTimeout(() => {
+      if (!isActive) return;
+      updateTripStatus("IN_PROGRESS");
+      toast({
+        title: "Trip started!",
+        description: "Your ride is now in progress",
+      });
+    }, 3000);
+
+    // Auto-complete after 8 seconds total (3s to start + 5s ride duration)
+    const timer2 = setTimeout(() => {
+      if (!isActive) return;
+      updateTripStatus("COMPLETED");
+      toast({
+        title: "Trip completed!",
+        description: "Thanks for riding with Ziba",
+      });
+      // Navigate to completion page after a short delay
+      setTimeout(() => {
+        navigate("/rider/ride-complete");
+      }, 2000);
+    }, 8000);
+
+    return () => {
+      isActive = false;
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, [currentTrip?.id, currentTrip?.status, currentTrip?.payment?.riderPaid, updateTripStatus, navigate, toast]);
 
   // Process payment when trip enters IN_PROGRESS (escrow)
   useEffect(() => {
@@ -211,7 +255,9 @@ export default function RiderLiveRide() {
     },
   });
 
-  if (isLoading) {
+  // Don't block on API loading if we have trip context
+  // Only show loading if we have neither currentTrip nor activeRide
+  if (isLoading && !currentTrip && !activeRide) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-3">
