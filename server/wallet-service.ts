@@ -510,10 +510,11 @@ export async function settleTrip(tripId: string): Promise<SettlementResult> {
         ? trip.statusHistory
         : [];
 
+      // Status already COMPLETED (no SETTLED in minimal lifecycle)
       await tx.ride.update({
         where: { id: tripId },
         data: {
-          status: "SETTLED",
+          // status: "COMPLETED", // Already set by state machine
           settledAt: new Date(),
           platformCommissionRate: commissionRate,
           platformCommissionAmount: platformFee,
@@ -521,7 +522,7 @@ export async function settleTrip(tripId: string): Promise<SettlementResult> {
           statusHistory: [
             ...statusHistory,
             {
-              status: "SETTLED",
+              status: "COMPLETED", // Minimal lifecycle: no SETTLED status
               timestamp: new Date().toISOString(),
               actor: "SYSTEM",
             },

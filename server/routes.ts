@@ -441,7 +441,7 @@ export async function registerRoutes(
           fareEstimate: adjustedFare,
           userId,
           driverId,
-          status: driverId ? "DRIVER_ASSIGNED" : "REQUESTED"
+          status: driverId ? "ACCEPTED" : "REQUESTED"
         },
         include: { user: true, driver: true },
       });
@@ -936,10 +936,10 @@ export async function registerRoutes(
         prisma.driver.count({ where: { status: "ACTIVE", isOnline: true } }),
         prisma.ride.count(),
         prisma.ride.count({ where: { status: "REQUESTED" } }),
-        prisma.ride.count({ where: { status: { in: ["DRIVER_ASSIGNED"] } } }),
+        prisma.ride.count({ where: { status: { in: ["ACCEPTED"] } } }),
         prisma.ride.count({ where: { status: "IN_PROGRESS" } }),
         prisma.ride.count({ where: { status: "COMPLETED" } }),
-        prisma.ride.count({ where: { status: "SETTLED" } }), // Note: No CANCELLED status in schema, using SETTLED for completed/cancelled rides
+        prisma.ride.count({ where: { status: "CANCELLED" } }),
         prisma.director.count(),
         prisma.driver.aggregate({ _avg: { averageRating: true }, where: { totalRatings: { gt: 0 } } }),
         prisma.user.aggregate({ _avg: { averageRating: true }, where: { totalRatings: { gt: 0 } } }),
@@ -1501,6 +1501,7 @@ export async function registerRoutes(
         }
 
         // Atomically assign driver - only succeeds if ride is still REQUESTED and has no driver
+        // Transition: REQUESTED → ACCEPTED (driver only)
         const updatedRide = await tx.ride.update({
           where: { 
             id,
@@ -1509,7 +1510,7 @@ export async function registerRoutes(
           },
           data: { 
             driverId,
-            status: "DRIVER_ASSIGNED"
+            status: "ACCEPTED" // Minimal status: ACCEPTED instead of DRIVER_ASSIGNED
           },
           include: { user: true, driver: true },
         });
@@ -1550,111 +1551,67 @@ export async function registerRoutes(
     }
   });
 
-  // Start ride (DRIVER_EN_ROUTE/ARRIVED → IN_PROGRESS)
+  // Start ride (ACCEPTED → IN_PROGRESS) - driver only
   app.post("/api/rides/:id/start", async (req, res) => {
     try {
       const { id } = req.params;
       const currentUser = getCurrentUser(req);
-
-      const ride = await prisma.ride.findUnique({ 
-        where: { id },
-        include: { driver: true }
-      });
-      if (!ride) {
-        return res.status(404).json({ message: "Ride not found" });
-      }
-
       const isAdmin = currentUser.role === "admin" || currentUser.role === "director";
+      const role = currentUser.role === "driver" ? "driver" : isAdmin ? "admin" : "rider";
 
-      if (!ride.driverId) {
-        return res.status(400).json({ message: "No driver assigned to this ride" });
-      }
-
-      // Validate state transition
-      const transitionCheck = validateTransition(ride.status, "IN_PROGRESS", isAdmin);
-      if (!transitionCheck.valid) {
-        // Allow transition from ASSIGNED or ARRIVED for backward compatibility and admin override
-        if (isAdmin && ["DRIVER_ASSIGNED", "DRIVER_ARRIVED"].includes(ride.status)) {
-          // Admin can force start from DRIVER_ASSIGNED or DRIVER_ARRIVED
-        } else if (!isAdmin && !["DRIVER_ARRIVED"].includes(ride.status)) {
-          return res.status(400).json({ 
-            message: transitionCheck.error || `Cannot start ride. Status is ${ride.status}, expected ARRIVED. Driver must arrive before starting.` 
-          });
+      // Check driver has no active rides (prevent double rides)
+      if (currentUser.role === "driver") {
+        const activeDriverRide = await prisma.ride.findFirst({
+          where: {
+            driverId: currentUser.id,
+            status: { in: ["ACCEPTED", "IN_PROGRESS"] }
+          }
+        });
+        if (activeDriverRide && activeDriverRide.id !== id) {
+          if (process.env.NODE_ENV === "development") {
+            console.warn("[start-ride] Driver has active ride:", { driverId: currentUser.id, activeRideId: activeDriverRide.id });
+          }
+          return res.status(400).json({ message: "You already have an active ride" });
         }
       }
 
-      const updatedRide = await prisma.ride.update({
-        where: { id },
-        data: { status: "IN_PROGRESS" },
-        include: { user: true, driver: true },
-      });
+      // Use state machine for strict transition validation
+      const result = await transitionTripStatus(id, "IN_PROGRESS", `${role}:${currentUser.id}`);
+      
+      if (!result.success) {
+        return res.status(result.code || 400).json({ message: result.error || "Invalid transition" });
+      }
 
-      res.json(updatedRide);
+      // Validate role permission
+      const roleCheck = validateRoleForTransition("IN_PROGRESS", role);
+      if (!roleCheck.allowed) {
+        return res.status(403).json({ message: roleCheck.reason || "Not authorized" });
+      }
+
+      res.json(result.ride);
     } catch (error) {
       console.error("Error starting ride:", error);
       res.status(500).json({ message: "Failed to start ride" });
     }
   });
   
-  // Driver arrives at pickup (ASSIGNED → ARRIVED)
-  // Driver cannot arrive before being assigned
+  // Driver arrives at pickup - DISABLED (DRIVER_ARRIVED removed, minimal statuses)
+  // In minimal lifecycle: ACCEPTED → IN_PROGRESS (no arrive step)
   app.post("/api/rides/:id/arrive", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const currentUser = getCurrentUser(req);
-      const isAdmin = currentUser.role === "admin" || currentUser.role === "director";
-
-      const ride = await prisma.ride.findUnique({ 
-        where: { id },
-        include: { driver: true }
-      });
-      if (!ride) {
-        return res.status(404).json({ message: "Ride not found" });
-      }
-
-      if (!ride.driverId) {
-        return res.status(400).json({ message: "No driver assigned to this ride" });
-      }
-
-      // Validate state transition - driver cannot arrive before ASSIGNED
-      const transitionCheck = validateTransition(ride.status, "DRIVER_ARRIVED", isAdmin);
-      if (!transitionCheck.valid) {
-        // Allow backward compatibility with old states
-        if (!["DRIVER_ASSIGNED"].includes(ride.status)) {
-          return res.status(400).json({ 
-            message: transitionCheck.error || `Cannot mark as arrived. Status is ${ride.status}, expected DRIVER_ASSIGNED. Driver must be assigned before arriving.` 
-          });
-        }
-      }
-
-      const updatedRide = await prisma.ride.update({
-        where: { id },
-        data: { status: "DRIVER_ARRIVED" },
-        include: { user: true, driver: true },
-      });
-
-      // Notify rider that driver has arrived
-      await createNotification(
-        ride.userId,
-        "rider",
-        `Driver ${updatedRide.driver?.fullName || "has"} has arrived at pickup location`,
-        "RIDE_ASSIGNED"
-      );
-
-      res.json(updatedRide);
-    } catch (error) {
-      console.error("Error marking ride as arrived:", error);
-      res.status(500).json({ message: "Failed to mark ride as arrived" });
-    }
+    return res.status(501).json({ message: "Arrive endpoint disabled. Use /start to begin ride." });
+    /*
+    // STUB: DRIVER_ARRIVED status removed for minimal lifecycle
+    // Direct transition: ACCEPTED → IN_PROGRESS
+    */
   });
 
-  // Complete ride (IN_PROGRESS → COMPLETED → SETTLED)
-  // Wallet settlement occurs at COMPLETED, then ride marked as SETTLED
+  // Complete ride (IN_PROGRESS → COMPLETED) - driver only
   app.post("/api/rides/:id/complete", async (req, res) => {
     try {
       const { id } = req.params;
       const currentUser = getCurrentUser(req);
       const isAdmin = currentUser.role === "admin" || currentUser.role === "director";
+      const role = currentUser.role === "driver" ? "driver" : isAdmin ? "admin" : "rider";
 
       const ride = await prisma.ride.findUnique({ 
         where: { id },
@@ -1664,12 +1621,17 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      // Validate state transition
-      const transitionCheck = validateTransition(ride.status, "COMPLETED", isAdmin);
-      if (!transitionCheck.valid) {
-        return res.status(400).json({ 
-          message: transitionCheck.error || `Cannot complete ride. Status is ${ride.status}, expected IN_PROGRESS` 
-        });
+      // Validate role permission
+      const roleCheck = validateRoleForTransition("COMPLETED", role);
+      if (!roleCheck.allowed) {
+        return res.status(403).json({ message: roleCheck.reason || "Not authorized to complete ride" });
+      }
+
+      // Use state machine for strict transition validation
+      const result = await transitionTripStatus(id, "COMPLETED", `${role}:${currentUser.id}`);
+      
+      if (!result.success) {
+        return res.status(result.code || 400).json({ message: result.error || "Invalid transition" });
       }
 
       // Get platform config for commission rate
@@ -1684,18 +1646,16 @@ export async function registerRoutes(
       const commissionAmount = fareAmount * config.commissionRate;
       const driverEarnings = fareAmount - commissionAmount;
 
-      // Use transaction for atomic wallet operations
-      // State: IN_PROGRESS → COMPLETED → SETTLED (all in one transaction)
-      const result = await prisma.$transaction(async (tx) => {
-        // First transition: IN_PROGRESS → COMPLETED
-        const updatedRide = await tx.ride.update({
-          where: { 
-            id,
-            status: "IN_PROGRESS", // Only update if still IN_PROGRESS (atomic check)
-          },
-          data: { status: "COMPLETED" },
+      // Process wallet settlement on completion (state already updated by state machine)
+      await prisma.$transaction(async (tx) => {
+        const updatedRide = await tx.ride.findUnique({
+          where: { id },
           include: { user: true, driver: true, payment: true },
         });
+        
+        if (!updatedRide) {
+          throw new Error("Ride not found");
+        }
 
         // Auto-create payment if no payment exists
         if (!updatedRide.payment) {
@@ -1791,23 +1751,17 @@ export async function registerRoutes(
           });
         }
 
-        // Final transition: COMPLETED → SETTLED (after wallet settlement)
-        const settledRide = await tx.ride.update({
+        // Ride remains COMPLETED (no SETTLED status in minimal lifecycle)
+        const completedRide = await tx.ride.findUnique({
           where: { id },
-          data: { status: "SETTLED" },
           include: { user: true, driver: true, payment: true },
         });
 
-        return settledRide;
+        return completedRide;
       });
 
-      // Fetch the updated ride with payment
-      const rideWithPayment = await prisma.ride.findUnique({
-        where: { id },
-        include: { user: true, driver: true, payment: true },
-      });
-
-      res.json(rideWithPayment);
+      // Return the completed ride (status already updated by state machine)
+      res.json(result.ride);
     } catch (error) {
       console.error("Error completing ride:", error);
       res.status(500).json({ message: "Failed to complete ride" });
@@ -1844,22 +1798,14 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Drivers can only cancel their own assigned rides" });
       }
 
-      if (isTerminalState(ride.status)) {
-        if (ride.status === "SETTLED") {
-          return res.status(400).json({ message: "Cannot cancel a settled ride" });
-        }
-        return res.status(400).json({ message: `Ride is already ${ride.status.toLowerCase()}` });
+      // Check if ride is terminal (cannot cancel)
+      const terminalStatuses: TripStatus[] = ["COMPLETED", "CANCELLED"];
+      if (terminalStatuses.includes(ride.status as TripStatus)) {
+        return res.status(400).json({ message: `Cannot cancel a ${ride.status.toLowerCase()} ride` });
       }
-
-      // Admin override: Allow cancellation at any non-terminal state
-      // But check if already completed (settled would be terminal, but COMPLETED needs settlement first)
-      if (ride.status === "COMPLETED") {
-        return res.status(400).json({ message: "Cannot cancel a completed ride. It must be settled first or marked as failed." });
-      }
-
-      // Validate cancellation - no CANCELLED status in schema, so allow cancellation from any state except SETTLED
-      // Note: No CANCELLED status in schema - handle cancellation without status change
-      const canCancel = ride.status !== "SETTLED";
+      
+      // Validate cancellation - allow cancellation from any non-terminal state
+      const canCancel = !terminalStatuses.includes(ride.status as TripStatus);
       if (!canCancel) {
         return res.status(400).json({ message: "Cannot cancel ride in current state" });
       }
@@ -1873,7 +1819,7 @@ export async function registerRoutes(
       const { penaltyAmount, refundAmount } = calculateCancellationPenalty(fareAmount, shouldApplyPenalty);
 
       // Guard: Ensure cancelling before IN_PROGRESS never penalizes
-      if (["REQUESTED", "DRIVER_ASSIGNED", "DRIVER_ARRIVED"].includes(ride.status) && penaltyAmount > 0) {
+      if (["REQUESTED", "ACCEPTED"].includes(ride.status) && penaltyAmount > 0) {
         console.error(`[GUARD] Invalid penalty applied for ride ${id} in state ${ride.status}`);
         return res.status(500).json({ message: "Internal error: Invalid penalty calculation" });
       }
@@ -2069,7 +2015,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "COMPLETED" && ride.status !== "SETTLED") {
+      if (ride.status !== "COMPLETED") {
         return res.status(400).json({ message: "Can only rate completed rides" });
       }
 
@@ -2137,7 +2083,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "COMPLETED" && ride.status !== "SETTLED") {
+      if (ride.status !== "COMPLETED") {
         return res.status(400).json({ message: "Can only rate completed rides" });
       }
 
@@ -2210,7 +2156,7 @@ export async function registerRoutes(
       const currentUser = getCurrentUser(req);
 
       // Role check - only admins and drivers can assign
-      const roleCheck = validateRoleForTransition("DRIVER_ASSIGNED", 
+      const roleCheck = validateRoleForTransition("ACCEPTED", 
         currentUser.role === "admin" ? "admin" : "driver");
       if (!roleCheck.allowed) {
         return res.status(403).json({ message: roleCheck.reason });
@@ -2244,7 +2190,7 @@ export async function registerRoutes(
         data: { driverId }
       });
 
-      const result = await transitionTripStatus(id, "DRIVER_ASSIGNED", `driver:${driverId}`);
+      const result = await transitionTripStatus(id, "ACCEPTED", `driver:${driverId}`);
       
       if (!result.success) {
         return res.status(result.code || 500).json({ message: result.error });
@@ -2257,30 +2203,12 @@ export async function registerRoutes(
     }
   });
 
-  // Driver arrived at pickup (DRIVER_ASSIGNED → DRIVER_ARRIVED)
+  // Driver arrived at pickup - DISABLED (DRIVER_ARRIVED removed in minimal lifecycle)
   app.post("/api/trips/:id/driver-arrived", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const currentUser = getCurrentUser(req);
-
-      // Role check - only driver can mark arrival
-      const roleCheck = validateRoleForTransition("DRIVER_ARRIVED", "driver");
-      if (currentUser.role !== "driver" && currentUser.role !== "admin") {
-        return res.status(403).json({ message: "Only driver can mark arrival" });
-      }
-
-      const result = await transitionTripStatus(id, "DRIVER_ARRIVED", 
-        `driver:${currentUser.id}`);
-      
-      if (!result.success) {
-        return res.status(result.code || 500).json({ message: result.error });
-      }
-
-      res.json(result.ride);
-    } catch (error) {
-      console.error("Error marking driver arrived:", error);
-      res.status(500).json({ message: "Failed to mark driver arrived" });
-    }
+    return res.status(501).json({ message: "Arrive endpoint disabled. Use /start to begin ride." });
+    /*
+    // STUB: DRIVER_ARRIVED removed - minimal lifecycle goes ACCEPTED → IN_PROGRESS
+    */
   });
 
   // Start trip (DRIVER_ARRIVED → IN_PROGRESS) - Locks fare
@@ -2387,6 +2315,9 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Only admin can settle trip" });
       }
 
+      // SETTLED removed - use COMPLETED only
+      return res.status(501).json({ message: "Settle endpoint disabled. Rides remain COMPLETED." });
+      /* STUB: SETTLED status removed
       const result = await transitionTripStatus(id, "SETTLED", 
         `admin:${currentUser.id}`);
       
@@ -2395,13 +2326,14 @@ export async function registerRoutes(
       }
 
       res.json(result.ride);
+      */
     } catch (error) {
       console.error("Error settling trip:", error);
       res.status(500).json({ message: "Failed to settle trip" });
     }
   });
 
-  // Failsafe: Block all mutations on COMPLETED/SETTLED trips
+  // Failsafe: Block all mutations on COMPLETED/CANCELLED trips
   app.use("/api/trips/:id", async (req, res, next) => {
     if (req.method === "GET") {
       return next();
@@ -2411,9 +2343,11 @@ export async function registerRoutes(
     const tripStatus = await getTripStatus(id);
 
     if (tripStatus && isTripImmutable(tripStatus.status)) {
-      console.error(`[TRIP-MUTATION-BLOCKED] tripId=${id} status=SETTLED`);
+      if (process.env.NODE_ENV === "development") {
+        console.error(`[TRIP-MUTATION-BLOCKED] tripId=${id} status=${tripStatus.status}`);
+      }
       return res.status(403).json({ 
-        message: "Trip is settled and immutable. No modifications allowed." 
+        message: `Trip is ${tripStatus.status.toLowerCase()} and immutable. No modifications allowed.` 
       });
     }
 
@@ -2783,7 +2717,7 @@ export async function registerRoutes(
             },
             data: {
               driverId: driver.id,
-              status: "DRIVER_ASSIGNED", // Transition to ASSIGNED state
+              status: "ACCEPTED", // Minimal status: ACCEPTED
             },
             include: {
               user: {
@@ -4741,7 +4675,7 @@ export async function registerRoutes(
       const ride = await prisma.ride.findFirst({
         where: {
           driverId: req.session.userId,
-          status: { in: ["DRIVER_ASSIGNED", "DRIVER_ARRIVED", "IN_PROGRESS"] }
+          status: { in: ["ACCEPTED", "IN_PROGRESS"] }
         },
         include: {
           user: {
@@ -4806,7 +4740,7 @@ export async function registerRoutes(
 
     try {
       const { status } = req.body;
-      const validStatuses = ["DRIVER_ASSIGNED", "DRIVER_ARRIVED", "IN_PROGRESS", "COMPLETED"];
+      const validStatuses = ["ACCEPTED", "IN_PROGRESS", "COMPLETED"];
       
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ message: "Invalid status" });
@@ -5027,7 +4961,7 @@ export async function registerRoutes(
         where: {
           id: rideId,
           driverId: req.session.userId,
-          status: { in: ["DRIVER_ASSIGNED", "DRIVER_ARRIVED", "IN_PROGRESS"] }
+          status: { in: ["ACCEPTED", "IN_PROGRESS"] }
         }
       });
 
@@ -5852,7 +5786,7 @@ export async function registerRoutes(
       const activeRide = await prisma.ride.findFirst({
         where: {
           userId: req.session.userId,
-          status: { in: ["REQUESTED", "DRIVER_ASSIGNED", "DRIVER_ARRIVED", "IN_PROGRESS"] }
+          status: { in: ["REQUESTED", "ACCEPTED", "IN_PROGRESS"] }
         },
         select: {
           id: true,
@@ -5973,11 +5907,11 @@ export async function registerRoutes(
         }
       }
 
-      // Check for existing active ride
+      // Check for existing active ride (prevent double rides)
       const existingRide = await prisma.ride.findFirst({
         where: {
           userId: req.session.userId,
-          status: { in: ["REQUESTED", "DRIVER_ASSIGNED", "DRIVER_ARRIVED", "IN_PROGRESS"] }
+          status: { in: ["REQUESTED", "ACCEPTED", "IN_PROGRESS"] }
         }
       });
 
@@ -6046,7 +5980,7 @@ export async function registerRoutes(
             where: { id: ride.id },
             data: {
               driverId: testDriver.id,
-              status: "DRIVER_ASSIGNED"
+              status: "ACCEPTED"
             },
             include: {
               user: {
@@ -6418,7 +6352,7 @@ export async function registerRoutes(
 
       const updatedRide = await prisma.ride.update({
         where: { id },
-        data: { status: "DRIVER_ARRIVED" },
+        data: { status: "ACCEPTED" }, // Test mode: simplified to ACCEPTED
         include: {
           driver: {
             select: { id: true, fullName: true, phone: true, vehicleType: true, vehiclePlate: true, averageRating: true }
@@ -6453,8 +6387,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "DRIVER_ARRIVED") {
-        return res.status(400).json({ message: "Can only start ride when driver has arrived" });
+      if (ride.status !== "ACCEPTED") {
+        return res.status(400).json({ message: "Can only start ride when driver has accepted (status: ACCEPTED)" });
       }
 
       const updatedRide = await prisma.ride.update({
@@ -7201,7 +7135,7 @@ export async function registerRoutes(
       const existingRide = await prisma.ride.findFirst({
         where: {
           userId: req.session.userId,
-          status: { in: ["REQUESTED", "DRIVER_ASSIGNED", "DRIVER_ARRIVED", "IN_PROGRESS"] }
+          status: { in: ["REQUESTED", "ACCEPTED", "IN_PROGRESS"] }
         }
       });
 

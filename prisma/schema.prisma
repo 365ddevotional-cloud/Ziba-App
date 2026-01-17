@@ -351,11 +351,10 @@ enum VehicleType {
 
 enum TripStatus {
   REQUESTED
-  DRIVER_ASSIGNED
-  DRIVER_ARRIVED
+  ACCEPTED
   IN_PROGRESS
   COMPLETED
-  SETTLED
+  CANCELLED
 }
 
 enum PaymentStatus {
