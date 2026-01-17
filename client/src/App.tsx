@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth";
 import { RiderAuthProvider } from "@/lib/rider-auth";
 import { CountryProvider } from "@/lib/country";
+import { TripProvider } from "@/lib/trip-context";
 import { TestBanner } from "@/components/test-banner";
 import { DevBanner } from "@/components/dev-banner";
 import Landing from "@/pages/landing";
@@ -56,6 +57,15 @@ import DirectorPendingApproval from "@/pages/director/pending-approval";
 import DirectorHome from "@/pages/director/home";
 import RiderRideComplete from "@/pages/ride/complete-rider";
 import DriverRideComplete from "@/pages/ride/complete-driver";
+
+// Wrapper component to provide TripProvider for rider routes
+function RiderAppWithTripProvider() {
+  return (
+    <TripProvider>
+      <RiderApp />
+    </TripProvider>
+  );
+}
 
 function Router() {
   // Dev-only route mount confirmation
@@ -111,8 +121,8 @@ function Router() {
       <Route path="/ride/complete/driver" component={DriverRideComplete} />
       <Route path="/rider/ride-complete" component={RiderRideComplete} />
       <Route path="/driver/ride-complete" component={DriverRideComplete} />
-      <Route path="/rider" component={RiderApp} />
-      <Route path="/rider/:rest*" component={RiderApp} />
+      <Route path="/rider" component={RiderAppWithTripProvider} />
+      <Route path="/rider/:rest*" component={RiderAppWithTripProvider} />
       <Route path="/driver" component={DriverApp} />
       <Route path="/driver/:rest*" component={DriverApp} />
       <Route component={NotFound} />
