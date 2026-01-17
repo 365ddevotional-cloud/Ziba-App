@@ -53,6 +53,7 @@ import LegalCookies from "@/pages/info/legal-cookies";
 import SignupPage from "@/pages/signup";
 import DriverApp from "@/pages/driver";
 import DirectorPendingApproval from "@/pages/director/pending-approval";
+import DirectorHome from "@/pages/director/home";
 import RiderRideComplete from "@/pages/ride/complete-rider";
 import DriverRideComplete from "@/pages/ride/complete-driver";
 
@@ -105,6 +106,7 @@ function Router() {
       <Route path="/legal/cookies" component={LegalCookies} />
       <Route path="/signup" component={SignupPage} />
       <Route path="/director/pending-approval" component={DirectorPendingApproval} />
+      <Route path="/director" component={DirectorHome} />
       <Route path="/ride/complete/rider" component={RiderRideComplete} />
       <Route path="/ride/complete/driver" component={DriverRideComplete} />
       <Route path="/rider/ride-complete" component={RiderRideComplete} />

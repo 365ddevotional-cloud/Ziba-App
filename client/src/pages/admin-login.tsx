@@ -26,6 +26,9 @@ export default function AdminLoginPage() {
         title: "Login Successful",
         description: "Welcome to the Ziba Admin Dashboard.",
       });
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Login] Redirecting admin to /admin");
+      }
       setLocation("/admin");
     } catch (error: any) {
       toast({

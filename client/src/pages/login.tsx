@@ -46,7 +46,10 @@ export default function Login() {
         title: "Welcome back!",
         description: "Login successful",
       });
-      navigate("/rider/home");
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Login] Redirecting rider to /rider");
+      }
+      navigate("/rider");
     } catch (error: any) {
       const errorMessage = error.message || "Invalid email or password";
       setError(errorMessage);
@@ -72,12 +75,17 @@ export default function Login() {
       });
       
       const data = await response.json();
+      const role = data.user?.role || "driver";
       
       toast({
         title: "Welcome back!",
         description: "Login successful",
       });
-      navigate("/driver/home");
+      
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[Login] Redirecting ${role} to /driver`);
+      }
+      navigate("/driver");
     } catch (error: any) {
       const errorMessage = error.message || "Invalid email or password";
       setError(errorMessage);
@@ -103,12 +111,18 @@ export default function Login() {
       });
       
       const data = await response.json();
+      // Director response has accountRole: "director" or role field
+      const role = data.user?.accountRole || data.user?.role || "director";
       
       toast({
         title: "Welcome back!",
         description: "Login successful",
       });
-      navigate("/admin");
+      
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[Login] Redirecting ${role} to /director`);
+      }
+      navigate("/director");
     } catch (error: any) {
       const errorMessage = error.message || "Invalid email or password";
       setError(errorMessage);
