@@ -34,14 +34,23 @@ function RiderAuthGuard({ children }: { children: React.ReactNode }) {
 
   // Block drivers from accessing rider routes
   if (isDriver) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[RiderAuthGuard] Blocked driver from accessing rider route");
+    }
     return <RiderAccessDenied />;
   }
 
   if (!isAuthenticated) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[RiderAuthGuard] Not authenticated, redirecting to /rider/login");
+    }
     return <Redirect to="/rider/login" />;
   }
 
   if (!isRider) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[RiderAuthGuard] User is not a rider, user:", user);
+    }
     return <RiderAccessDenied />;
   }
 

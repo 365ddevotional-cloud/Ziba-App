@@ -5915,6 +5915,12 @@ export async function registerRoutes(
   // Request a new ride
   app.post("/api/rider/request-ride", async (req, res) => {
     if (!req.session.userId || req.session.userRole !== "rider") {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[request-ride] Authentication failed:", { 
+          userId: req.session.userId, 
+          role: req.session.userRole 
+        });
+      }
       return res.status(401).json({ message: "Not authenticated as rider" });
     }
 
@@ -5922,6 +5928,9 @@ export async function registerRoutes(
       const { pickupLocation, dropoffLocation, fareEstimate, passengerName, passengerPhone, passengerNotes } = req.body;
 
       if (!pickupLocation || !dropoffLocation) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[request-ride] Missing locations:", { pickupLocation, dropoffLocation });
+        }
         return res.status(400).json({ message: "Pickup and dropoff locations are required" });
       }
 
@@ -5931,9 +5940,19 @@ export async function registerRoutes(
         select: { isTripCoordinator: true }
       });
 
+      if (!user) {
+        if (process.env.NODE_ENV === "development") {
+          console.error("[request-ride] User not found:", req.session.userId);
+        }
+        return res.status(404).json({ message: "User not found" });
+      }
+
       // Validate passenger fields if coordinator
-      if (user?.isTripCoordinator) {
+      if (user.isTripCoordinator) {
         if (!passengerName || !passengerPhone) {
+          if (process.env.NODE_ENV === "development") {
+            console.warn("[request-ride] Coordinator missing passenger info:", { passengerName, passengerPhone });
+          }
           return res.status(400).json({ message: "Passenger name and phone are required when booking as a trip coordinator" });
         }
       }
@@ -5947,6 +5966,9 @@ export async function registerRoutes(
       });
 
       if (existingRide) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[request-ride] Active ride exists:", { rideId: existingRide.id, status: existingRide.status });
+        }
         return res.status(400).json({ message: "You already have an active ride" });
       }
 
@@ -6083,9 +6105,15 @@ export async function registerRoutes(
         }
       }
 
+      if (process.env.NODE_ENV === "development") {
+        console.log("[request-ride] Ride created successfully:", { rideId: ride.id, status: ride.status });
+      }
       res.status(201).json(ride);
     } catch (error) {
-      console.error("Error requesting ride:", error);
+      console.error("[request-ride] Error requesting ride:", error);
+      if (process.env.NODE_ENV === "development") {
+        console.error("[request-ride] Error details:", { userId: req.session.userId, error });
+      }
       res.status(500).json({ message: "Failed to request ride" });
     }
   });

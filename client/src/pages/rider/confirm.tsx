@@ -35,7 +35,7 @@ export default function RiderConfirm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
-  const { user } = useRiderAuth();
+  const { user, isLoading: authLoading } = useRiderAuth();
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
   const pickup = params.get("pickup") || "";
@@ -56,6 +56,58 @@ export default function RiderConfirm() {
       ? { distance: parseFloat(distanceParam), duration: parseInt(durationParam, 10) }
       : null
   );
+  const [hasValidatedParams, setHasValidatedParams] = useState(false);
+
+  // Validate required params on mount
+  useEffect(() => {
+    if (authLoading) return;
+    
+    if (!pickup || !destination) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[RiderConfirm] Missing required params:", { pickup, destination });
+      }
+      toast({
+        title: "Missing information",
+        description: "Please provide pickup and destination locations",
+        variant: "destructive",
+      });
+      navigate("/rider/home?error=missing-locations");
+      return;
+    }
+
+    // Validate distance and duration params
+    if (!distanceParam || !durationParam) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[RiderConfirm] Missing route data:", { distanceParam, durationParam });
+      }
+      toast({
+        title: "Missing route information",
+        description: "Please request a ride with valid route data",
+        variant: "destructive",
+      });
+      navigate("/rider/home?error=missing-route-data");
+      return;
+    }
+
+    // Validate numeric values
+    const distance = parseFloat(distanceParam);
+    const duration = parseInt(durationParam, 10);
+    if (isNaN(distance) || isNaN(duration) || distance <= 0 || duration <= 0) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[RiderConfirm] Invalid route data:", { distance, duration });
+      }
+      toast({
+        title: "Invalid route information",
+        description: "Please request a ride with valid route data",
+        variant: "destructive",
+      });
+      navigate("/rider/home?error=invalid-route-data");
+      return;
+    }
+
+    setRouteData({ distance, duration });
+    setHasValidatedParams(true);
+  }, [pickup, destination, distanceParam, durationParam, authLoading, navigate, toast]);
 
   // Calculate fare locally using pricing logic
   const fareEstimate = useMemo(() => {
@@ -117,9 +169,26 @@ export default function RiderConfirm() {
         credentials: "include",
       });
 
+      if (response.status === 401) {
+        if (process.env.NODE_ENV === "development") {
+          console.error("[RiderConfirm] Authentication failed, redirecting to login");
+        }
+        throw new Error("Authentication failed. Please log in again.");
+      }
+
+      if (response.status === 403) {
+        if (process.env.NODE_ENV === "development") {
+          console.error("[RiderConfirm] Forbidden: Not authorized as rider");
+        }
+        throw new Error("You are not authorized to request rides.");
+      }
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to request ride");
+        const error = await response.json().catch(() => ({ message: "Failed to request ride" }));
+        if (process.env.NODE_ENV === "development") {
+          console.error("[RiderConfirm] Request failed:", response.status, error);
+        }
+        throw new Error(error.message || error.error || "Failed to request ride");
       }
 
       const ride = await response.json();
@@ -158,13 +227,29 @@ export default function RiderConfirm() {
     },
   });
 
-  if (!pickup || !destination) {
+  // Show loading state while validating or auth is loading
+  if (authLoading || !hasValidatedParams) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 text-center space-y-4">
+            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+            <h2 className="text-xl font-semibold">Loading...</h2>
+            <p className="text-muted-foreground">Validating ride information</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Final check for missing params (shouldn't reach here after validation)
+  if (!pickup || !destination || !routeData) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center space-y-4">
             <MapPin className="w-12 h-12 text-muted-foreground mx-auto" />
-            <h2 className="text-xl font-semibold">Missing Location</h2>
+            <h2 className="text-xl font-semibold">Missing Information</h2>
             <p className="text-muted-foreground">Please enter pickup and destination</p>
             <Link href="/rider/request">
               <Button className="w-full" data-testid="button-go-back">
