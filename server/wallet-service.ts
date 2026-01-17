@@ -108,7 +108,7 @@ export async function credit(
         throw new Error("Wallet not found");
       }
 
-      const existingTx = await tx.walletTransaction.findUnique({
+      const existingTx = await tx.walletTransaction.findFirst({
         where: { reference },
       });
       if (existingTx) {
@@ -175,7 +175,7 @@ export async function debit(
         );
       }
 
-      const existingTx = await tx.walletTransaction.findUnique({
+      const existingTx = await tx.walletTransaction.findFirst({
         where: { reference },
       });
       if (existingTx) {
@@ -242,7 +242,7 @@ export async function hold(
         );
       }
 
-      const existingTx = await tx.walletTransaction.findUnique({
+      const existingTx = await tx.walletTransaction.findFirst({
         where: { reference },
       });
       if (existingTx) {
@@ -312,7 +312,7 @@ export async function release(
         );
       }
 
-      const existingTx = await tx.walletTransaction.findUnique({
+      const existingTx = await tx.walletTransaction.findFirst({
         where: { reference },
       });
       if (existingTx) {
