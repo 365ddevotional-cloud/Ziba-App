@@ -23,6 +23,11 @@ const WalletContext = createContext<WalletContextType | null>(null);
 const PLATFORM_COMMISSION_RATE = 0.1; // 10%
 
 export function WalletProvider({ children }: { children: ReactNode }) {
+  // Dev-only safety assertion: verify WalletProvider is mounted
+  if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
+    console.log("[WalletProvider] WalletProvider mounted");
+  }
+  
   const [riderWallet, setRiderWallet] = useState<Wallet>({
     ownerId: "rider_default",
     ownerType: "rider",
