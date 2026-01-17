@@ -57,6 +57,8 @@ export default function RiderConfirm() {
       : null
   );
   const [hasValidatedParams, setHasValidatedParams] = useState(false);
+  const [isPaid, setIsPaid] = useState(false);
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
 
   // Validate required params on mount
   useEffect(() => {
@@ -120,6 +122,38 @@ export default function RiderConfirm() {
     if (!fareEstimate) return null;
     return rideMode === "SHARE" ? (fareEstimate.fare / 2) * 0.9 : fareEstimate.fare;
   }, [fareEstimate, rideMode]);
+
+  const payRideMutation = useMutation({
+    mutationFn: async (rideId: string) => {
+      // Mock payment - dev only
+      const response = await fetch(`/api/rider/rides/${rideId}/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: "Payment failed" }));
+        throw new Error(error.message || "Payment failed");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsPaid(true);
+      toast({
+        title: "Payment successful (mock)",
+        description: "Your payment has been processed",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Payment failed",
+        description: error.message || "Could not process payment",
+        variant: "destructive",
+      });
+    },
+  });
 
   const requestRideMutation = useMutation({
     mutationFn: async () => {
@@ -194,7 +228,19 @@ export default function RiderConfirm() {
       const ride = await response.json();
       return ride;
     },
-    onSuccess: (ride: any) => {
+    onSuccess: async (ride: any) => {
+      // Process mock payment immediately after ride creation
+      try {
+        await payRideMutation.mutateAsync(ride.id);
+      } catch (error) {
+        // Payment failed - show error but don't block navigation
+        toast({
+          title: "Payment failed",
+          description: "Ride created but payment failed. Please complete payment.",
+          variant: "destructive",
+        });
+      }
+
       queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });
       
       if (ride.shareStatus === "SEARCHING") {
@@ -202,7 +248,6 @@ export default function RiderConfirm() {
           title: "Finding a co-rider...",
           description: "We'll match you with another rider going the same way.",
         });
-        // Navigate to a waiting page or active ride page with polling
         navigate("/rider/active-ride");
       } else if (ride.shareStatus === "MATCHED_AND_ASSIGNED" || ride.driver) {
         toast({
@@ -418,26 +463,31 @@ export default function RiderConfirm() {
         )}
       </main>
 
-      <div className="fixed bottom-16 left-0 right-0 p-4 bg-card border-t border-border z-40">
+      <div className="fixed bottom-16 left-0 right-0 p-4 bg-card border-t border-border z-40 space-y-2">
         <Button
           className="w-full"
           size="lg"
           onClick={() => requestRideMutation.mutate()}
-          disabled={requestRideMutation.isPending || !fareEstimate || !routeData}
-          data-testid="button-confirm-ride"
+          disabled={requestRideMutation.isPending || payRideMutation.isPending || !fareEstimate || !routeData}
+          data-testid="button-pay-now"
         >
-          {requestRideMutation.isPending ? (
+          {requestRideMutation.isPending || payRideMutation.isPending ? (
             <>
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Requesting...
+              Processing...
             </>
           ) : (
             <>
-              <Car className="w-5 h-5 mr-2" />
-              Confirm Ride
+              <CreditCard className="w-5 h-5 mr-2" />
+              Pay Now (Mock)
             </>
           )}
         </Button>
+        {isPaid && (
+          <div className="text-center text-sm text-green-600 dark:text-green-400">
+            ✓ Payment successful (mock)
+          </div>
+        )}
       </div>
 
       <RiderBottomNav activeTab="home" />

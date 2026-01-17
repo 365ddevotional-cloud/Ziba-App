@@ -1627,6 +1627,17 @@ export async function registerRoutes(
         return res.status(403).json({ message: roleCheck.reason || "Not authorized to complete ride" });
       }
 
+      // Check if payment is completed (required for ride completion)
+      const payment = await prisma.payment.findUnique({
+        where: { rideId: id },
+      });
+
+      if (!payment || payment.status !== "PAID") {
+        return res.status(400).json({ 
+          message: "Cannot complete ride. Payment is required. Please complete payment first." 
+        });
+      }
+
       // Use state machine for strict transition validation
       const result = await transitionTripStatus(id, "COMPLETED", `${role}:${currentUser.id}`);
       
@@ -6072,6 +6083,57 @@ export async function registerRoutes(
   async function checkShareGroupTimeout(shareGroupId: string, timeoutMinutes: number = 5): Promise<void> {
     return; // ShareGroup feature disabled
   }
+
+  // Mock payment endpoint (dev only)
+  app.post("/api/rider/rides/:id/pay", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const { id } = req.params;
+
+      const ride = await prisma.ride.findFirst({
+        where: { id, userId: req.session.userId },
+        include: { payment: true },
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      // Check if already paid
+      if (ride.payment && ride.payment.status === "PAID") {
+        return res.json({ message: "Payment already processed", payment: ride.payment });
+      }
+
+      // Create or update payment record (mock - always succeeds)
+      const fareAmount = ride.fareEstimate || 1000;
+      const payment = await prisma.payment.upsert({
+        where: { rideId: id },
+        update: {
+          status: "PAID",
+          amount: fareAmount,
+        },
+        create: {
+          amount: fareAmount,
+          status: "PAID",
+          rideId: id,
+          gatewayRef: `mock_${Date.now()}`,
+          gatewayMode: "SANDBOX",
+        },
+      });
+
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[MOCK-PAYMENT] Ride ${id} marked as paid: ${payment.id}`);
+      }
+
+      res.json({ message: "Payment successful (mock)", payment });
+    } catch (error) {
+      console.error("Error processing mock payment:", error);
+      res.status(500).json({ message: "Failed to process payment" });
+    }
+  });
 
   // Cancel ride (rider can only cancel before IN_PROGRESS)
   // Rider cannot cancel after IN_PROGRESS starts
