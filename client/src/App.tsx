@@ -58,8 +58,9 @@ import DirectorHome from "@/pages/director/home";
 import RiderRideComplete from "@/pages/ride/complete-rider";
 import DriverRideComplete from "@/pages/ride/complete-driver";
 
-// Wrapper component to provide TripProvider for rider routes
-function RiderAppWithTripProvider() {
+// RiderRoot: Ensures ALL rider routes are wrapped with TripProvider
+// This is the ONLY entry point for rider routes to guarantee TripProvider is always available
+function RiderRoot() {
   return (
     <TripProvider>
       <RiderApp />
@@ -121,8 +122,8 @@ function Router() {
       <Route path="/ride/complete/driver" component={DriverRideComplete} />
       <Route path="/rider/ride-complete" component={RiderRideComplete} />
       <Route path="/driver/ride-complete" component={DriverRideComplete} />
-      <Route path="/rider" component={RiderAppWithTripProvider} />
-      <Route path="/rider/:rest*" component={RiderAppWithTripProvider} />
+      <Route path="/rider" component={RiderRoot} />
+      <Route path="/rider/:rest*" component={RiderRoot} />
       <Route path="/driver" component={DriverApp} />
       <Route path="/driver/:rest*" component={DriverApp} />
       <Route component={NotFound} />

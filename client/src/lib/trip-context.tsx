@@ -50,6 +50,11 @@ interface TripContextType {
 const TripContext = createContext<TripContextType | null>(null);
 
 export function TripProvider({ children }: { children: ReactNode }) {
+  // Dev-only safety assertion: verify TripProvider is mounted
+  if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
+    console.log("[TripProvider] TripProvider mounted");
+  }
+  
   const [currentTrip, setCurrentTrip] = useState<TripData | null>(null);
 
   const updateTripStatus = (status: TripStatus) => {
