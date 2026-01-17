@@ -244,9 +244,11 @@ export default function RiderConfirm() {
         });
       }
 
-      // Set trip in TripProvider for immediate UI update
+      // Set trip in TripProvider for immediate UI update (DEMO MODE: frontend controls state)
       if (routeData && fareEstimate) {
         const tripFare = adjustedFare || fareEstimate.fare;
+        // In demo mode, start with CONFIRMED status (payment done, ready to progress)
+        // This ensures auto-progression works immediately
         const tripData = {
           id: ride.id,
           pickupLocation: pickup,
@@ -254,18 +256,23 @@ export default function RiderConfirm() {
           distance: routeData.distance,
           duration: routeData.duration,
           fare: tripFare,
-          status: "CONFIRMED" as const,
+          status: "CONFIRMED" as const, // Will auto-progress to IN_PROGRESS -> COMPLETED
           createdAt: new Date().toISOString(),
           paymentMethod: selectedPayment,
           payment: {
             fare: tripFare,
-            riderPaid: true,
+            riderPaid: true, // Payment is done, trip can progress
             driverPaid: false,
             platformCommission: tripFare * 0.15,
             escrowHeld: true,
           },
         };
         setCurrentTrip(tripData);
+        
+        // In demo mode, immediately navigate - trip context will handle progression
+        if (process.env.NODE_ENV === "development") {
+          console.log("[RiderConfirm] Trip set in context, auto-progression will start");
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });

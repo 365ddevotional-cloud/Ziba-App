@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useTrip, TripStatus } from "@/lib/trip-context";
 import { useWallet, PLATFORM_COMMISSION_RATE } from "@/lib/wallet-context";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -65,43 +65,70 @@ export default function RiderLiveRide() {
   const driverInfo = currentTrip?.driver;
 
   // Demo auto-progression: Auto-advance trip lifecycle after payment
+  // This ensures the demo ALWAYS completes, regardless of backend state
   useEffect(() => {
     if (!currentTrip) return;
     
-    // Only auto-progress if trip is CONFIRMED and payment is done
-    if (currentTrip.status !== "CONFIRMED" || !currentTrip.payment?.riderPaid) return;
+    // Auto-progress if payment is done, regardless of initial status
+    // Handle REQUESTED, ACCEPTED, CONFIRMED -> IN_PROGRESS -> COMPLETED
+    const initialStatus = currentTrip.status;
+    const hasPayment = currentTrip.payment?.riderPaid;
+    
+    // If no payment yet, wait for it (but don't block forever)
+    if (!hasPayment) return;
     
     // Prevent multiple runs
     let isActive = true;
+    let timer1: NodeJS.Timeout | null = null;
+    let timer2: NodeJS.Timeout | null = null;
 
-    // Auto-progress to IN_PROGRESS after 3 seconds
-    const timer1 = setTimeout(() => {
-      if (!isActive) return;
-      updateTripStatus("IN_PROGRESS");
-      toast({
-        title: "Trip started!",
-        description: "Your ride is now in progress",
-      });
-    }, 3000);
-
-    // Auto-complete after 8 seconds total (3s to start + 5s ride duration)
-    const timer2 = setTimeout(() => {
-      if (!isActive) return;
-      updateTripStatus("COMPLETED");
-      toast({
-        title: "Trip completed!",
-        description: "Thanks for riding with Ziba",
-      });
-      // Navigate to completion page after a short delay
-      setTimeout(() => {
-        navigate("/rider/ride-complete");
+    // If already IN_PROGRESS or COMPLETED, skip progression
+    if (initialStatus === "IN_PROGRESS") {
+      // Auto-complete if already in progress
+      timer2 = setTimeout(() => {
+        if (!isActive) return;
+        updateTripStatus("COMPLETED");
+        toast({
+          title: "Trip completed!",
+          description: "Thanks for riding with Ziba",
+        });
+        setTimeout(() => {
+          navigate("/rider/ride-complete");
+        }, 2000);
+      }, 5000); // 5 seconds if already in progress
+    } else if (initialStatus === "COMPLETED" || initialStatus === "CANCELLED") {
+      // Already terminal, do nothing
+      return;
+    } else {
+      // REQUESTED, ACCEPTED, or CONFIRMED -> IN_PROGRESS -> COMPLETED
+      // Auto-progress to IN_PROGRESS after 2 seconds
+      timer1 = setTimeout(() => {
+        if (!isActive) return;
+        updateTripStatus("IN_PROGRESS");
+        toast({
+          title: "Trip started!",
+          description: "Your ride is now in progress",
+        });
       }, 2000);
-    }, 8000);
+
+      // Auto-complete after 7 seconds total (2s to start + 5s ride duration)
+      timer2 = setTimeout(() => {
+        if (!isActive) return;
+        updateTripStatus("COMPLETED");
+        toast({
+          title: "Trip completed!",
+          description: "Thanks for riding with Ziba",
+        });
+        setTimeout(() => {
+          navigate("/rider/ride-complete");
+        }, 2000);
+      }, 7000);
+    }
 
     return () => {
       isActive = false;
-      clearTimeout(timer1);
-      clearTimeout(timer2);
+      if (timer1) clearTimeout(timer1);
+      if (timer2) clearTimeout(timer2);
     };
   }, [currentTrip?.id, currentTrip?.status, currentTrip?.payment?.riderPaid, updateTripStatus, navigate, toast]);
 
@@ -255,9 +282,22 @@ export default function RiderLiveRide() {
     },
   });
 
-  // Don't block on API loading if we have trip context
-  // Only show loading if we have neither currentTrip nor activeRide
-  if (isLoading && !currentTrip && !activeRide) {
+  // Hard timeout fallback: Never wait more than 3 seconds for loading
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  useEffect(() => {
+    if (isLoading && !currentTrip && !activeRide) {
+      const timeout = setTimeout(() => {
+        setLoadingTimeout(true);
+      }, 3000); // Max 3 seconds
+      return () => clearTimeout(timeout);
+    } else {
+      setLoadingTimeout(false);
+    }
+  }, [isLoading, currentTrip, activeRide]);
+
+  // Don't block on API loading if we have trip context OR timeout reached
+  // Only show loading if we have neither currentTrip nor activeRide AND timeout not reached
+  if (isLoading && !currentTrip && !activeRide && !loadingTimeout) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-3">
