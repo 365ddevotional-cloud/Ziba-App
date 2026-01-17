@@ -39,11 +39,14 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    // SPA fallback - Vite handles this automatically, but we ensure it's explicit
+    // All routes that don't match static files will serve index.html
     proxy: process.env.NODE_ENV === "development" && !process.env.REPL_ID
       ? {
           "/api": {
             target: `http://127.0.0.1:${process.env.BACKEND_PORT || "5000"}`,
             changeOrigin: true,
+            secure: false,
           },
         }
       : undefined,

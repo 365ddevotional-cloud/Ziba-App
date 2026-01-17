@@ -28,6 +28,25 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// CORS configuration for local development
+// In production, CORS is handled by the proxy/reverse proxy
+if (process.env.NODE_ENV === "development" && !process.env.REPL_ID) {
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    // Allow requests from Vite dev server
+    if (origin === "http://127.0.0.1:5173" || origin === "http://localhost:5173") {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    }
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+}
+
 // Use MemoryStore for SQLite (local dev), PgSession for PostgreSQL (production)
 // SQLite-compatible session store for local development
 // Environment variables read at runtime (not build time)
