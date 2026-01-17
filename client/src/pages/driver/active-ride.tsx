@@ -64,7 +64,7 @@ export default function DriverActiveRide() {
   const getGpsIntervalMs = (status: string): number => {
     const intervals = protectionStatus?.gpsIntervals || { enRoute: 10000, inProgress: 6000 };
     switch (status) {
-      case "DRIVER_ASSIGNED":
+      case "ACCEPTED":
         return intervals.enRoute;
       case "IN_PROGRESS":
         return intervals.inProgress;
@@ -143,7 +143,7 @@ export default function DriverActiveRide() {
       setGpsInterval(null);
     }
 
-    if (ride.status === "COMPLETED" || ride.status === "SETTLED") {
+    if (ride.status === "COMPLETED" || ride.status === "CANCELLED") {
       return;
     }
 
@@ -185,13 +185,7 @@ export default function DriverActiveRide() {
 
   const getStatusAction = () => {
     switch (ride.status) {
-      case "DRIVER_ASSIGNED":
-        return {
-          label: "I've Arrived",
-          nextStatus: "DRIVER_ARRIVED",
-          icon: MapPin,
-        };
-      case "DRIVER_ARRIVED":
+      case "ACCEPTED":
         return {
           label: "Start Trip",
           nextStatus: "IN_PROGRESS",
@@ -211,58 +205,24 @@ export default function DriverActiveRide() {
   const statusAction = getStatusAction();
 
   const handleNavigate = () => {
-    const isNavigatingToPickup = ["DRIVER_ASSIGNED"].includes(ride.status);
-    let lat: number | null;
-    let lng: number | null;
-    let address: string;
-
-    if (isNavigatingToPickup) {
-      lat = ride.pickupLat;
-      lng = ride.pickupLng;
-      address = ride.pickupLocation;
-    } else {
-      lat = ride.dropoffLat;
-      lng = ride.dropoffLng;
-      address = ride.dropoffLocation;
-    }
-
-    const userAgent = navigator.userAgent.toLowerCase();
-    const isIOS = /iphone|ipad|ipod/.test(userAgent);
-    const isAndroid = /android/.test(userAgent);
+    // Navigate to destination (dropoff) when ride is IN_PROGRESS
+    const lat = ride.dropoffLat;
+    const lng = ride.dropoffLng;
+    const address = ride.dropoffLocation;
 
     let url: string;
 
+    // Use coordinates if available, fallback to address string
     if (lat && lng) {
-      if (isAndroid) {
-        url = `google.navigation:q=${lat},${lng}&mode=d`;
-      } else if (isIOS) {
-        url = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
-      } else {
-        url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
-      }
+      url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
     } else {
-      url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}&travelmode=driving`;
+      url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
     }
 
-    if (url.startsWith("google.navigation:") || url.startsWith("comgooglemaps://")) {
-      const fallbackUrl = lat && lng
-        ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`
-        : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}&travelmode=driving`;
-
-      const start = Date.now();
-      window.location.href = url;
-      
-      setTimeout(() => {
-        if (Date.now() - start < 2000) {
-          window.open(fallbackUrl, "_blank");
-        }
-      }, 1500);
-    } else {
-      window.open(url, "_blank");
-    }
+    window.open(url, "_blank");
   };
 
-  const isNavigating = ["DRIVER_ASSIGNED", "DRIVER_ARRIVED", "IN_PROGRESS"].includes(ride.status);
+  const canNavigate = ride.status === "IN_PROGRESS";
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -364,17 +324,16 @@ export default function DriverActiveRide() {
       </main>
 
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-4 space-y-3">
-        {isNavigating && (
-          <Button
-            variant="outline"
-            className="w-full h-12 gap-2"
-            onClick={handleNavigate}
-            data-testid="button-navigate-external"
-          >
-            <Navigation className="w-5 h-5" />
-            Open in Google Maps
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          className="w-full h-12 gap-2"
+          onClick={handleNavigate}
+          disabled={!canNavigate}
+          data-testid="button-navigate"
+        >
+          <Navigation className="w-5 h-5" />
+          Navigate
+        </Button>
         
         {statusAction && (
           <Button
