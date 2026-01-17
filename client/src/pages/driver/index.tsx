@@ -29,7 +29,7 @@ function DriverAuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (isError || !driver) {
-    return <Redirect to="/signup" />;
+    return <Redirect to="/login" />;
   }
 
   if (!driver.isVerified || driver.status === "PENDING") {

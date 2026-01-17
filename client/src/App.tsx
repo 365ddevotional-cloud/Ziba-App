@@ -32,6 +32,7 @@ import AdminTrustSafetyPage from "@/pages/admin-trust-safety";
 import AdminAnnouncementsPage from "@/pages/admin-announcements";
 import NotificationsPage from "@/pages/notifications";
 import AdminLoginPage from "@/pages/admin-login";
+import LoginPage from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import WhySafeAndSecure from "@/pages/info/why-safe-and-secure";
 import WhyAlwaysAvailable from "@/pages/info/why-always-available";
@@ -58,6 +59,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Landing} />
+      <Route path="/login" component={LoginPage} />
       <Route path="/admin/login" component={AdminLoginPage} />
       <Route path="/users" component={UsersPage} />
       <Route path="/drivers" component={DriversPage} />
