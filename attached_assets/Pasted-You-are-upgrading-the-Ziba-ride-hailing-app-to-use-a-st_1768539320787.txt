@@ -1,0 +1,98 @@
+You are upgrading the Ziba ride-hailing app to use a strict, server-enforced Trip State Machine.
+
+GOAL:
+Implement an immutable, forward-only trip lifecycle that prevents invalid transitions, double charges, or skipped steps.
+
+REQUIREMENTS (DO NOT SKIP):
+
+1. DEFINE TRIP STATES (ENUM)
+Add a TripStatus enum with ONLY these values, in this exact order:
+- REQUESTED
+- DRIVER_ASSIGNED
+- DRIVER_ARRIVED
+- IN_PROGRESS
+- COMPLETED
+- SETTLED
+
+No other states allowed.
+
+2. DATABASE CHANGES
+- Add `status` column to trips table (enum or string, default = REQUESTED)
+- Add `statusHistory` (JSON array) storing:
+  { status, timestamp, actor }
+- Add `lockedFare` (number) set ONLY when status becomes IN_PROGRESS
+- Add `completedAt` timestamp
+- Add `settledAt` timestamp
+
+3. SERVER-SIDE STATE GUARD (CRITICAL)
+Create a single function:
+`transitionTripStatus(tripId, nextStatus, actor)`
+
+This function MUST:
+- Fetch current trip status
+- Validate nextStatus is EXACTLY the next allowed state
+- Reject invalid transitions with HTTP 409
+- Append to statusHistory
+- Persist changes atomically (transaction)
+
+Allowed transitions ONLY:
+REQUESTED → DRIVER_ASSIGNED  
+DRIVER_ASSIGNED → DRIVER_ARRIVED  
+DRIVER_ARRIVED → IN_PROGRESS  
+IN_PROGRESS → COMPLETED  
+COMPLETED → SETTLED  
+
+Any skip or reversal MUST FAIL.
+
+4. API ENDPOINTS (SERVER ONLY CONTROLS STATUS)
+Create/Update endpoints:
+- POST /api/trips/:id/assign-driver
+- POST /api/trips/:id/driver-arrived
+- POST /api/trips/:id/start
+- POST /api/trips/:id/complete
+- POST /api/trips/:id/settle
+
+Each endpoint:
+- Calls transitionTripStatus()
+- Rejects invalid role access (driver vs rider vs admin)
+- Returns updated trip object
+
+NO CLIENT MAY SET STATUS DIRECTLY.
+
+5. BUSINESS LOGIC HOOKS
+- On IN_PROGRESS:
+  - Lock fare (calculate once, store in lockedFare)
+- On COMPLETED:
+  - Prevent any further GPS or route updates
+- On SETTLED:
+  - Mark trip immutable (read-only forever)
+
+6. UI INTEGRATION
+- Update rider and driver UI to READ status only from server
+- Disable buttons unless current state allows action
+- Show clear status labels (e.g. “Driver Arrived”, “Trip In Progress”)
+
+7. FAILSAFE RULES
+- If trip is COMPLETED or SETTLED:
+  - All mutation endpoints return HTTP 403
+- If status mismatch occurs:
+  - Log error with tripId and actor
+  - Do NOT auto-correct
+
+8. TESTING (MANDATORY)
+Add basic tests or logs proving:
+- Cannot skip states
+- Cannot complete twice
+- Cannot settle before completion
+- Fare locks once and never changes
+
+9. DO NOT:
+- Add background jobs
+- Add cron
+- Add UI-only enforcement
+- Add temporary bypass flags
+
+This must work in Preview AND Published environments identically.
+
+END RESULT:
+Ziba must now behave like a real production ride-hailing backend with a strict, auditable trip lifecycle.

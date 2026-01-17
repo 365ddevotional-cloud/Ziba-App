@@ -1,44 +1,24 @@
 import { Switch, Route, Redirect } from "wouter";
-import { useDriverAuth } from "@/lib/driver-auth";
-import { useRiderAuth } from "@/lib/rider-auth";
+import { useQuery } from "@tanstack/react-query";
 import DriverHome from "./home";
-import DriverLogin from "./login";
-import DriverOnboard from "./onboard";
-import DriverStatus from "./status";
-import DriverAccessDenied from "./access-denied";
+import DriverActiveRide from "./active-ride";
+import DriverWallet from "./wallet";
+import DriverPendingVerification from "./pending-verification";
 import { Loader2 } from "lucide-react";
 
-function DriverAuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, isDriver, user } = useDriverAuth();
-  const { isRider } = useRiderAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Block riders from accessing driver routes
-  if (isRider) {
-    return <DriverAccessDenied />;
-  }
-
-  if (!isAuthenticated) {
-    return <Redirect to="/driver/login" />;
-  }
-
-  if (!isDriver) {
-    return <DriverAccessDenied />;
-  }
-
-  return <>{children}</>;
+interface DriverProfile {
+  id: string;
+  fullName: string;
+  email: string;
+  isVerified: boolean;
+  status: string;
 }
 
-function DriverGuestGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, isDriver } = useDriverAuth();
-  const { isRider } = useRiderAuth();
+function DriverAuthGuard({ children }: { children: React.ReactNode }) {
+  const { data: driver, isLoading, isError } = useQuery<DriverProfile>({
+    queryKey: ["/api/driver/me"],
+    retry: false,
+  });
 
   if (isLoading) {
     return (
@@ -48,17 +28,12 @@ function DriverGuestGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Block riders from accessing driver routes
-  if (isRider) {
-    return <DriverAccessDenied />;
+  if (isError || !driver) {
+    return <Redirect to="/signup" />;
   }
 
-  if (isAuthenticated && isDriver) {
-    return <Redirect to="/driver/home" />;
-  }
-
-  if (isAuthenticated && !isDriver) {
-    return <DriverAccessDenied />;
+  if (!driver.isVerified || driver.status === "PENDING") {
+    return <DriverPendingVerification />;
   }
 
   return <>{children}</>;
@@ -67,24 +42,22 @@ function DriverGuestGuard({ children }: { children: React.ReactNode }) {
 export default function DriverApp() {
   return (
     <Switch>
-      <Route path="/driver/login">
-        <DriverGuestGuard>
-          <DriverLogin />
-        </DriverGuestGuard>
+      <Route path="/driver/pending-verification">
+        <DriverPendingVerification />
+      </Route>
+      <Route path="/driver/ride/:id">
+        <DriverAuthGuard>
+          <DriverActiveRide />
+        </DriverAuthGuard>
+      </Route>
+      <Route path="/driver/wallet">
+        <DriverAuthGuard>
+          <DriverWallet />
+        </DriverAuthGuard>
       </Route>
       <Route path="/driver/home">
         <DriverAuthGuard>
           <DriverHome />
-        </DriverAuthGuard>
-      </Route>
-      <Route path="/driver/onboard">
-        <DriverAuthGuard>
-          <DriverOnboard />
-        </DriverAuthGuard>
-      </Route>
-      <Route path="/driver/status">
-        <DriverAuthGuard>
-          <DriverStatus />
         </DriverAuthGuard>
       </Route>
       <Route path="/driver">

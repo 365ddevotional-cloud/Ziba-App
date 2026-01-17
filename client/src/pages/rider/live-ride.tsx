@@ -201,8 +201,9 @@ export default function RiderLiveRide() {
       queryClient.invalidateQueries({ queryKey: ["/api/rider/active-ride"] });
       queryClient.invalidateQueries({ queryKey: ["/api/rider/rides"] });
       queryClient.invalidateQueries({ queryKey: ["/api/rider/wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rider/last-completed-ride"] });
       toast({ title: "Trip completed", description: "Thanks for riding with Ziba!" });
-      navigate(`/rider/trip-summary/${data.id}`);
+      navigate("/rider/ride-complete");
     },
     onError: (error: any) => {
       console.error("Test complete error:", error);

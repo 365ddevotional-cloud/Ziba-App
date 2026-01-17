@@ -1,0 +1,87 @@
+TASK: Implement full Wallet interaction flows for Rider accounts.
+
+CONTEXT:
+The Wallet page currently displays:
+- Add Funds
+- Add Card
+- Payment Methods
+But these buttons do nothing when clicked.
+
+GOAL:
+Make all three buttons functional, navigable, and populated with real UI states.
+
+REQUIREMENTS (DO NOT SKIP):
+
+1. ROUTES
+Create the following routes:
+- /rider/wallet/add-funds
+- /rider/wallet/add-card
+- /rider/wallet/payment-methods
+
+Ensure routes are registered in the router (fix any “Did you forget to add the page to the router?” errors).
+
+2. ADD FUNDS PAGE (/rider/wallet/add-funds)
+UI:
+- Amount input (number, NGN)
+- Payment method selector (Wallet Card / Bank Transfer)
+- Primary button: “Proceed to Payment”
+- Secondary button: “Cancel” → returns to /rider/wallet
+
+Logic:
+- Validate amount > 0
+- Mock payment success
+- On success:
+  - Increase wallet balance
+  - Log transaction as “Top-Up”
+  - Redirect back to /rider/wallet with success toast
+
+3. ADD CARD PAGE (/rider/wallet/add-card)
+UI:
+- Card Number
+- Expiry Date
+- CVV
+- Cardholder Name
+- Save Card toggle
+- Button: “Add Card”
+
+Logic:
+- Validate fields
+- Mock card tokenization
+- Save card to user profile
+- Redirect to /rider/wallet/payment-methods
+
+4. PAYMENT METHODS PAGE (/rider/wallet/payment-methods)
+UI:
+- List saved cards
+- Wallet balance option
+- Default payment selector
+- Remove card option
+
+Logic:
+- Allow setting default payment method
+- Prevent deleting last payment method
+- Persist selection in user state
+
+5. BUTTON WIRING (IMPORTANT)
+On Wallet page:
+- Add Funds → navigate to /rider/wallet/add-funds
+- Add Card → navigate to /rider/wallet/add-card
+- Payment Methods → navigate to /rider/wallet/payment-methods
+
+6. UX & STYLE
+- Use existing Ziba color system
+- Keep dark theme
+- Buttons must show loading + disabled states
+- Show toast notifications for success/errors
+
+7. SECURITY
+- Rider-only access
+- Redirect unauthenticated users to /login
+
+8. NO BREAKING CHANGES
+- Do not modify Admin, Driver, or Director flows
+- Do not remove existing wallet balance logic
+
+DELIVERABLE:
+All Wallet buttons clickable, routed, populated, and visually complete.
+No placeholders. No dead buttons.

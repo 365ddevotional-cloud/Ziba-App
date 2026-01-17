@@ -7,6 +7,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { createServer as createNetServer } from "net";
 import { bootstrapFounderAdmin } from "./bootstrap";
+import { ensurePlatformWallet } from "./wallet-service";
 
 const app = express();
 const httpServer = createServer(app);
@@ -158,6 +159,7 @@ app.use((req, res, next) => {
 (async () => {
   try {
     await bootstrapFounderAdmin();
+    await ensurePlatformWallet();
     await registerRoutes(httpServer, app);
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

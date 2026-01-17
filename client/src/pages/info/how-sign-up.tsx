@@ -177,10 +177,12 @@ export default function HowSignUp() {
           <div className="bg-card border border-card-border rounded-xl p-6 text-center">
             <h2 className="text-xl font-semibold text-foreground mb-2">Ready to get started?</h2>
             <p className="text-muted-foreground mb-4">Join thousands of riders who trust Ziba every day.</p>
-            <Button size="lg" className="gap-2" data-testid="button-signup-cta">
-              Create Account
-              <ArrowRight className="w-4 h-4" />
-            </Button>
+            <Link href="/signup">
+              <Button size="lg" className="gap-2 cursor-pointer" data-testid="button-signup-cta">
+                Create Account
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

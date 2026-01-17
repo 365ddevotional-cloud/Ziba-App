@@ -2,6 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { prisma } from "./prisma";
 import { hashPassword, verifyPassword, requireAuth, getCurrentUser, UserRole } from "./auth";
+import { analyzeFraud } from "./fraud-detection";
+import { enforceMinimumFare, validateFare, MINIMUM_ZIBA_TAKE, COST_PER_TRIP, SAFETY_FACTOR } from "./minimum-fare";
+import { computeMapMetrics, getProtectionStatus, getGpsInterval, formatMetricsReport, MAP_COST_TARGETS, type DailyMapMetrics } from "./map-cost-protection";
+import { transitionTripStatus, getTripStatus, validateRoleForTransition, isTripImmutable, isTripCompleted, TripStatus, TRIP_STATUS_ORDER } from "./trip-state-machine";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -435,11 +439,28 @@ export async function registerRoutes(
         }
       }
 
+      // Enforce minimum fare to prevent negative margin
+      let adjustedFare = fareEstimate ? parseFloat(fareEstimate) : null;
+      if (adjustedFare !== null) {
+        // Get platform config for commission rate
+        const config = await prisma.platformConfig.findFirst();
+        const commissionRate = config?.commissionRate || 0.15;
+        
+        // Validate and auto-adjust fare if below minimum
+        const fareResult = enforceMinimumFare(adjustedFare, commissionRate);
+        adjustedFare = fareResult.adjustedFare;
+        
+        // Log if fare was adjusted
+        if (fareResult.wasAdjusted) {
+          console.log(`Fare adjusted for ride: ${fareResult.originalFare} -> ${fareResult.adjustedFare} (minimum: ${fareResult.minimumFare})`);
+        }
+      }
+
       const ride = await prisma.ride.create({
         data: { 
           pickupLocation, 
           dropoffLocation, 
-          fareEstimate: fareEstimate ? parseFloat(fareEstimate) : null,
+          fareEstimate: adjustedFare,
           userId,
           driverId,
           status: driverId ? "ASSIGNED" : "REQUESTED"
@@ -461,12 +482,21 @@ export async function registerRoutes(
       // This endpoint now only allows updating ride details, NOT status or driver assignment
       // Use the dedicated lifecycle endpoints for status changes: /assign, /start, /complete, /cancel
       
+      // Enforce minimum fare if fareEstimate is being updated
+      let adjustedFare = fareEstimate !== undefined ? parseFloat(fareEstimate) : undefined;
+      if (adjustedFare !== undefined) {
+        const config = await prisma.platformConfig.findFirst();
+        const commissionRate = config?.commissionRate || 0.15;
+        const fareResult = enforceMinimumFare(adjustedFare, commissionRate);
+        adjustedFare = fareResult.adjustedFare;
+      }
+      
       const ride = await prisma.ride.update({
         where: { id },
         data: { 
           pickupLocation, 
           dropoffLocation, 
-          fareEstimate: fareEstimate !== undefined ? parseFloat(fareEstimate) : undefined,
+          fareEstimate: adjustedFare,
         },
         include: { user: true, driver: true },
       });
@@ -939,6 +969,10 @@ export async function registerRoutes(
   });
 
   app.get("/api/admins", async (req, res) => {
+    const currentUser = getCurrentUser(req);
+    if (currentUser.role !== "admin") {
+      return res.status(401).json({ message: "Not authenticated as admin" });
+    }
     try {
       const admins = await prisma.admin.findMany({
         orderBy: { createdAt: "desc" },
@@ -953,6 +987,10 @@ export async function registerRoutes(
   // ==================== ADMIN STATS ====================
   
   app.get("/api/admin/stats", async (req, res) => {
+    const currentUser = getCurrentUser(req);
+    if (currentUser.role !== "admin") {
+      return res.status(401).json({ message: "Not authenticated as admin" });
+    }
     try {
       const [
         totalUsers,
@@ -1108,8 +1146,8 @@ export async function registerRoutes(
   app.get("/api/admin/activity", async (req, res) => {
     try {
       const currentUser = getCurrentUser(req);
-      if (currentUser.role !== "admin" && currentUser.role !== "director") {
-        return res.status(403).json({ message: "Access denied" });
+      if (currentUser.role !== "admin") {
+        return res.status(401).json({ message: "Not authenticated as admin" });
       }
 
       const [recentRides, recentPayments, recentIncentives, recentUsers, recentDrivers] = await Promise.all([
@@ -2106,7 +2144,7 @@ export async function registerRoutes(
   // Rate a driver (after completed ride)
   app.post("/api/ratings/driver", async (req, res) => {
     try {
-      const { rideId, rating } = req.body;
+      const { rideId, rating, feedback } = req.body;
 
       if (!rideId || rating === undefined) {
         return res.status(400).json({ message: "rideId and rating are required" });
@@ -2124,7 +2162,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "COMPLETED") {
+      if (ride.status !== "COMPLETED" && ride.status !== "SETTLED") {
         return res.status(400).json({ message: "Can only rate completed rides" });
       }
 
@@ -2140,6 +2178,7 @@ export async function registerRoutes(
       const driverRating = await prisma.driverRating.create({
         data: {
           rating,
+          feedback: feedback || null,
           rideId,
           driverId: ride.driverId,
           userId: ride.userId,
@@ -2170,7 +2209,7 @@ export async function registerRoutes(
   // Rate a user (after completed ride)
   app.post("/api/ratings/user", async (req, res) => {
     try {
-      const { rideId, rating } = req.body;
+      const { rideId, rating, feedback } = req.body;
 
       if (!rideId || rating === undefined) {
         return res.status(400).json({ message: "rideId and rating are required" });
@@ -2188,7 +2227,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Ride not found" });
       }
 
-      if (ride.status !== "COMPLETED") {
+      if (ride.status !== "COMPLETED" && ride.status !== "SETTLED") {
         return res.status(400).json({ message: "Can only rate completed rides" });
       }
 
@@ -2204,6 +2243,7 @@ export async function registerRoutes(
       const userRating = await prisma.userRating.create({
         data: {
           rating,
+          feedback: feedback || null,
           rideId,
           userId: ride.userId,
           driverId: ride.driverId,
@@ -2229,6 +2269,244 @@ export async function registerRoutes(
       console.error("Error rating user:", error);
       res.status(500).json({ message: "Failed to rate user" });
     }
+  });
+
+  // ==================== TRIP STATE MACHINE ====================
+  // Strict, forward-only trip lifecycle with server-enforced state transitions
+
+  // Get trip status and allowed next transition
+  app.get("/api/trips/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const status = await getTripStatus(id);
+      
+      if (!status) {
+        return res.status(404).json({ message: "Trip not found" });
+      }
+
+      res.json(status);
+    } catch (error) {
+      console.error("Error getting trip status:", error);
+      res.status(500).json({ message: "Failed to get trip status" });
+    }
+  });
+
+  // Assign driver to trip (REQUESTED → DRIVER_ASSIGNED)
+  app.post("/api/trips/:id/assign-driver", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { driverId } = req.body;
+      const currentUser = getCurrentUser(req);
+
+      // Role check - only admins and drivers can assign
+      const roleCheck = validateRoleForTransition("DRIVER_ASSIGNED", 
+        currentUser.role === "admin" ? "admin" : "driver");
+      if (!roleCheck.allowed) {
+        return res.status(403).json({ message: roleCheck.reason });
+      }
+
+      if (!driverId) {
+        return res.status(400).json({ message: "driverId is required" });
+      }
+
+      // Validate driver exists and is available
+      const driver = await prisma.driver.findUnique({
+        where: { id: driverId },
+        include: { rides: { where: { status: "IN_PROGRESS" } } }
+      });
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+      if (driver.status !== "ACTIVE") {
+        return res.status(400).json({ message: "Driver must be ACTIVE to be assigned" });
+      }
+      if (!driver.isOnline) {
+        return res.status(400).json({ message: "Driver must be ONLINE to be assigned" });
+      }
+      if (driver.rides.length > 0) {
+        return res.status(400).json({ message: "Driver is currently on another ride" });
+      }
+
+      // First update driverId, then transition status
+      await prisma.ride.update({
+        where: { id },
+        data: { driverId }
+      });
+
+      const result = await transitionTripStatus(id, "DRIVER_ASSIGNED", `driver:${driverId}`);
+      
+      if (!result.success) {
+        return res.status(result.code || 500).json({ message: result.error });
+      }
+
+      res.json(result.ride);
+    } catch (error) {
+      console.error("Error assigning driver:", error);
+      res.status(500).json({ message: "Failed to assign driver" });
+    }
+  });
+
+  // Driver arrived at pickup (DRIVER_ASSIGNED → DRIVER_ARRIVED)
+  app.post("/api/trips/:id/driver-arrived", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      // Role check - only driver can mark arrival
+      const roleCheck = validateRoleForTransition("DRIVER_ARRIVED", "driver");
+      if (currentUser.role !== "driver" && currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only driver can mark arrival" });
+      }
+
+      const result = await transitionTripStatus(id, "DRIVER_ARRIVED", 
+        `driver:${currentUser.id}`);
+      
+      if (!result.success) {
+        return res.status(result.code || 500).json({ message: result.error });
+      }
+
+      res.json(result.ride);
+    } catch (error) {
+      console.error("Error marking driver arrived:", error);
+      res.status(500).json({ message: "Failed to mark driver arrived" });
+    }
+  });
+
+  // Start trip (DRIVER_ARRIVED → IN_PROGRESS) - Locks fare
+  app.post("/api/trips/:id/start", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      // Role check - only driver can start trip
+      if (currentUser.role !== "driver" && currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only driver can start trip" });
+      }
+
+      const result = await transitionTripStatus(id, "IN_PROGRESS", 
+        `driver:${currentUser.id}`);
+      
+      if (!result.success) {
+        return res.status(result.code || 500).json({ message: result.error });
+      }
+
+      // Verify fare was locked
+      if (!result.ride?.lockedFare) {
+        console.warn(`[TRIP-STATE-WARNING] Trip ${id} started without lockedFare`);
+      }
+
+      res.json(result.ride);
+    } catch (error) {
+      console.error("Error starting trip:", error);
+      res.status(500).json({ message: "Failed to start trip" });
+    }
+  });
+
+  // Complete trip (IN_PROGRESS → COMPLETED) - Prevents GPS/route updates
+  app.post("/api/trips/:id/complete", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      // Role check - only driver can complete trip
+      if (currentUser.role !== "driver" && currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only driver can complete trip" });
+      }
+
+      // Get the ride for fraud analysis
+      const ride = await prisma.ride.findUnique({
+        where: { id },
+        include: { gpsLogs: true }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Trip not found" });
+      }
+
+      const result = await transitionTripStatus(id, "COMPLETED", 
+        `driver:${currentUser.id}`);
+      
+      if (!result.success) {
+        return res.status(result.code || 500).json({ message: result.error });
+      }
+
+      // Run fraud detection
+      const gpsPoints = ride.gpsLogs.map(log => ({
+        lat: log.lat,
+        lng: log.lng,
+        createdAt: log.createdAt
+      }));
+      
+      const fraudResult = analyzeFraud(
+        gpsPoints,
+        ride.estimatedDistance,
+        ride.estimatedDuration,
+        ride.startedAt,
+        ride.completedAt || new Date()
+      );
+
+      // Update ride with fraud results
+      if (fraudResult.fraudScore > 0) {
+        await prisma.ride.update({
+          where: { id },
+          data: {
+            fraudScore: fraudResult.fraudScore,
+            isFlagged: fraudResult.isFlagged,
+            payoutHeld: fraudResult.fraudScore >= 4,
+            fraudReasons: JSON.stringify(fraudResult.reasons)
+          }
+        });
+      }
+
+      res.json(result.ride);
+    } catch (error) {
+      console.error("Error completing trip:", error);
+      res.status(500).json({ message: "Failed to complete trip" });
+    }
+  });
+
+  // Settle trip (COMPLETED → SETTLED) - Makes trip immutable
+  app.post("/api/trips/:id/settle", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = getCurrentUser(req);
+
+      // Role check - only admin can settle trip
+      if (currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Only admin can settle trip" });
+      }
+
+      const result = await transitionTripStatus(id, "SETTLED", 
+        `admin:${currentUser.id}`);
+      
+      if (!result.success) {
+        return res.status(result.code || 500).json({ message: result.error });
+      }
+
+      res.json(result.ride);
+    } catch (error) {
+      console.error("Error settling trip:", error);
+      res.status(500).json({ message: "Failed to settle trip" });
+    }
+  });
+
+  // Failsafe: Block all mutations on COMPLETED/SETTLED trips
+  app.use("/api/trips/:id", async (req, res, next) => {
+    if (req.method === "GET") {
+      return next();
+    }
+
+    const { id } = req.params;
+    const tripStatus = await getTripStatus(id);
+
+    if (tripStatus && isTripImmutable(tripStatus.status)) {
+      console.error(`[TRIP-MUTATION-BLOCKED] tripId=${id} status=SETTLED`);
+      return res.status(403).json({ 
+        message: "Trip is settled and immutable. No modifications allowed." 
+      });
+    }
+
+    next();
   });
 
   // ==================== WALLETS ====================
@@ -2690,7 +2968,7 @@ export async function registerRoutes(
       }
       
       const wallet = await getOrCreateWallet(ownerId, ownerType);
-      const transactions = await prisma.transaction.findMany({
+      const transactions = await prisma.walletTransaction.findMany({
         where: { walletId: wallet.id },
         orderBy: { createdAt: "desc" },
         take: 20,
@@ -2711,7 +2989,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      const transactions = await prisma.transaction.findMany({
+      const transactions = await prisma.walletTransaction.findMany({
         orderBy: { createdAt: "desc" },
         take: 100,
         include: { wallet: true },
@@ -3077,6 +3355,86 @@ export async function registerRoutes(
     }
   });
 
+  // Admin send announcement
+  app.post("/api/admin/announcement", requireAuth("admin"), async (req, res) => {
+    try {
+      const { title, message, targetAudience } = req.body;
+      const adminId = (req.session as any).adminId;
+
+      if (!title || !message || !targetAudience) {
+        return res.status(400).json({ message: "Title, message, and targetAudience are required" });
+      }
+
+      if (!["all", "riders", "drivers"].includes(targetAudience)) {
+        return res.status(400).json({ message: "Invalid target audience" });
+      }
+
+      const notifications: any[] = [];
+
+      if (targetAudience === "all" || targetAudience === "riders") {
+        const riders = await prisma.user.findMany({
+          where: { status: "ACTIVE" },
+          select: { id: true },
+        });
+        riders.forEach((rider) => {
+          notifications.push({
+            userId: rider.id,
+            role: "rider",
+            title,
+            message,
+            type: "ADMIN_ANNOUNCEMENT",
+            metadata: { adminId, targetAudience },
+          });
+        });
+      }
+
+      if (targetAudience === "all" || targetAudience === "drivers") {
+        const drivers = await prisma.driver.findMany({
+          where: { status: "ACTIVE" },
+          select: { id: true },
+        });
+        drivers.forEach((driver) => {
+          notifications.push({
+            userId: driver.id,
+            role: "driver",
+            title,
+            message,
+            type: "ADMIN_ANNOUNCEMENT",
+            metadata: { adminId, targetAudience },
+          });
+        });
+      }
+
+      if (notifications.length > 0) {
+        await prisma.notification.createMany({
+          data: notifications,
+        });
+      }
+
+      console.log(`[Admin] Announcement sent to ${notifications.length} users by admin ${adminId}`);
+      res.json({ success: true, count: notifications.length });
+    } catch (error) {
+      console.error("Error sending announcement:", error);
+      res.status(500).json({ message: "Failed to send announcement" });
+    }
+  });
+
+  // Get announcement history (admin only)
+  app.get("/api/admin/announcements", requireAuth("admin"), async (req, res) => {
+    try {
+      const announcements = await prisma.notification.findMany({
+        where: { type: "ADMIN_ANNOUNCEMENT" },
+        orderBy: { createdAt: "desc" },
+        distinct: ["title", "message"],
+        take: 50,
+      });
+      res.json(announcements);
+    } catch (error) {
+      console.error("Error fetching announcements:", error);
+      res.status(500).json({ message: "Failed to fetch announcements" });
+    }
+  });
+
   // ==================== FARE CONFIG ====================
 
   // Get all fare configs (admin only)
@@ -3325,7 +3683,7 @@ export async function registerRoutes(
       const totalDriverBalance = driverWallets.reduce((sum, w) => sum + w.balance, 0);
 
       // Transaction stats
-      const transactions = await prisma.transaction.findMany();
+      const transactions = await prisma.walletTransaction.findMany();
       const payouts = transactions.filter(t => t.type === "PAYOUT");
       const totalPayouts = Math.abs(payouts.reduce((sum, t) => sum + t.amount, 0));
 
@@ -3949,6 +4307,147 @@ export async function registerRoutes(
     }
   });
 
+  // Driver registration
+  app.post("/api/driver/register", async (req, res) => {
+    try {
+      const { fullName, email, password, phone, vehicleType, vehiclePlate } = req.body;
+      
+      if (!fullName || !email || !password || !phone || !vehicleType || !vehiclePlate) {
+        return res.status(400).json({ message: "Full name, email, password, phone, vehicle type, and vehicle plate are required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const validVehicleTypes = ["CAR", "BIKE", "VAN"];
+      if (!validVehicleTypes.includes(vehicleType)) {
+        return res.status(400).json({ message: "Invalid vehicle type. Must be CAR, BIKE, or VAN" });
+      }
+
+      const existingDriver = await prisma.driver.findUnique({ where: { email } });
+      if (existingDriver) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      const passwordHash = await hashPassword(password);
+      
+      const driver = await prisma.driver.create({
+        data: {
+          fullName,
+          email,
+          passwordHash,
+          phone,
+          vehicleType: vehicleType as "CAR" | "BIKE" | "VAN",
+          vehiclePlate,
+          status: "PENDING",
+          isVerified: false,
+          isTestAccount: TEST_MODE
+        }
+      });
+
+      // Create wallet for new driver
+      await prisma.wallet.create({
+        data: {
+          ownerId: driver.id,
+          ownerType: "DRIVER",
+          balance: 0
+        }
+      });
+
+      // Set session
+      req.session.userId = driver.id;
+      req.session.userRole = "driver" as UserRole;
+      req.session.userEmail = driver.email;
+
+      res.status(201).json({
+        message: "Registration successful. Your account is pending verification.",
+        user: {
+          id: driver.id,
+          fullName: driver.fullName,
+          email: driver.email,
+          phone: driver.phone,
+          vehicleType: driver.vehicleType,
+          vehiclePlate: driver.vehiclePlate,
+          status: driver.status,
+          role: "driver",
+          isVerified: driver.isVerified,
+          isTestAccount: driver.isTestAccount
+        }
+      });
+    } catch (error: any) {
+      console.error("Driver registration error:", error);
+      if (error.code === "P2002") {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  // Director registration
+  app.post("/api/director/register", async (req, res) => {
+    try {
+      const { fullName, email, password, phone, role, region } = req.body;
+      
+      if (!fullName || !email || !password) {
+        return res.status(400).json({ message: "Full name, email, and password are required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const existingDirector = await prisma.director.findUnique({ where: { email } });
+      if (existingDirector) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      const passwordHash = await hashPassword(password);
+      
+      const director = await prisma.director.create({
+        data: {
+          fullName,
+          email,
+          passwordHash,
+          phone: phone || null,
+          role: role || "OPERATIONS",
+          region: region || "Default",
+          status: "PENDING",
+          isVerified: false,
+          isApproved: false,
+          isTestAccount: TEST_MODE
+        }
+      });
+
+      // Set session
+      req.session.userId = director.id;
+      req.session.userRole = "director" as UserRole;
+      req.session.userEmail = director.email;
+
+      res.status(201).json({
+        message: "Registration successful. Your account is pending admin approval.",
+        user: {
+          id: director.id,
+          fullName: director.fullName,
+          email: director.email,
+          role: director.role,
+          region: director.region,
+          status: director.status,
+          accountRole: "director",
+          isVerified: director.isVerified,
+          isApproved: director.isApproved,
+          isTestAccount: director.isTestAccount
+        }
+      });
+    } catch (error: any) {
+      console.error("Director registration error:", error);
+      if (error.code === "P2002") {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
   // Rider login
   app.post("/api/rider/login", async (req, res) => {
     try {
@@ -4040,6 +4539,1275 @@ export async function registerRoutes(
 
   // Rider logout
   app.post("/api/rider/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  // Driver login
+  app.post("/api/driver/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const driver = await prisma.driver.findUnique({ where: { email } });
+      if (!driver) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (!driver.passwordHash) {
+        return res.status(401).json({ message: "Account not configured for login" });
+      }
+
+      const isValid = await verifyPassword(password, driver.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Check verification status
+      if (!driver.isVerified) {
+        return res.status(403).json({ 
+          message: "Account pending verification", 
+          status: "PENDING_VERIFICATION",
+          redirect: "/driver/pending-verification"
+        });
+      }
+
+      if (driver.status === "SUSPENDED") {
+        return res.status(403).json({ message: "Account suspended" });
+      }
+
+      // Set session
+      req.session.userId = driver.id;
+      req.session.userRole = "driver" as UserRole;
+      req.session.userEmail = driver.email;
+
+      res.json({
+        message: "Login successful",
+        user: {
+          id: driver.id,
+          fullName: driver.fullName,
+          email: driver.email,
+          phone: driver.phone,
+          vehicleType: driver.vehicleType,
+          vehiclePlate: driver.vehiclePlate,
+          status: driver.status,
+          role: "driver",
+          isVerified: driver.isVerified,
+          isTestAccount: driver.isTestAccount
+        }
+      });
+    } catch (error) {
+      console.error("Driver login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Driver auth check
+  app.get("/api/driver/me", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const driver = await prisma.driver.findUnique({
+        where: { id: req.session.userId },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          phone: true,
+          vehicleType: true,
+          vehiclePlate: true,
+          status: true,
+          isOnline: true,
+          averageRating: true,
+          isVerified: true,
+          isTestAccount: true
+        }
+      });
+
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      res.json({
+        ...driver,
+        role: "driver"
+      });
+    } catch (error) {
+      console.error("Error fetching driver:", error);
+      res.status(500).json({ message: "Failed to fetch driver data" });
+    }
+  });
+
+  // Driver logout
+  app.post("/api/driver/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  // Get last completed ride for driver (for ride completion page)
+  app.get("/api/driver/last-completed-ride", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const lastCompletedRide = await prisma.ride.findFirst({
+        where: {
+          driverId: req.session.userId,
+          status: "COMPLETED"
+        },
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: {
+            select: {
+              id: true,
+              fullName: true,
+              averageRating: true
+            }
+          },
+          userRating: true,
+          payment: true
+        }
+      });
+
+      if (!lastCompletedRide) {
+        return res.status(404).json({ message: "No completed ride found" });
+      }
+
+      // Calculate driver earnings (85% of fare after platform commission)
+      const fareAmount = lastCompletedRide.fareEstimate || 0;
+      const commissionRate = 0.15; // 15% platform commission
+      const driverEarnings = fareAmount * (1 - commissionRate);
+      const commission = fareAmount * commissionRate;
+
+      res.json({
+        ...lastCompletedRide,
+        driverEarnings,
+        commission
+      });
+    } catch (error) {
+      console.error("Error fetching last completed ride:", error);
+      res.status(500).json({ message: "Failed to fetch last completed ride" });
+    }
+  });
+
+  // Driver rate rider
+  app.post("/api/driver/rides/:id/rate-rider", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const { id } = req.params;
+      const { rating } = req.body;
+
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+
+      // Get the ride
+      const ride = await prisma.ride.findUnique({
+        where: { id },
+        include: { user: true }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      if (ride.driverId !== req.session.userId) {
+        return res.status(403).json({ message: "Not authorized to rate this ride" });
+      }
+
+      if (ride.status !== "COMPLETED") {
+        return res.status(400).json({ message: "Can only rate completed rides" });
+      }
+
+      // Check if already rated
+      const existingRating = await prisma.userRating.findUnique({
+        where: { rideId: id }
+      });
+
+      if (existingRating) {
+        return res.status(400).json({ message: "Ride already rated" });
+      }
+
+      // Create the rating
+      await prisma.userRating.create({
+        data: {
+          rating,
+          rideId: id,
+          userId: ride.userId,
+          driverId: req.session.userId
+        }
+      });
+
+      // Update user's average rating
+      const userRatings = await prisma.userRating.findMany({
+        where: { userId: ride.userId }
+      });
+
+      const avgRating = userRatings.reduce((sum, r) => sum + r.rating, 0) / userRatings.length;
+
+      await prisma.user.update({
+        where: { id: ride.userId },
+        data: {
+          averageRating: avgRating,
+          totalRatings: userRatings.length
+        }
+      });
+
+      res.json({ message: "Rating submitted successfully" });
+    } catch (error) {
+      console.error("Error rating rider:", error);
+      res.status(500).json({ message: "Failed to submit rating" });
+    }
+  });
+
+  // Driver go online
+  app.post("/api/driver/go-online", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      await prisma.driver.update({
+        where: { id: req.session.userId },
+        data: { isOnline: true }
+      });
+
+      res.json({ message: "You are now online", isOnline: true });
+    } catch (error) {
+      console.error("Error going online:", error);
+      res.status(500).json({ message: "Failed to go online" });
+    }
+  });
+
+  // Driver go offline
+  app.post("/api/driver/go-offline", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      await prisma.driver.update({
+        where: { id: req.session.userId },
+        data: { isOnline: false }
+      });
+
+      res.json({ message: "You are now offline", isOnline: false });
+    } catch (error) {
+      console.error("Error going offline:", error);
+      res.status(500).json({ message: "Failed to go offline" });
+    }
+  });
+
+  // Get driver active ride
+  app.get("/api/driver/active-ride", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const ride = await prisma.ride.findFirst({
+        where: {
+          driverId: req.session.userId,
+          status: { in: ["ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "IN_PROGRESS"] }
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              averageRating: true
+            }
+          }
+        },
+        orderBy: { createdAt: "desc" }
+      });
+
+      res.json(ride);
+    } catch (error) {
+      console.error("Error fetching active ride:", error);
+      res.status(500).json({ message: "Failed to fetch active ride" });
+    }
+  });
+
+  // Get specific ride for driver
+  app.get("/api/driver/ride/:id", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const ride = await prisma.ride.findFirst({
+        where: {
+          id: req.params.id,
+          driverId: req.session.userId
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              averageRating: true
+            }
+          }
+        }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      res.json(ride);
+    } catch (error) {
+      console.error("Error fetching ride:", error);
+      res.status(500).json({ message: "Failed to fetch ride" });
+    }
+  });
+
+  // Driver update ride status
+  app.post("/api/driver/rides/:id/update-status", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const { status } = req.body;
+      const validStatuses = ["DRIVER_EN_ROUTE", "ARRIVED", "IN_PROGRESS", "COMPLETED"];
+      
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      const ride = await prisma.ride.findFirst({
+        where: {
+          id: req.params.id,
+          driverId: req.session.userId
+        }
+      }) as any;
+
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      const updateData: any = { status };
+
+      // Lock fare and set timestamps at trip start
+      if (status === "IN_PROGRESS") {
+        updateData.startedAt = new Date();
+        if (ride.fareEstimate && !ride.lockedFare) {
+          updateData.lockedFare = ride.fareEstimate;
+        }
+      }
+
+      // Set completion timestamp and run fraud detection
+      if (status === "COMPLETED") {
+        updateData.completedAt = new Date();
+        
+        // Fetch GPS logs for fraud analysis
+        const gpsLogs = await (prisma as any).gpsLog.findMany({
+          where: { rideId: ride.id },
+          orderBy: { createdAt: "asc" }
+        });
+
+        // Run fraud detection
+        const fraudResult = analyzeFraud(
+          gpsLogs,
+          ride.estimatedDistance,
+          ride.estimatedDuration,
+          ride.startedAt,
+          updateData.completedAt
+        );
+
+        // Add fraud data to update
+        updateData.actualDistance = fraudResult.actualDistance;
+        updateData.actualDuration = fraudResult.actualDuration;
+        updateData.fraudScore = fraudResult.fraudScore;
+        updateData.isFlagged = fraudResult.isFlagged;
+        updateData.payoutHeld = fraudResult.payoutHeld;
+        updateData.fraudReasons = fraudResult.reasons.length > 0 
+          ? JSON.stringify(fraudResult.reasons) 
+          : null;
+
+        // Handle payment and wallet transactions
+        const fare = (ride.lockedFare || ride.fareEstimate || 0) as number;
+        if (fare > 0) {
+          // Get platform config for commission
+          const config = await prisma.platformConfig.findFirst();
+          const commissionRate = config?.commissionRate || 0.15;
+          const driverEarnings = fare * (1 - commissionRate);
+
+          // Get or create driver wallet
+          let driverWallet = await prisma.wallet.findFirst({
+            where: { ownerId: req.session.userId, ownerType: "DRIVER" }
+          });
+          if (!driverWallet) {
+            driverWallet = await prisma.wallet.create({
+              data: { ownerId: req.session.userId, ownerType: "DRIVER", balance: 0 }
+            });
+          }
+
+          // Only credit driver if payout is NOT held
+          if (!fraudResult.payoutHeld) {
+            await prisma.wallet.update({
+              where: { id: driverWallet.id },
+              data: { balance: { increment: driverEarnings } }
+            });
+
+            await prisma.walletTransaction.create({
+              data: {
+                walletId: driverWallet.id,
+                type: "CREDIT",
+                amount: driverEarnings,
+                reference: `Ride earnings: ${ride.id}`
+              }
+            });
+          } else {
+            // Create pending transaction for held payout
+            await prisma.walletTransaction.create({
+              data: {
+                walletId: driverWallet.id,
+                type: "PENDING",
+                amount: driverEarnings,
+                reference: `Ride earnings (held for review): ${ride.id}`
+              }
+            });
+          }
+
+          // Get or create user wallet and debit
+          let userWallet = await prisma.wallet.findFirst({
+            where: { ownerId: ride.userId, ownerType: "USER" }
+          });
+          if (userWallet && userWallet.balance >= fare) {
+            await prisma.wallet.update({
+              where: { id: userWallet.id },
+              data: { balance: { decrement: fare } }
+            });
+
+            await prisma.walletTransaction.create({
+              data: {
+                walletId: userWallet.id,
+                type: "RIDE_PAYMENT",
+                amount: fare,
+                reference: `Ride payment: ${ride.id}`
+              }
+            });
+          }
+
+          // Create payment record
+          await prisma.payment.create({
+            data: {
+              amount: fare,
+              status: "PAID",
+              rideId: ride.id,
+              gatewayMode: "SANDBOX"
+            }
+          });
+        }
+      }
+
+      const updatedRide = await prisma.ride.update({
+        where: { id: req.params.id },
+        data: updateData,
+        include: {
+          user: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              averageRating: true
+            }
+          }
+        }
+      });
+
+      res.json(updatedRide);
+    } catch (error) {
+      console.error("Error updating ride status:", error);
+      res.status(500).json({ message: "Failed to update ride status" });
+    }
+  });
+
+  // Driver stats
+  app.get("/api/driver/stats", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const driver = await prisma.driver.findUnique({
+        where: { id: req.session.userId },
+        include: {
+          _count: { select: { rides: true } }
+        }
+      });
+
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      // Get today's stats
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const todayRides = await prisma.ride.findMany({
+        where: {
+          driverId: req.session.userId,
+          status: "COMPLETED",
+          createdAt: { gte: today }
+        },
+        select: { fareEstimate: true }
+      });
+
+      const todayEarnings = todayRides.reduce((sum, ride) => {
+        const fare = ride.fareEstimate || 0;
+        return sum + (fare * 0.85); // 85% to driver
+      }, 0);
+
+      res.json({
+        todayEarnings,
+        todayTrips: todayRides.length,
+        rating: driver.averageRating,
+        totalTrips: driver._count.rides
+      });
+    } catch (error) {
+      console.error("Error fetching driver stats:", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  // GPS log for safety tracking (light tracking every 5-8 seconds)
+  app.post("/api/driver/gps-log", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const { rideId, lat, lng, speed, bearing } = req.body;
+
+      if (!rideId || lat === undefined || lng === undefined) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Verify the ride belongs to this driver and is active (en route or in progress)
+      const ride = await prisma.ride.findFirst({
+        where: {
+          id: rideId,
+          driverId: req.session.userId,
+          status: { in: ["DRIVER_EN_ROUTE", "IN_PROGRESS"] }
+        }
+      });
+
+      if (!ride) {
+        return res.status(404).json({ message: "Active ride not found" });
+      }
+
+      await (prisma as any).gpsLog.create({
+        data: {
+          rideId,
+          driverId: req.session.userId,
+          lat,
+          lng,
+          speed: speed || null,
+          bearing: bearing || null
+        }
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error logging GPS:", error);
+      res.status(500).json({ message: "Failed to log GPS" });
+    }
+  });
+
+  // Driver idle GPS logging (when online but no active ride)
+  app.post("/api/driver/idle-gps", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const { lat, lng } = req.body;
+
+      if (lat === undefined || lng === undefined) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Update driver's last known location
+      await prisma.driver.update({
+        where: { id: req.session.userId },
+        data: {
+          lastLocationLat: lat,
+          lastLocationLng: lng,
+          lastLocationUpdatedAt: new Date()
+        }
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error logging idle GPS:", error);
+      res.status(500).json({ message: "Failed to log idle GPS" });
+    }
+  });
+
+  // ==================== DRIVER WALLET ====================
+
+  // Get driver wallet
+  app.get("/api/driver/wallet", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      let wallet = await prisma.wallet.findUnique({
+        where: {
+          ownerId_ownerType: {
+            ownerId: req.session.userId,
+            ownerType: "DRIVER"
+          }
+        },
+        include: {
+          transactions: {
+            orderBy: { createdAt: "desc" },
+            take: 20
+          }
+        }
+      });
+
+      // Create wallet if doesn't exist
+      if (!wallet) {
+        wallet = await prisma.wallet.create({
+          data: {
+            ownerId: req.session.userId,
+            ownerType: "DRIVER",
+            balance: 0,
+            lockedBalance: 0,
+            currency: "NGN"
+          },
+          include: {
+            transactions: true
+          }
+        });
+      }
+
+      res.json(wallet);
+    } catch (error) {
+      console.error("Error fetching driver wallet:", error);
+      res.status(500).json({ message: "Failed to fetch wallet" });
+    }
+  });
+
+  // ==================== DRIVER BANK ACCOUNT ====================
+
+  // Get driver bank account
+  app.get("/api/driver/bank-account", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const bankAccount = await prisma.driverBankAccount.findUnique({
+        where: { driverId: req.session.userId }
+      });
+
+      if (!bankAccount) {
+        return res.json(null);
+      }
+
+      // Mask account number for security
+      const maskedAccountNumber = bankAccount.accountNumber.slice(-4).padStart(
+        bankAccount.accountNumber.length, '*'
+      );
+
+      res.json({
+        ...bankAccount,
+        accountNumber: maskedAccountNumber,
+        fullAccountNumber: undefined // Never expose full number
+      });
+    } catch (error) {
+      console.error("Error fetching bank account:", error);
+      res.status(500).json({ message: "Failed to fetch bank account" });
+    }
+  });
+
+  // Add or update driver bank account
+  app.post("/api/driver/bank-account", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const { bankName, accountNumber, accountName, country } = req.body;
+
+      if (!bankName || !accountNumber || !accountName) {
+        return res.status(400).json({ message: "Bank name, account number, and account name are required" });
+      }
+
+      // Validate account number (basic validation)
+      if (accountNumber.length < 8 || accountNumber.length > 20) {
+        return res.status(400).json({ message: "Invalid account number length" });
+      }
+
+      const bankAccount = await prisma.driverBankAccount.upsert({
+        where: { driverId: req.session.userId },
+        update: {
+          bankName,
+          accountNumber,
+          accountName,
+          country: country || "NG",
+          verified: false // Reset verification on update
+        },
+        create: {
+          driverId: req.session.userId,
+          bankName,
+          accountNumber,
+          accountName,
+          country: country || "NG",
+          verified: false
+        }
+      });
+
+      // Mask account number in response
+      const maskedAccountNumber = bankAccount.accountNumber.slice(-4).padStart(
+        bankAccount.accountNumber.length, '*'
+      );
+
+      console.log(`[BankAccount] Driver ${req.session.userId} updated bank account`);
+
+      res.json({
+        ...bankAccount,
+        accountNumber: maskedAccountNumber
+      });
+    } catch (error) {
+      console.error("Error updating bank account:", error);
+      res.status(500).json({ message: "Failed to update bank account" });
+    }
+  });
+
+  // ==================== DRIVER WITHDRAWAL ====================
+
+  // Request withdrawal
+  app.post("/api/driver/withdraw", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const { amount } = req.body;
+      const driverId = req.session.userId;
+
+      if (typeof amount !== "number" || amount <= 0) {
+        return res.status(400).json({ message: "Invalid withdrawal amount" });
+      }
+
+      // Check for pending withdrawal request
+      const pendingRequest = await prisma.payoutRequest.findFirst({
+        where: {
+          driverId,
+          status: { in: ["PENDING", "APPROVED"] }
+        }
+      });
+
+      if (pendingRequest) {
+        return res.status(400).json({ 
+          message: "You already have a pending withdrawal request. Please wait for it to be processed." 
+        });
+      }
+
+      // Check bank account exists and is verified
+      const bankAccount = await prisma.driverBankAccount.findUnique({
+        where: { driverId }
+      });
+
+      if (!bankAccount) {
+        return res.status(400).json({ message: "Please add a bank account before withdrawing" });
+      }
+
+      // Get driver wallet
+      const wallet = await prisma.wallet.findUnique({
+        where: {
+          ownerId_ownerType: { ownerId: driverId, ownerType: "DRIVER" }
+        }
+      });
+
+      if (!wallet) {
+        return res.status(400).json({ message: "Wallet not found" });
+      }
+
+      // Check available balance (balance - lockedBalance)
+      const availableBalance = wallet.balance;
+      if (amount > availableBalance) {
+        return res.status(400).json({ 
+          message: `Insufficient balance. Available: ${availableBalance.toFixed(2)}` 
+        });
+      }
+
+      // Minimum withdrawal amount
+      const minWithdrawal = 1000; // 1000 NGN minimum
+      if (amount < minWithdrawal) {
+        return res.status(400).json({ 
+          message: `Minimum withdrawal amount is ${minWithdrawal}` 
+        });
+      }
+
+      // Create payout request and lock funds atomically
+      const result = await prisma.$transaction(async (tx) => {
+        // Lock the funds
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            balance: { decrement: amount },
+            lockedBalance: { increment: amount }
+          }
+        });
+
+        // Create payout request
+        const payoutRequest = await tx.payoutRequest.create({
+          data: {
+            driverId,
+            amount,
+            status: "PENDING"
+          }
+        });
+
+        // Create transaction record
+        await tx.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            type: "HOLD",
+            amount: -amount,
+            description: `Withdrawal request - ${amount.toFixed(2)} held for payout`,
+            reference: `WITHDRAW-HOLD-${payoutRequest.id}`
+          }
+        });
+
+        return payoutRequest;
+      });
+
+      console.log(`[Withdrawal] Driver ${driverId} requested withdrawal of ${amount}`);
+
+      res.json({
+        success: true,
+        message: "Withdrawal request submitted successfully",
+        payoutRequest: result
+      });
+    } catch (error) {
+      console.error("Error processing withdrawal:", error);
+      res.status(500).json({ message: "Failed to process withdrawal" });
+    }
+  });
+
+  // Get driver payout history
+  app.get("/api/driver/payouts", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "driver") {
+      return res.status(401).json({ message: "Not authenticated as driver" });
+    }
+
+    try {
+      const payouts = await prisma.payoutRequest.findMany({
+        where: { driverId: req.session.userId },
+        orderBy: { requestedAt: "desc" },
+        take: 50
+      });
+
+      res.json(payouts);
+    } catch (error) {
+      console.error("Error fetching payouts:", error);
+      res.status(500).json({ message: "Failed to fetch payouts" });
+    }
+  });
+
+  // ==================== ADMIN PAYOUT MANAGEMENT ====================
+
+  // Get all payout requests (admin only)
+  app.get("/api/admin/payouts", requireAuth("admin"), async (req, res) => {
+    try {
+      const { status } = req.query;
+
+      const where: any = {};
+      if (status && typeof status === "string") {
+        where.status = status;
+      }
+
+      const payouts = await prisma.payoutRequest.findMany({
+        where,
+        include: {
+          driver: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              phone: true
+            }
+          }
+        },
+        orderBy: { requestedAt: "desc" }
+      });
+
+      // Get bank accounts for all drivers
+      const driverIds = payouts.map(p => p.driverId);
+      const bankAccounts = await prisma.driverBankAccount.findMany({
+        where: { driverId: { in: driverIds } }
+      });
+
+      const bankAccountMap = new Map(bankAccounts.map(ba => [ba.driverId, ba]));
+
+      const payoutsWithBankInfo = payouts.map(p => ({
+        ...p,
+        bankAccount: bankAccountMap.get(p.driverId) ? {
+          bankName: bankAccountMap.get(p.driverId)!.bankName,
+          accountNumber: bankAccountMap.get(p.driverId)!.accountNumber.slice(-4).padStart(10, '*'),
+          accountName: bankAccountMap.get(p.driverId)!.accountName,
+          verified: bankAccountMap.get(p.driverId)!.verified
+        } : null
+      }));
+
+      res.json(payoutsWithBankInfo);
+    } catch (error) {
+      console.error("Error fetching payouts:", error);
+      res.status(500).json({ message: "Failed to fetch payouts" });
+    }
+  });
+
+  // Approve payout request (admin only)
+  app.post("/api/admin/payouts/:id/approve", requireAuth("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.session.userId;
+
+      const payout = await prisma.payoutRequest.findUnique({
+        where: { id },
+        include: { driver: true }
+      });
+
+      if (!payout) {
+        return res.status(404).json({ message: "Payout request not found" });
+      }
+
+      if (payout.status !== "PENDING") {
+        return res.status(400).json({ message: `Cannot approve payout. Status is ${payout.status}` });
+      }
+
+      await prisma.payoutRequest.update({
+        where: { id },
+        data: {
+          status: "APPROVED",
+          processedAt: new Date(),
+          processedBy: adminId
+        }
+      });
+
+      console.log(`[Payout] Admin ${adminId} approved payout ${id} for driver ${payout.driverId}`);
+
+      res.json({
+        success: true,
+        message: "Payout approved. Ready for payment processing."
+      });
+    } catch (error) {
+      console.error("Error approving payout:", error);
+      res.status(500).json({ message: "Failed to approve payout" });
+    }
+  });
+
+  // Reject payout request (admin only)
+  app.post("/api/admin/payouts/:id/reject", requireAuth("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { rejectionReason } = req.body;
+      const adminId = req.session.userId;
+
+      if (!rejectionReason || rejectionReason.trim().length === 0) {
+        return res.status(400).json({ message: "Rejection reason is required" });
+      }
+
+      const payout = await prisma.payoutRequest.findUnique({
+        where: { id }
+      });
+
+      if (!payout) {
+        return res.status(404).json({ message: "Payout request not found" });
+      }
+
+      if (payout.status !== "PENDING" && payout.status !== "APPROVED") {
+        return res.status(400).json({ message: `Cannot reject payout. Status is ${payout.status}` });
+      }
+
+      // Reject and return funds to available balance
+      await prisma.$transaction(async (tx) => {
+        // Update payout status
+        await tx.payoutRequest.update({
+          where: { id },
+          data: {
+            status: "REJECTED",
+            processedAt: new Date(),
+            processedBy: adminId,
+            rejectionReason: rejectionReason.trim()
+          }
+        });
+
+        // Return locked funds to available balance
+        const wallet = await tx.wallet.findUnique({
+          where: {
+            ownerId_ownerType: { ownerId: payout.driverId, ownerType: "DRIVER" }
+          }
+        });
+
+        if (wallet) {
+          await tx.wallet.update({
+            where: { id: wallet.id },
+            data: {
+              balance: { increment: payout.amount },
+              lockedBalance: { decrement: payout.amount }
+            }
+          });
+
+          await tx.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              type: "RELEASE",
+              amount: payout.amount,
+              description: `Withdrawal rejected - funds returned`,
+              reference: `WITHDRAW-REJECT-${id}`
+            }
+          });
+        }
+      });
+
+      console.log(`[Payout] Admin ${adminId} rejected payout ${id}: ${rejectionReason}`);
+
+      res.json({
+        success: true,
+        message: "Payout rejected. Funds returned to driver's available balance."
+      });
+    } catch (error) {
+      console.error("Error rejecting payout:", error);
+      res.status(500).json({ message: "Failed to reject payout" });
+    }
+  });
+
+  // Mark payout as paid (admin only)
+  app.post("/api/admin/payouts/:id/mark-paid", requireAuth("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.session.userId;
+
+      const payout = await prisma.payoutRequest.findUnique({
+        where: { id }
+      });
+
+      if (!payout) {
+        return res.status(404).json({ message: "Payout request not found" });
+      }
+
+      if (payout.status !== "APPROVED") {
+        return res.status(400).json({ message: `Cannot mark as paid. Status is ${payout.status}, expected APPROVED` });
+      }
+
+      // Mark as paid and deduct locked balance
+      await prisma.$transaction(async (tx) => {
+        await tx.payoutRequest.update({
+          where: { id },
+          data: {
+            status: "PAID",
+            processedAt: new Date(),
+            processedBy: adminId
+          }
+        });
+
+        const wallet = await tx.wallet.findUnique({
+          where: {
+            ownerId_ownerType: { ownerId: payout.driverId, ownerType: "DRIVER" }
+          }
+        });
+
+        if (wallet) {
+          await tx.wallet.update({
+            where: { id: wallet.id },
+            data: {
+              lockedBalance: { decrement: payout.amount }
+            }
+          });
+
+          await tx.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              type: "PAYOUT",
+              amount: -payout.amount,
+              description: `Withdrawal completed - paid to bank account`,
+              reference: `WITHDRAW-PAID-${id}`
+            }
+          });
+        }
+      });
+
+      console.log(`[Payout] Admin ${adminId} marked payout ${id} as PAID`);
+
+      res.json({
+        success: true,
+        message: "Payout marked as paid successfully."
+      });
+    } catch (error) {
+      console.error("Error marking payout as paid:", error);
+      res.status(500).json({ message: "Failed to mark payout as paid" });
+    }
+  });
+
+  // Verify bank account (admin only)
+  app.post("/api/admin/bank-accounts/:driverId/verify", requireAuth("admin"), async (req, res) => {
+    try {
+      const { driverId } = req.params;
+      const { verified } = req.body;
+
+      const bankAccount = await prisma.driverBankAccount.findUnique({
+        where: { driverId }
+      });
+
+      if (!bankAccount) {
+        return res.status(404).json({ message: "Bank account not found" });
+      }
+
+      await prisma.driverBankAccount.update({
+        where: { driverId },
+        data: { verified: verified === true }
+      });
+
+      console.log(`[BankAccount] Admin verified bank account for driver ${driverId}: ${verified}`);
+
+      res.json({
+        success: true,
+        message: verified ? "Bank account verified" : "Bank account verification removed"
+      });
+    } catch (error) {
+      console.error("Error verifying bank account:", error);
+      res.status(500).json({ message: "Failed to verify bank account" });
+    }
+  });
+
+  // Director login
+  app.post("/api/director/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const director = await prisma.director.findUnique({ where: { email } });
+      if (!director) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (!director.passwordHash) {
+        return res.status(401).json({ message: "Account not configured for login" });
+      }
+
+      const isValid = await verifyPassword(password, director.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Check verification status first
+      if (!director.isVerified) {
+        return res.status(403).json({ 
+          message: "Account pending verification", 
+          status: "PENDING_VERIFICATION",
+          redirect: "/director/pending-approval"
+        });
+      }
+
+      // Check approval status
+      if (!director.isApproved) {
+        return res.status(403).json({ 
+          message: "Account pending admin approval", 
+          status: "PENDING_APPROVAL",
+          redirect: "/director/pending-approval"
+        });
+      }
+
+      if (director.status === "SUSPENDED") {
+        return res.status(403).json({ message: "Account suspended" });
+      }
+
+      // Set session
+      req.session.userId = director.id;
+      req.session.userRole = "director" as UserRole;
+      req.session.userEmail = director.email;
+
+      res.json({
+        message: "Login successful",
+        user: {
+          id: director.id,
+          fullName: director.fullName,
+          email: director.email,
+          role: director.role,
+          region: director.region,
+          status: director.status,
+          accountRole: "director",
+          isApproved: director.isApproved,
+          isTestAccount: director.isTestAccount
+        }
+      });
+    } catch (error) {
+      console.error("Director login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Director auth check
+  app.get("/api/director/me", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "director") {
+      return res.status(401).json({ message: "Not authenticated as director" });
+    }
+
+    try {
+      const director = await prisma.director.findUnique({
+        where: { id: req.session.userId },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          phone: true,
+          role: true,
+          region: true,
+          status: true,
+          isApproved: true,
+          isTestAccount: true
+        }
+      });
+
+      if (!director) {
+        return res.status(404).json({ message: "Director not found" });
+      }
+
+      res.json({
+        ...director,
+        accountRole: "director"
+      });
+    } catch (error) {
+      console.error("Error fetching director:", error);
+      res.status(500).json({ message: "Failed to fetch director data" });
+    }
+  });
+
+  // Director logout
+  app.post("/api/director/logout", (req, res) => {
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ message: "Logout failed" });
@@ -4217,6 +5985,46 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching active ride:", error);
       res.status(500).json({ message: "Failed to fetch active ride" });
+    }
+  });
+
+  // Get last completed ride for rider (for ride completion page)
+  app.get("/api/rider/last-completed-ride", async (req, res) => {
+    if (!req.session.userId || req.session.userRole !== "rider") {
+      return res.status(401).json({ message: "Not authenticated as rider" });
+    }
+
+    try {
+      const lastCompletedRide = await prisma.ride.findFirst({
+        where: {
+          userId: req.session.userId,
+          status: "COMPLETED"
+        },
+        orderBy: { createdAt: "desc" },
+        include: {
+          driver: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              vehicleType: true,
+              vehiclePlate: true,
+              averageRating: true
+            }
+          },
+          driverRating: true,
+          payment: true
+        }
+      });
+
+      if (!lastCompletedRide) {
+        return res.status(404).json({ message: "No completed ride found" });
+      }
+
+      res.json(lastCompletedRide);
+    } catch (error) {
+      console.error("Error fetching last completed ride:", error);
+      res.status(500).json({ message: "Failed to fetch last completed ride" });
     }
   });
 
@@ -4438,12 +6246,21 @@ export async function registerRoutes(
       }
 
       // Create ride (PRIVATE mode or SHARE mode waiting for match)
+      // Enforce minimum fare to prevent negative margin (from origin/main)
+      let adjustedFare = fareEstimate ? parseFloat(fareEstimate) : null;
+      if (adjustedFare !== null) {
+        const config = await prisma.platformConfig.findFirst();
+        const commissionRate = config?.commissionRate || 0.15;
+        const fareResult = enforceMinimumFare(adjustedFare, commissionRate);
+        adjustedFare = fareResult.adjustedFare;
+      }
+
       let ride = await prisma.ride.create({
         data: {
           userId: req.session.userId,
           pickupLocation,
           dropoffLocation,
-          fareEstimate: fareEstimate || null,
+          fareEstimate: adjustedFare,
           rideMode: mode,
           shareGroupId: shareGroupId,
           maxPassengers: isShareMode ? 2 : 1,
@@ -5239,7 +7056,7 @@ export async function registerRoutes(
         }
 
         const userWallet = await tx.wallet.findUnique({
-          where: { ownerId_ownerType: { ownerId: userId, ownerType: "USER" } }
+          where: { ownerId_ownerType: { ownerId: ride.userId, ownerType: "USER" } }
         });
 
         if (userWallet) {
@@ -5481,12 +7298,14 @@ export async function registerRoutes(
           data: { balance: { increment: amount } }
         });
 
-        await prisma.transaction.create({
+        await prisma.walletTransaction.create({
           data: {
             walletId: driverWallet.id,
             type: "TIP",
             amount,
-            reference: `Tip for ride ${rideId}`
+            tripId: rideId,
+            description: `Tip for ride ${rideId}`,
+            reference: `TIP-${rideId}-${Date.now()}`
           }
         });
       }
@@ -5524,18 +7343,26 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Wallet not found" });
       }
 
+      // Check if rider has locked funds (active trip)
+      if ((wallet as any).lockedBalance > 0) {
+        return res.status(400).json({ 
+          message: "Cannot add funds while you have an active trip. Please complete or cancel your current trip first."
+        });
+      }
+
       // Actually credit the wallet (simulating instant funding for demo)
       await prisma.wallet.update({
         where: { id: wallet.id },
         data: { balance: { increment: amount } }
       });
 
-      const transaction = await prisma.transaction.create({
+      const transaction = await prisma.walletTransaction.create({
         data: {
           walletId: wallet.id,
           type: "CREDIT",
           amount,
-          reference: `Wallet top-up via ${method || "card"}`
+          description: `Wallet top-up via ${method || "card"}`,
+          reference: `TOPUP-${wallet.id}-${Date.now()}`
         }
       });
 
@@ -5676,7 +7503,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Wallet not found" });
       }
 
-      const transaction = await prisma.transaction.findFirst({
+      const transaction = await prisma.walletTransaction.findFirst({
         where: {
           id,
           walletId: wallet.id
@@ -5752,11 +7579,19 @@ export async function registerRoutes(
         fare *= surgeMultiplier;
       }
 
-      // Apply minimum fare
+      // Apply country-configured minimum fare
       fare = Math.max(fare, fareConfig.minimumFare);
 
+      // Enforce platform minimum fare to prevent negative margin
+      // MinimumFare = MinimumZibaTake / CommissionRate
+      const commissionRate = fareConfig.platformCommission || 0.15;
+      const minimumFareResult = enforceMinimumFare(fare, commissionRate);
+      
+      // Use the adjusted fare that ensures platform profitability
+      const finalFare = minimumFareResult.adjustedFare;
+
       res.json({
-        fare: Math.round(fare),
+        fare: Math.round(finalFare),
         currency: fareConfig.currency,
         currencySymbol: fareConfig.currencySymbol,
         breakdown: {
@@ -5765,7 +7600,10 @@ export async function registerRoutes(
           timeCharge: duration ? duration * fareConfig.pricePerMinute : 0,
           surgeApplied: fareConfig.surgeEnabled,
           surgeMultiplier: fareConfig.surgeEnabled ? fareConfig.surgeMultiplier : 1.0
-        }
+        },
+        minimumFareEnforced: minimumFareResult.wasAdjusted,
+        platformMinimumFare: minimumFareResult.minimumFare,
+        zibaTake: minimumFareResult.zibaTake
       });
     } catch (error) {
       console.error("Error calculating fare:", error);
@@ -6012,6 +7850,684 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error requesting ride:", error);
       res.status(500).json({ message: "Failed to request ride" });
+    }
+  });
+
+  // ==================== MAP COST PROTECTION ====================
+
+  // Get current map cost protection status
+  app.get("/api/map-cost/protection-status", async (req, res) => {
+    try {
+      // Get today's date
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Get today's metrics
+      let metrics = await (prisma as any).mapCostMetrics.findUnique({
+        where: { date: today }
+      });
+
+      if (!metrics) {
+        metrics = {
+          date: today,
+          mapCost: 0,
+          completedTrips: 0,
+          zibaRevenue: 0,
+          paidMapRequests: 0,
+          totalMapRequests: 0,
+          mapCostPerTrip: 0,
+          paidUsageRate: 0,
+          mapCostRatio: 0,
+          protectionActive: false
+        };
+      }
+
+      const dailyMetrics: DailyMapMetrics = {
+        date: today.toISOString().split('T')[0],
+        mapCost: metrics.mapCost,
+        completedTrips: metrics.completedTrips,
+        zibaRevenue: metrics.zibaRevenue,
+        paidMapRequests: metrics.paidMapRequests,
+        totalMapRequests: metrics.totalMapRequests
+      };
+
+      const computed = computeMapMetrics(dailyMetrics);
+      const protection = getProtectionStatus(computed);
+
+      res.json({
+        metrics: dailyMetrics,
+        computed,
+        protection,
+        targets: MAP_COST_TARGETS,
+        gpsIntervals: {
+          idle: getGpsInterval('IDLE', protection.gpsFrequencyReduced),
+          enRoute: getGpsInterval('EN_ROUTE', protection.gpsFrequencyReduced),
+          inProgress: getGpsInterval('IN_PROGRESS', protection.gpsFrequencyReduced)
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching map cost protection status:", error);
+      res.status(500).json({ message: "Failed to fetch protection status" });
+    }
+  });
+
+  // Record map API usage
+  app.post("/api/map-cost/record", async (req, res) => {
+    try {
+      const { cost, isPaid } = req.body;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Upsert today's metrics
+      const metrics = await (prisma as any).mapCostMetrics.upsert({
+        where: { date: today },
+        create: {
+          date: today,
+          mapCost: cost || 0,
+          paidMapRequests: isPaid ? 1 : 0,
+          totalMapRequests: 1
+        },
+        update: {
+          mapCost: { increment: cost || 0 },
+          paidMapRequests: isPaid ? { increment: 1 } : undefined,
+          totalMapRequests: { increment: 1 }
+        }
+      });
+
+      res.json({ recorded: true, metrics });
+    } catch (error) {
+      console.error("Error recording map cost:", error);
+      res.status(500).json({ message: "Failed to record map cost" });
+    }
+  });
+
+  // Update daily metrics (called on ride completion)
+  app.post("/api/map-cost/update-daily", async (req, res) => {
+    try {
+      const { tripCompleted, revenue } = req.body;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const updateData: any = {};
+      if (tripCompleted) {
+        updateData.completedTrips = { increment: 1 };
+      }
+      if (revenue && revenue > 0) {
+        updateData.zibaRevenue = { increment: revenue };
+      }
+
+      const metrics = await (prisma as any).mapCostMetrics.upsert({
+        where: { date: today },
+        create: {
+          date: today,
+          completedTrips: tripCompleted ? 1 : 0,
+          zibaRevenue: revenue || 0
+        },
+        update: updateData
+      });
+
+      // Recompute ratios
+      const dailyMetrics: DailyMapMetrics = {
+        date: today.toISOString().split('T')[0],
+        mapCost: metrics.mapCost,
+        completedTrips: metrics.completedTrips,
+        zibaRevenue: metrics.zibaRevenue,
+        paidMapRequests: metrics.paidMapRequests,
+        totalMapRequests: metrics.totalMapRequests
+      };
+
+      const computed = computeMapMetrics(dailyMetrics);
+      const protection = getProtectionStatus(computed);
+
+      // Update computed values
+      await (prisma as any).mapCostMetrics.update({
+        where: { date: today },
+        data: {
+          mapCostPerTrip: computed.mapCostPerTrip,
+          paidUsageRate: computed.paidUsageRate,
+          mapCostRatio: computed.mapCostRatio,
+          protectionActive: protection.gpsFrequencyReduced
+        }
+      });
+
+      res.json({ updated: true, computed, protection });
+    } catch (error) {
+      console.error("Error updating daily metrics:", error);
+      res.status(500).json({ message: "Failed to update daily metrics" });
+    }
+  });
+
+  // Admin: Get map cost metrics history
+  app.get("/api/admin/map-cost/history", requireAuth("admin"), async (req, res) => {
+    try {
+      const { days } = req.query;
+      const daysBack = parseInt(days as string) || 30;
+
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysBack);
+      startDate.setHours(0, 0, 0, 0);
+
+      const metrics = await (prisma as any).mapCostMetrics.findMany({
+        where: {
+          date: { gte: startDate }
+        },
+        orderBy: { date: 'desc' }
+      });
+
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching map cost history:", error);
+      res.status(500).json({ message: "Failed to fetch map cost history" });
+    }
+  });
+
+  // Admin: Get/update protection config
+  app.get("/api/admin/map-cost/config", requireAuth("admin"), async (req, res) => {
+    try {
+      let config = await (prisma as any).mapCostProtectionConfig.findFirst();
+
+      if (!config) {
+        config = await (prisma as any).mapCostProtectionConfig.create({
+          data: {}
+        });
+      }
+
+      res.json(config);
+    } catch (error) {
+      console.error("Error fetching map cost config:", error);
+      res.status(500).json({ message: "Failed to fetch map cost config" });
+    }
+  });
+
+  app.patch("/api/admin/map-cost/config", requireAuth("admin"), async (req, res) => {
+    try {
+      const { maxCostPerTrip, maxPaidUsageRate, maxMapCostRatio, criticalMapCostRatio } = req.body;
+
+      let config = await (prisma as any).mapCostProtectionConfig.findFirst();
+
+      if (!config) {
+        config = await (prisma as any).mapCostProtectionConfig.create({
+          data: {
+            maxCostPerTrip: maxCostPerTrip || 0.03,
+            maxPaidUsageRate: maxPaidUsageRate || 0.20,
+            maxMapCostRatio: maxMapCostRatio || 0.015,
+            criticalMapCostRatio: criticalMapCostRatio || 0.02
+          }
+        });
+      } else {
+        config = await (prisma as any).mapCostProtectionConfig.update({
+          where: { id: config.id },
+          data: {
+            maxCostPerTrip: maxCostPerTrip !== undefined ? maxCostPerTrip : config.maxCostPerTrip,
+            maxPaidUsageRate: maxPaidUsageRate !== undefined ? maxPaidUsageRate : config.maxPaidUsageRate,
+            maxMapCostRatio: maxMapCostRatio !== undefined ? maxMapCostRatio : config.maxMapCostRatio,
+            criticalMapCostRatio: criticalMapCostRatio !== undefined ? criticalMapCostRatio : config.criticalMapCostRatio
+          }
+        });
+      }
+
+      res.json(config);
+    } catch (error) {
+      console.error("Error updating map cost config:", error);
+      res.status(500).json({ message: "Failed to update map cost config" });
+    }
+  });
+
+  // ==================== ADMIN PLATFORM SETTINGS ====================
+
+  // Get platform settings (commission rate)
+  app.get("/api/admin/platform-settings", requireAuth("admin"), async (req, res) => {
+    try {
+      let config = await prisma.platformConfig.findFirst();
+
+      if (!config) {
+        config = await prisma.platformConfig.create({
+          data: {
+            commissionRate: 0.15,
+            minCommissionRate: 0.15,
+            maxCommissionRate: 0.18,
+          }
+        });
+      }
+
+      res.json({
+        id: config.id,
+        commissionRate: config.commissionRate,
+        minCommissionRate: config.minCommissionRate,
+        maxCommissionRate: config.maxCommissionRate,
+        updatedAt: config.updatedAt,
+        updatedBy: config.updatedBy,
+      });
+    } catch (error) {
+      console.error("Error fetching platform settings:", error);
+      res.status(500).json({ message: "Failed to fetch platform settings" });
+    }
+  });
+
+  // Update commission rate (admin only)
+  app.post("/api/admin/platform-settings/commission", requireAuth("admin"), async (req, res) => {
+    try {
+      const { commissionRate } = req.body;
+      const adminId = req.session.userId;
+
+      if (typeof commissionRate !== "number") {
+        return res.status(400).json({ message: "Commission rate must be a number" });
+      }
+
+      let config = await prisma.platformConfig.findFirst();
+
+      if (!config) {
+        config = await prisma.platformConfig.create({
+          data: {
+            commissionRate: 0.15,
+            minCommissionRate: 0.15,
+            maxCommissionRate: 0.18,
+          }
+        });
+      }
+
+      const minRate = config.minCommissionRate;
+      const maxRate = config.maxCommissionRate;
+
+      if (commissionRate < minRate || commissionRate > maxRate) {
+        return res.status(400).json({ 
+          message: `Commission rate must be between ${minRate * 100}% and ${maxRate * 100}%` 
+        });
+      }
+
+      const oldRate = config.commissionRate;
+
+      // Update commission rate
+      const updatedConfig = await prisma.platformConfig.update({
+        where: { id: config.id },
+        data: {
+          commissionRate,
+          updatedBy: adminId,
+        }
+      });
+
+      // Create audit log
+      await prisma.commissionAuditLog.create({
+        data: {
+          adminId: adminId!,
+          oldRate,
+          newRate: commissionRate,
+        }
+      });
+
+      console.log(`[PlatformSettings] Commission updated from ${oldRate * 100}% to ${commissionRate * 100}% by admin ${adminId}`);
+
+      res.json({
+        success: true,
+        commissionRate: updatedConfig.commissionRate,
+        message: `Commission rate updated to ${commissionRate * 100}%`,
+      });
+    } catch (error) {
+      console.error("Error updating commission rate:", error);
+      res.status(500).json({ message: "Failed to update commission rate" });
+    }
+  });
+
+  // Get commission audit log
+  app.get("/api/admin/platform-settings/audit-log", requireAuth("admin"), async (req, res) => {
+    try {
+      const logs = await prisma.commissionAuditLog.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching commission audit log:", error);
+      res.status(500).json({ message: "Failed to fetch audit log" });
+    }
+  });
+
+  // ==================== TRUST & SAFETY SYSTEM ====================
+
+  // Submit a report (rider or driver)
+  app.post("/api/report", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { reportedUserId, reportedRole, tripId, category, description } = req.body;
+
+      if (!reportedUserId || !reportedRole || !category || !description) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const validCategories = [
+        "UNSAFE_DRIVING",
+        "RUDE_BEHAVIOR",
+        "PAYMENT_ISSUE",
+        "FRAUD",
+        "HARASSMENT",
+        "VEHICLE_ISSUE",
+        "ROUTE_DEVIATION",
+        "OTHER"
+      ];
+
+      if (!validCategories.includes(category)) {
+        return res.status(400).json({ message: "Invalid report category" });
+      }
+
+      // Verify trip exists and user was part of it (if tripId provided)
+      if (tripId) {
+        const trip = await prisma.ride.findUnique({ where: { id: tripId } });
+        if (!trip) {
+          return res.status(404).json({ message: "Trip not found" });
+        }
+
+        const isParticipant = 
+          (currentUser.role === "rider" && trip.userId === currentUser.id) ||
+          (currentUser.role === "driver" && trip.driverId === currentUser.id);
+
+        if (!isParticipant) {
+          return res.status(403).json({ message: "You were not part of this trip" });
+        }
+      }
+
+      const report = await prisma.userReport.create({
+        data: {
+          reporterId: currentUser.id,
+          reporterRole: currentUser.role,
+          reportedUserId,
+          reportedRole,
+          tripId,
+          category,
+          description,
+        },
+      });
+
+      console.log(`[Report] Created report ${report.id} by ${currentUser.role}:${currentUser.id} against ${reportedRole}:${reportedUserId}`);
+
+      res.status(201).json({ 
+        id: report.id, 
+        message: "Report submitted successfully" 
+      });
+    } catch (error) {
+      console.error("Error creating report:", error);
+      res.status(500).json({ message: "Failed to submit report" });
+    }
+  });
+
+  // Get user's own reports (rider or driver)
+  app.get("/api/my-reports", async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const reports = await prisma.userReport.findMany({
+        where: { reporterId: currentUser.id },
+        orderBy: { createdAt: "desc" },
+      });
+
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      res.status(500).json({ message: "Failed to fetch reports" });
+    }
+  });
+
+  // Admin: Get all reports
+  app.get("/api/admin/reports", requireAuth("admin"), async (req, res) => {
+    try {
+      const { status, category } = req.query;
+
+      const where: any = {};
+      if (status && status !== "ALL") {
+        where.status = status;
+      }
+      if (category && category !== "ALL") {
+        where.category = category;
+      }
+
+      const reports = await prisma.userReport.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+      });
+
+      // Enrich with user/driver details
+      const enrichedReports = await Promise.all(
+        reports.map(async (report) => {
+          let reporter = null;
+          let reported = null;
+
+          if (report.reporterRole === "rider") {
+            reporter = await prisma.user.findUnique({
+              where: { id: report.reporterId },
+              select: { id: true, fullName: true, email: true },
+            });
+          } else if (report.reporterRole === "driver") {
+            reporter = await prisma.driver.findUnique({
+              where: { id: report.reporterId },
+              select: { id: true, fullName: true, email: true },
+            });
+          }
+
+          if (report.reportedRole === "rider") {
+            reported = await prisma.user.findUnique({
+              where: { id: report.reportedUserId },
+              select: { id: true, fullName: true, email: true, status: true, averageRating: true },
+            });
+          } else if (report.reportedRole === "driver") {
+            reported = await prisma.driver.findUnique({
+              where: { id: report.reportedUserId },
+              select: { id: true, fullName: true, email: true, status: true, averageRating: true },
+            });
+          }
+
+          return {
+            ...report,
+            reporter,
+            reported,
+          };
+        })
+      );
+
+      res.json(enrichedReports);
+    } catch (error) {
+      console.error("Error fetching admin reports:", error);
+      res.status(500).json({ message: "Failed to fetch reports" });
+    }
+  });
+
+  // Admin: Review a report
+  app.post("/api/admin/reports/:id/review", requireAuth("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, actionTaken } = req.body;
+      const adminId = (req.session as any).adminId;
+
+      if (!status || !["REVIEWED", "ACTION_TAKEN", "DISMISSED"].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      const report = await prisma.userReport.findUnique({ where: { id } });
+      if (!report) {
+        return res.status(404).json({ message: "Report not found" });
+      }
+
+      const updatedReport = await prisma.userReport.update({
+        where: { id },
+        data: {
+          status,
+          actionTaken,
+          reviewedAt: new Date(),
+          reviewedBy: adminId,
+        },
+      });
+
+      console.log(`[Report] Report ${id} reviewed by admin ${adminId}: ${status}`);
+
+      res.json(updatedReport);
+    } catch (error) {
+      console.error("Error reviewing report:", error);
+      res.status(500).json({ message: "Failed to review report" });
+    }
+  });
+
+  // Admin: Suspend a user or driver
+  app.post("/api/admin/suspend-user", requireAuth("admin"), async (req, res) => {
+    try {
+      const { userId, role, reason } = req.body;
+      const adminId = (req.session as any).adminId;
+
+      if (!userId || !role || !reason) {
+        return res.status(400).json({ message: "userId, role, and reason are required" });
+      }
+
+      if (role === "rider") {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        await prisma.user.update({
+          where: { id: userId },
+          data: { status: "SUSPENDED" },
+        });
+
+        console.log(`[TrustSafety] User ${userId} suspended by admin ${adminId}: ${reason}`);
+      } else if (role === "driver") {
+        const driver = await prisma.driver.findUnique({ where: { id: userId } });
+        if (!driver) {
+          return res.status(404).json({ message: "Driver not found" });
+        }
+
+        await prisma.driver.update({
+          where: { id: userId },
+          data: { status: "SUSPENDED", isOnline: false },
+        });
+
+        console.log(`[TrustSafety] Driver ${userId} suspended by admin ${adminId}: ${reason}`);
+      } else {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      res.json({ message: `${role} suspended successfully` });
+    } catch (error) {
+      console.error("Error suspending user:", error);
+      res.status(500).json({ message: "Failed to suspend user" });
+    }
+  });
+
+  // Admin: Unsuspend a user or driver
+  app.post("/api/admin/unsuspend-user", requireAuth("admin"), async (req, res) => {
+    try {
+      const { userId, role } = req.body;
+      const adminId = (req.session as any).adminId;
+
+      if (!userId || !role) {
+        return res.status(400).json({ message: "userId and role are required" });
+      }
+
+      if (role === "rider") {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        await prisma.user.update({
+          where: { id: userId },
+          data: { status: "ACTIVE" },
+        });
+
+        console.log(`[TrustSafety] User ${userId} unsuspended by admin ${adminId}`);
+      } else if (role === "driver") {
+        const driver = await prisma.driver.findUnique({ where: { id: userId } });
+        if (!driver) {
+          return res.status(404).json({ message: "Driver not found" });
+        }
+
+        await prisma.driver.update({
+          where: { id: userId },
+          data: { status: "ACTIVE" },
+        });
+
+        console.log(`[TrustSafety] Driver ${userId} unsuspended by admin ${adminId}`);
+      } else {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      res.json({ message: `${role} unsuspended successfully` });
+    } catch (error) {
+      console.error("Error unsuspending user:", error);
+      res.status(500).json({ message: "Failed to unsuspend user" });
+    }
+  });
+
+  // Admin: Get trust & safety stats
+  app.get("/api/admin/trust-safety/stats", requireAuth("admin"), async (req, res) => {
+    try {
+      const [
+        openReports,
+        reviewedReports,
+        suspendedUsers,
+        suspendedDrivers,
+        lowRatedDrivers,
+      ] = await Promise.all([
+        prisma.userReport.count({ where: { status: "OPEN" } }),
+        prisma.userReport.count({ where: { status: { in: ["REVIEWED", "ACTION_TAKEN"] } } }),
+        prisma.user.count({ where: { status: "SUSPENDED" } }),
+        prisma.driver.count({ where: { status: "SUSPENDED" } }),
+        prisma.driver.count({ where: { averageRating: { lt: 4.0, gt: 0 } } }),
+      ]);
+
+      res.json({
+        openReports,
+        reviewedReports,
+        suspendedUsers,
+        suspendedDrivers,
+        lowRatedDrivers,
+      });
+    } catch (error) {
+      console.error("Error fetching trust & safety stats:", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  // Admin: Get all ratings
+  app.get("/api/admin/ratings", requireAuth("admin"), async (req, res) => {
+    try {
+      const driverRatings = await prisma.driverRating.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          driver: { select: { id: true, fullName: true, email: true } },
+          ride: { select: { id: true, pickupLocation: true, dropoffLocation: true } },
+        },
+      });
+
+      const userRatings = await prisma.userRating.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          user: { select: { id: true, fullName: true, email: true } },
+          ride: { select: { id: true, pickupLocation: true, dropoffLocation: true } },
+        },
+      });
+
+      res.json({
+        driverRatings: driverRatings.map(r => ({
+          ...r,
+          type: "RIDER_TO_DRIVER",
+        })),
+        userRatings: userRatings.map(r => ({
+          ...r,
+          type: "DRIVER_TO_RIDER",
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching ratings:", error);
+      res.status(500).json({ message: "Failed to fetch ratings" });
     }
   });
 

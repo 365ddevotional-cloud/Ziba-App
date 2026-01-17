@@ -1,0 +1,125 @@
+You are working on the Ziba ride-hailing web app.
+
+GOAL:
+Fix dull colors, enforce a mature premium UI, and add missing ride-completion pages with proper routing for BOTH Rider and Driver.
+
+DO NOT remove any existing features.
+DO NOT delete any files.
+Only ADD or UPDATE where necessary.
+
+────────────────────────
+1) GLOBAL BRAND SYSTEM
+────────────────────────
+Define and enforce these global CSS variables and ensure ALL pages use them:
+
+Primary:
+--ziba-blue: #0A3D62
+--ziba-teal: #1ABC9C
+
+Backgrounds:
+--ziba-dark: #0F172A
+--ziba-surface: #111827
+--ziba-light: #F7F9FB
+
+Text:
+--ziba-text-primary: #FFFFFF
+--ziba-text-secondary: #CBD5E1
+--ziba-text-muted: #94A3B8
+
+Status:
+--ziba-success: #22C55E
+--ziba-warning: #F59E0B
+--ziba-error: #EF4444
+
+Apply them consistently across:
+• Landing page
+• Signup pages
+• Dashboards
+• Cards
+• Buttons
+• Navbar
+• Admin pages
+
+────────────────────────
+2) HERO & CARD POLISH
+────────────────────────
+Update the main hero section to use a premium gradient:
+
+background:
+linear-gradient(135deg, #0A3D62 0%, #0F172A 65%)
+
+Headlines:
+• Bold
+• Slight negative letter-spacing
+• “On Demand” text must use --ziba-teal
+
+Cards:
+• Background: --ziba-surface
+• Border radius: 16px
+• Subtle border: rgba(255,255,255,0.05)
+• Soft shadow for depth
+
+Teal must be used ONLY for:
+• Primary buttons
+• Icons
+• Active states
+• Key highlights
+
+No flat or washed-out backgrounds.
+
+────────────────────────
+3) ADD RIDE COMPLETION PAGES
+────────────────────────
+Create TWO SEPARATE pages:
+
+A) Rider Ride Complete
+Route: /rider/ride-complete
+Shows:
+• Trip summary
+• Distance & duration
+• Fare breakdown
+• Driver info
+• Rating input
+• Tip option
+• “Request New Ride” button
+
+B) Driver Ride Complete
+Route: /driver/ride-complete
+Shows:
+• Earnings
+• Distance & duration
+• Rider rating
+• Status: Completed
+• “Go Online” button
+
+Pages must respect role authorization.
+
+────────────────────────
+4) REGISTER ROUTES (CRITICAL)
+────────────────────────
+Ensure both routes are added to the router:
+
+/rider/ride-complete
+/driver/ride-complete
+
+Fix any “Did you forget to add the page to the router?” errors.
+
+────────────────────────
+5) FLOW INTEGRATION
+────────────────────────
+After a ride is marked COMPLETE:
+• Rider is redirected to /rider/ride-complete
+• Driver is redirected to /driver/ride-complete
+
+────────────────────────
+6) DO NOT TOUCH
+────────────────────────
+• Privacy Policy draft banner
+• Terms of Service draft banner
+• Existing verification logic
+• Admin approval flow
+
+Finish cleanly.
+No placeholders.
+No dull colors.
+Professional, mature, production-ready UI.

@@ -20,12 +20,15 @@ interface Transaction {
   type: string;
   amount: number;
   reference: string | null;
+  description: string | null;
   createdAt: string;
 }
 
 interface WalletData {
   id: string;
   balance: number;
+  lockedBalance: number;
+  currency: string;
   transactions: Transaction[];
 }
 
@@ -56,12 +59,17 @@ export default function RiderWallet() {
         return <ArrowUpRight className="w-4 h-4 text-red-500" />;
       case "TIP":
         return <DollarSign className="w-4 h-4 text-yellow-500" />;
+      case "HOLD":
+        return <WalletIcon className="w-4 h-4 text-amber-500" />;
+      case "RELEASE":
+        return <WalletIcon className="w-4 h-4 text-blue-500" />;
       default:
         return <CreditCard className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
-  const getTransactionLabel = (type: string) => {
+  const getTransactionLabel = (type: string, description?: string | null) => {
+    if (description) return description;
     switch (type) {
       case "CREDIT":
         return "Added to wallet";
@@ -71,6 +79,10 @@ export default function RiderWallet() {
         return "Ride payment";
       case "TIP":
         return "Tip to driver";
+      case "HOLD":
+        return "Funds held for trip";
+      case "RELEASE":
+        return "Funds released";
       default:
         return type.replace(/_/g, " ");
     }
@@ -105,8 +117,13 @@ export default function RiderWallet() {
               <CardContent className="p-6 text-center">
                 <p className="text-sm text-primary-foreground/80 mb-2">Available Balance</p>
                 <p className="text-4xl font-bold text-primary-foreground" data-testid="text-balance">
-                  NGN {wallet.balance.toLocaleString()}
+                  {wallet.currency} {wallet.balance.toLocaleString()}
                 </p>
+                {wallet.lockedBalance > 0 && (
+                  <p className="text-sm text-primary-foreground/70 mt-2" data-testid="text-locked-balance">
+                    {wallet.currency} {wallet.lockedBalance.toLocaleString()} held for active trip
+                  </p>
+                )}
                 <div className="flex justify-center gap-3 mt-6">
                   <Link href="/rider/wallet/add-funds">
                     <Button
@@ -170,7 +187,7 @@ export default function RiderWallet() {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-foreground">
-                              {getTransactionLabel(tx.type)}
+                              {getTransactionLabel(tx.type, tx.description)}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {formatDate(tx.createdAt)}

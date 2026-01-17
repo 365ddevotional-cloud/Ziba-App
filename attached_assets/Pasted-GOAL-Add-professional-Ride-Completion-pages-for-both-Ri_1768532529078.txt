@@ -1,0 +1,110 @@
+GOAL:
+Add professional Ride Completion pages for both Rider and Driver after a trip ends, with clear status, summary, and next actions.
+
+DO NOT delete or break existing ride flow.
+
+────────────────────────
+1️⃣ ROUTES TO ADD
+────────────────────────
+Create these routes:
+
+- /ride/complete/rider
+- /ride/complete/driver
+
+Ensure both routes are registered in the router.
+
+────────────────────────
+2️⃣ SHARED DATA MODEL
+────────────────────────
+Both pages must consume the same completed ride object:
+
+Ride {
+  id
+  pickupLocation
+  dropoffLocation
+  distance
+  duration
+  fare
+  paymentMethod
+  riderName
+  driverName
+  vehicle
+  completedAt
+  rating (optional)
+}
+
+────────────────────────
+3️⃣ RIDER COMPLETION PAGE
+(/ride/complete/rider)
+────────────────────────
+UI CONTENT:
+- Success icon (teal check)
+- Title: “Ride Completed”
+- Driver name + vehicle info
+- Pickup → Dropoff summary
+- Distance & duration
+- Total fare
+- Payment method
+- Timestamp
+
+ACTIONS:
+- ⭐ Rate Driver (1–5 stars)
+- 💬 Leave optional feedback
+- 🚗 Book Another Ride (go to /rider/home)
+- 🧾 View Ride History
+
+STYLE:
+- Use Ziba brand colors
+- Card-based layout
+- Primary action button = teal
+- Smooth fade-in animation
+
+────────────────────────
+4️⃣ DRIVER COMPLETION PAGE
+(/ride/complete/driver)
+────────────────────────
+UI CONTENT:
+- Success icon
+- Title: “Trip Finished”
+- Rider name
+- Pickup → Dropoff summary
+- Distance & duration
+- Earnings from ride
+- Timestamp
+
+ACTIONS:
+- ⭐ Rate Rider
+- 💬 Report an issue (optional)
+- 🟢 Go Online / Accept Next Ride
+- 📊 View Earnings Summary
+
+STYLE:
+- Same design language as rider
+- Earnings amount highlighted
+- Green/teal success accent
+
+────────────────────────
+5️⃣ FLOW INTEGRATION (CRITICAL)
+────────────────────────
+When a driver clicks “End Ride”:
+- Mark ride.status = COMPLETED
+- Save completedAt timestamp
+- Redirect:
+  - Rider → /ride/complete/rider
+  - Driver → /ride/complete/driver
+
+Ensure page reload works (no blank screen).
+
+────────────────────────
+6️⃣ SAFETY CHECKS
+────────────────────────
+- Prevent access if ride not completed
+- Show error message if ride data missing
+- Do NOT allow editing completed rides
+
+────────────────────────
+RESULT:
+Both Rider and Driver clearly see a polished, professional “Ride Completed” experience similar to Uber/Bolt quality.
+
+DO NOT modify colors, auth logic, or existing pages.
+ONLY ADD COMPLETION FLOW.

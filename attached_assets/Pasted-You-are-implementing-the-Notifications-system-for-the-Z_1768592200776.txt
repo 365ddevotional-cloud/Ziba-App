@@ -1,0 +1,97 @@
+You are implementing the Notifications system for the Ziba ride-hailing platform.
+
+GOAL:
+Create a unified notification system that supports:
+- In-app notifications
+- Push-ready architecture (Firebase/Expo later)
+- Admin announcements
+- System alerts for rides, payments, ratings, and safety
+
+--------------------------------
+1. DATABASE MODEL
+--------------------------------
+
+Notification:
+- id
+- userId
+- role: RIDER | DRIVER | ADMIN
+- type:
+  - RIDE_REQUEST
+  - DRIVER_ASSIGNED
+  - TRIP_STARTED
+  - TRIP_COMPLETED
+  - PAYMENT_HELD
+  - PAYMENT_RELEASED
+  - PAYOUT_SENT
+  - RATING_RECEIVED
+  - REPORT_STATUS
+  - SYSTEM
+  - ADMIN_ANNOUNCEMENT
+- title
+- message
+- isRead (boolean)
+- createdAt
+
+--------------------------------
+2. SERVER LOGIC (AUTO CREATE NOTIFICATIONS)
+--------------------------------
+
+Trigger notifications when:
+- Driver is matched → DRIVER_ASSIGNED
+- Trip starts → TRIP_STARTED
+- Trip completes → TRIP_COMPLETED
+- Fare held → PAYMENT_HELD
+- Fare settled → PAYMENT_RELEASED
+- Driver payout → PAYOUT_SENT
+- Rating received → RATING_RECEIVED
+- Report reviewed → REPORT_STATUS
+
+--------------------------------
+3. API ENDPOINTS
+--------------------------------
+
+GET /api/notifications
+- Returns notifications for logged-in user
+- Sorted newest first
+
+POST /api/notifications/read
+- Marks one or all notifications as read
+
+POST /api/admin/announcement
+- Admin-only
+- Sends notification to:
+  - All users
+  - Riders only
+  - Drivers only
+
+--------------------------------
+4. UI REQUIREMENTS
+--------------------------------
+
+Rider / Driver:
+- Notification bell icon
+- Unread badge count
+- Click notification → deep link to relevant page
+
+Admin:
+- Announcement composer
+- Notification history view
+
+--------------------------------
+5. SECURITY RULES
+--------------------------------
+
+- Users can only read their own notifications
+- Admin announcements logged
+- Notifications immutable after creation
+- Push delivery optional (future-ready)
+
+--------------------------------
+END RESULT
+--------------------------------
+
+Ziba now has:
+- In-app notifications
+- System alerts
+- Admin announcements
+- Push-ready architecture

@@ -1,54 +1,57 @@
 # Ziba - Ride-Hailing Platform
 
-## Stage 17 Complete - Payments, Wallet, Tips + Safe Test Mode
-
 ## Overview
-Ziba is a ride-hailing and logistics platform, similar to Uber, designed to connect users with drivers for transportation services. The project is now production-ready, featuring a dynamic fare control system, advanced authentication with role-based access control, and comprehensive production hardening. Ziba aims to provide a robust, scalable, and user-friendly platform for ride-hailing operations across multiple countries, with a focus on efficient logistics, fair pricing, and comprehensive administrative oversight. The platform supports various user roles including users, drivers, directors, and administrators, each with tailored functionalities and access levels.
+Ziba is a production-ready ride-hailing and logistics platform, akin to Uber, designed to connect users with drivers for transportation services. It features dynamic fare control, advanced authentication with role-based access, and comprehensive production hardening. The platform aims to be a robust, scalable, and user-friendly solution for ride-hailing operations across multiple countries, emphasizing efficient logistics, fair pricing, and extensive administrative oversight. It supports various user roles, including riders, drivers, directors, and administrators, each with customized functionalities and access levels.
 
 ## User Preferences
 I want to ensure all changes are thoroughly reviewed. Please ask for confirmation before implementing any significant changes or new features. I prefer clear, concise explanations and detailed documentation for any new modules or complex logic introduced.
 
 ## System Architecture
-The Ziba platform is built with a modern web development stack:
-- **Frontend**: Developed using React, Vite, and TypeScript, providing a responsive and interactive user interface. Styling is handled with Tailwind CSS, augmented by Shadcn UI components for a polished design. The UI/UX emphasizes a professional, Uber-like aesthetic with a dark blue primary color, Inter font family, and mobile-first responsive design. Dark mode is the default, with a toggle for light mode.
-- **Backend**: Implemented with Node.js and Express, providing a robust API layer.
-- **Database**: PostgreSQL is used as the primary data store, with Prisma ORM facilitating seamless database interactions and schema management.
-- **Authentication**: Features `bcrypt` for secure password hashing and `express-session` with a PostgreSQL store for session management. Currently configured for **ADMIN-ONLY** login at `/admin/login`. Founder admin account: `founder@ziba.app` (auto-created on server start if no admins exist). All admin routes are protected by AdminGuard requiring ADMIN role. User, Driver, and Director logins are disabled pending future implementation. Test account impersonation system allows admin to login as any test account for development testing.
-- **Production Hardening (Stage 16)**: 
-    - Admin bootstrap permanently disabled - no backdoors, no magic passwords, no auto-reset logic
-    - Authentication relies solely on stored database credentials
-    - Compute costs optimized by removing all refetchInterval polling
-    - Debug routes and test account login blocked in production via NODE_ENV checks
-    - Play Store preparation checklist created (PLAY_STORE_CHECKLIST.md)
-    - Play Store Checklist admin page at `/admin/playstore-checklist` with real-time readiness verification
-- **Payments & Wallet (Stage 17)**:
-    - Tips system (Uber-style) with preset percentages (5%, 10%, 15%, 20%) or custom amounts
-    - Tips go 100% to driver with separate wallet credit
-    - Payment gateway abstraction supporting SANDBOX and LIVE modes
-    - Supported providers: Stripe (international), Paystack/Flutterwave (Africa-ready)
-    - TEST_MODE toggle in Admin UI - controls test account behavior
-    - Test accounts only work when Test Mode is ON
-    - No real money moves in SANDBOX mode
-- **Core Features**:
-    - **User and Driver Management**: Comprehensive CRUD operations for users and drivers, including status management, online/offline toggling for drivers, and rating systems.
-    - **Ride Management**: End-to-end ride lifecycle management from request to completion, including driver assignment, ride status tracking, and automatic wallet transactions upon ride completion.
-    - **Dynamic Fare Control System**: Implemented with a `FareConfig` model allowing country-specific pricing (base fare, per KM, per minute), commission splits, and advanced smart pricing features like surge pricing, weather, and traffic multipliers with configurable caps.
-    - **Wallet and Payment System**: Integrated wallet system for users and drivers, handling ride payments, commissions, and driver payouts. User wallets start with a default balance, and ride completion automatically debits user wallets and credits driver wallets minus commission.
-    - **Notifications**: Real-time notification system for ride events and wallet updates, with unread counts and mark-as-read functionalities.
-    - **Admin Dashboard**: A comprehensive administrative interface for managing users, drivers, directors, rides, payments, incentives, wallets, platform configurations, and analytics. It includes platform statistics and director performance metrics.
-    - **Multi-country Currency Support**: Global support with dynamic currency formatting using `Intl.NumberFormat` and a country selector, with settings persisting locally.
-    - **Test Login Manager**: An admin-only tool for generating and managing test accounts with "Login As" functionality for development and testing environments. This feature is production-guarded.
+The Ziba platform is built using a modern web development stack.
+
+**Frontend:**
+- **Technology**: React, Vite, TypeScript.
+- **Styling**: Tailwind CSS with Shadcn UI components.
+- **UI/UX**: Professional, Uber-like aesthetic with a dark blue primary color, Inter font family, and mobile-first responsive design. Dark mode is default with a light mode toggle.
+
+**Backend:**
+- **Technology**: Node.js and Express.
+- **Database**: PostgreSQL with Prisma ORM.
+
+**Authentication:**
+- **Security**: `bcrypt` for password hashing, `express-session` for session management.
+- **Multi-Role System**: Unified signup at `/signup` for Rider, Driver, and Director roles. Rider accounts are active immediately. Driver and Director accounts require admin verification/approval.
+- **Role-Aware Login**: Specific login endpoints for Rider, Driver, and Director, with access restrictions based on verification/approval status.
+- **Access Control**: Role-based access for API routes (e.g., `/api/admin/*` requires ADMIN role).
+- **Test Accounts**: Admin tool for test account generation and "Login As" functionality (production-guarded).
+
+**Core Features:**
+- **Ride Management**: End-to-end lifecycle from request to completion, including driver assignment, status tracking, and automatic wallet transactions.
+- **Trip State Machine**: Defines strict, forward-only transitions for trip statuses (`REQUESTED` → `DRIVER_ASSIGNED` → `DRIVER_ARRIVED` → `IN_PROGRESS` → `COMPLETED` → `SETTLED`). Role-based guards and business logic hooks are integrated into transitions (e.g., fare locking at `IN_PROGRESS`, fraud detection at `COMPLETED`). Settled trips are immutable.
+- **Dynamic Fare Control**: `FareConfig` model supports country-specific pricing (base, per KM/minute), commission splits, and smart pricing (surge, weather, traffic multipliers) with configurable caps.
+- **Admin-Controlled Commission**: Configurable platform commission rate (15-18%) managed via Platform Settings page. Changes are audited with `CommissionAuditLog`, only affect future trips, and are applied at settlement. Each settled trip stores `platformCommissionRate`, `platformCommissionAmount`, and `driverPayoutAmount`.
+- **Minimum Fare Logic**: Ensures no trip generates negative margin for Ziba by automatically adjusting fares below a calculated minimum based on operational costs and commission rates.
+- **Wallet and Payment System**: Integrated user and driver wallets handling payments, commissions, and payouts. Supports tipping.
+- **Hybrid Maps System**: Uses optimized GPS tracking frequencies based on driver status (idle, en route, in-trip). No in-app turn-by-turn navigation; "Navigate" button opens external Google Maps via deep links.
+- **Map Cost Protection**: System to monitor and control map API costs. Tracks metrics like `MapCostPerTrip` and `MapCostRatio`, implementing protective actions (e.g., reduced GPS frequency, disabling paid autocomplete) if cost thresholds are exceeded.
+- **Fraud Detection**: Flags trips for review and holds payouts based on discrepancies between estimated vs. actual distance/time, GPS anomalies (jumps, looping), and mid-trip idleness.
+- **Notifications**: Real-time system for ride events and wallet updates.
+- **Admin Dashboard**: Comprehensive interface for managing users, drivers, directors, rides, payments, configurations, and analytics. Includes Play Store checklist verification.
+- **Multi-country Currency Support**: Global support with `Intl.NumberFormat` for dynamic currency formatting.
+- **Brand Design System**: Defined color palette (Deep Royal Blue, Emerald Teal), typography (Inter), and UI component styling for a consistent, professional brand identity.
+- **Production Hardening**: Idempotent admin bootstrapping, secure password hashing, optimized compute costs, and production-guarded debug routes.
 
 ## External Dependencies
-- **PostgreSQL**: Relational database for all persistent data.
-- **Prisma ORM**: Database toolkit for Node.js and TypeScript.
-- **React**: Frontend JavaScript library for building user interfaces.
+- **PostgreSQL**: Primary database.
+- **Prisma ORM**: Database toolkit.
+- **React**: Frontend library.
 - **Vite**: Frontend build tool.
-- **TypeScript**: Superset of JavaScript that adds static types.
-- **Node.js**: JavaScript runtime for the backend server.
-- **Express**: Web application framework for Node.js.
-- **Tailwind CSS**: Utility-first CSS framework for styling.
-- **Shadcn UI**: Reusable UI components.
-- **Bcrypt**: Library for hashing passwords.
-- **Express-session**: Middleware for managing user sessions.
-- **Intl.NumberFormat**: JavaScript API for locale-sensitive number formatting (used for currency display).
+- **TypeScript**: Static type checking.
+- **Node.js**: Backend runtime.
+- **Express**: Backend framework.
+- **Tailwind CSS**: Styling framework.
+- **Shadcn UI**: UI component library.
+- **Bcrypt**: Password hashing.
+- **Express-session**: Session management.
+- **Stripe**: Payment gateway (international).
+- **Paystack/Flutterwave**: Payment gateways (Africa-ready).

@@ -1,0 +1,140 @@
+You are implementing the Driver Onboarding & Verification system for the Ziba ride-hailing platform.
+
+GOAL:
+Introduce a secure, admin-controlled driver onboarding process with document upload, verification states, and access gating.
+
+STRICT RULES:
+- Drivers CANNOT accept rides until fully verified
+- Only ADMIN can approve or reject drivers
+- Driver verification status must be enforced server-side
+- No bypass from client UI
+
+--------------------------------
+1. DRIVER VERIFICATION STATES
+--------------------------------
+
+Add DriverVerificationStatus enum:
+- UNVERIFIED
+- PENDING_REVIEW
+- APPROVED
+- REJECTED
+- SUSPENDED
+
+Default state after signup: UNVERIFIED
+
+--------------------------------
+2. DATABASE MODELS
+--------------------------------
+
+DriverProfile:
+- driverId
+- verificationStatus
+- rejectionReason (nullable)
+- verifiedAt (nullable)
+- verifiedBy (adminId, nullable)
+
+DriverDocuments:
+- id
+- driverId
+- type:
+  - ID_CARD
+  - DRIVER_LICENSE
+  - VEHICLE_PAPERS
+  - PROFILE_PHOTO
+- fileUrl
+- uploadedAt
+- status: PENDING | APPROVED | REJECTED
+
+--------------------------------
+3. DRIVER API (ONBOARDING)
+--------------------------------
+
+POST /api/driver/onboarding/start
+- Sets verificationStatus → PENDING_REVIEW
+
+POST /api/driver/documents/upload
+- Upload driver documents
+- Store securely
+- Mark document status = PENDING
+
+GET /api/driver/onboarding/status
+- Returns verificationStatus + missing documents
+
+--------------------------------
+4. ADMIN API (VERIFICATION CONTROL)
+--------------------------------
+
+GET /api/admin/drivers/pending
+- List drivers awaiting verification
+
+GET /api/admin/drivers/{driverId}
+- View driver profile + documents
+
+POST /api/admin/drivers/{driverId}/approve
+- verificationStatus → APPROVED
+- verifiedAt timestamp
+- verifiedBy adminId
+
+POST /api/admin/drivers/{driverId}/reject
+- verificationStatus → REJECTED
+- Requires rejectionReason
+
+POST /api/admin/drivers/{driverId}/suspend
+- verificationStatus → SUSPENDED
+- Requires reason
+
+--------------------------------
+5. ACCESS ENFORCEMENT (CRITICAL)
+--------------------------------
+
+- Only APPROVED drivers may:
+  - Go ONLINE
+  - Receive ride requests
+  - Accept trips
+
+- If verificationStatus != APPROVED:
+  - Block ride APIs with HTTP 403
+  - Show clear UI message:
+    “Your account is pending verification”
+
+--------------------------------
+6. DRIVER UI
+--------------------------------
+
+Driver Onboarding Page:
+- Progress checklist:
+  - Upload ID
+  - Upload License
+  - Upload Vehicle Papers
+  - Upload Profile Photo
+- Status badges (Pending / Approved / Rejected)
+- Rejection reason display (if any)
+
+--------------------------------
+7. ADMIN UI
+--------------------------------
+
+Admin → Driver Verification Dashboard:
+- Pending drivers list
+- Document preview
+- Approve / Reject buttons
+- Audit log display
+
+--------------------------------
+8. SECURITY & AUDIT
+--------------------------------
+
+- Store documents securely (no public URLs)
+- Log all admin actions
+- Prevent document deletion after approval
+- No client-side status mutation
+
+--------------------------------
+END RESULT
+--------------------------------
+
+Ziba now has:
+- Safe driver onboarding
+- KYC-lite verification
+- Admin approval control
+- Production-ready trust gating
