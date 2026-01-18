@@ -93,7 +93,7 @@ export default function AdminLoginPage() {
                   className="bg-ziba-dark border-ziba-border text-ziba-text-primary placeholder:text-ziba-text-secondary focus:border-ziba-accent"
                   style={{
                     color: "#F9FAFB", // --ziba-text-primary - explicit text color for password dots
-                    caretColor: "#14B8A6", // --ziba-accent - explicit caret/cursor color
+                    caretColor: "#1ABC9C", // --ziba-accent - explicit caret/cursor color
                     WebkitTextFillColor: "#F9FAFB", // Safari/Chrome password field fix - ensures dots are visible
                   }}
                   data-testid="input-admin-password"
