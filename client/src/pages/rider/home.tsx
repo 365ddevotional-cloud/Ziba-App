@@ -83,7 +83,7 @@ export default function RiderHome() {
               className="w-full h-12" 
               data-testid="button-view-ride"
               onClick={() => {
-                // In demo mode, ensure trip exists before navigating
+                // In demo mode, ensure trip exists and is persisted before navigating
                 const isDemoMode = process.env.NODE_ENV === "development";
                 if (isDemoMode && !currentTrip && !activeRide) {
                   // Create demo trip if missing
@@ -105,8 +105,16 @@ export default function RiderHome() {
                       escrowHeld: true,
                     },
                   };
+                  // Persist to localStorage FIRST (using same key as TripProvider)
+                  try {
+                    localStorage.setItem("ziba_demo_trip", JSON.stringify(demoTrip));
+                  } catch (error) {
+                    console.warn("[Home] Failed to persist demo trip:", error);
+                  }
+                  // THEN inject into context
                   setCurrentTrip(demoTrip);
                 }
+                // Navigate only after trip is persisted
                 navigate("/rider/active-ride");
               }}
             >

@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { useTrip, TripStatus } from "@/lib/trip-context";
+import { useTrip, TripStatus, TripData } from "@/lib/trip-context";
 import { useWallet, PLATFORM_COMMISSION_RATE } from "@/lib/wallet-context";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -49,8 +49,30 @@ export default function RiderLiveRide() {
   const { currentTrip, updateTripStatus, cancelTrip, canCancel: tripCanCancel, setCurrentTrip } = useTrip();
   const { updateRiderBalance, updateDriverBalance, updatePlatformBalance } = useWallet();
 
-  // DEMO MODE: Add 2-second timeout to API query
+  // DEMO MODE: Hard guard - check localStorage immediately on mount
   const isDemoMode = process.env.NODE_ENV === "development";
+  const [localStorageTripLoaded, setLocalStorageTripLoaded] = useState(false);
+  
+  // CRITICAL: Rehydrate from localStorage on mount (before API calls)
+  useEffect(() => {
+    if (isDemoMode && !currentTrip && typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("ziba_demo_trip");
+        if (stored) {
+          const trip = JSON.parse(stored) as TripData;
+          // Only restore if trip is not in terminal state
+          if (trip.status !== "COMPLETED" && trip.status !== "CANCELLED") {
+            console.log("[Active Ride] Rehydrating demo trip from localStorage");
+            setCurrentTrip(trip);
+            setLocalStorageTripLoaded(true);
+          }
+        }
+      } catch (error) {
+        console.warn("[Active Ride] Failed to rehydrate trip from localStorage:", error);
+      }
+    }
+  }, []); // Run once on mount only
+
   const { data: activeRide, isLoading, refetch, isFetching } = useQuery<Ride | null>({
     queryKey: ["/api/rider/active-ride"],
     staleTime: 1000 * 60,
@@ -358,18 +380,48 @@ export default function RiderLiveRide() {
     }
   }, [tripStatus, isLoading, isDemoMode]);
 
-  // Guard 3: Hard 3-second loading timeout
+  // Guard 3: Hard 1-second loading timeout (per requirements)
   useEffect(() => {
-    if (isLoading && !currentTrip && !activeRide) {
+    if (isLoading && !currentTrip && !activeRide && !demoTripCreated) {
       const timeout = setTimeout(() => {
         setLoadingTimeout(true);
         setSkipLoading(true);
-      }, 3000); // Max 3 seconds
+        // DEMO MODE: Create fallback trip if missing after 1 second
+        if (isDemoMode && !currentTrip && !activeRide) {
+          console.warn("[Demo Kill-Switch] No trip found after 1s, creating demo trip from localStorage fallback");
+          const demoTrip: TripData = {
+            id: `demo-${Date.now()}`,
+            pickupLocation: "Current Location",
+            dropoffLocation: "Destination",
+            distance: 5.2,
+            duration: 12,
+            fare: 2500,
+            status: "CONFIRMED",
+            createdAt: new Date().toISOString(),
+            paymentMethod: "wallet",
+            payment: {
+              fare: 2500,
+              riderPaid: true,
+              driverPaid: false,
+              platformCommission: 375,
+              escrowHeld: true,
+            },
+          };
+          // Persist to localStorage
+          try {
+            localStorage.setItem("ziba_demo_trip", JSON.stringify(demoTrip));
+          } catch (error) {
+            console.warn("[Active Ride] Failed to persist demo trip:", error);
+          }
+          setCurrentTrip(demoTrip);
+          setDemoTripCreated(true);
+        }
+      }, 1000); // Max 1 second per requirements
       return () => clearTimeout(timeout);
     } else {
       setLoadingTimeout(false);
     }
-  }, [isLoading, currentTrip, activeRide]);
+  }, [isLoading, currentTrip, activeRide, demoTripCreated, isDemoMode, setCurrentTrip]);
 
   // Guard 4: Force IN_PROGRESS if stuck at ACCEPTED/CONFIRMED for 2 seconds
   useEffect(() => {

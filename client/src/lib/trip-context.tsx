@@ -49,7 +49,7 @@ interface TripContextType {
 
 const TripContext = createContext<TripContextType | null>(null);
 
-const TRIP_STORAGE_KEY = "ziba_current_trip";
+const TRIP_STORAGE_KEY = "ziba_demo_trip";
 
 // Helper to restore trip from localStorage (demo mode only)
 function restoreTripFromStorage(): TripData | null {
