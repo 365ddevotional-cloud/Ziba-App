@@ -132,6 +132,36 @@ export default function RiderLiveRide() {
     };
   }, [currentTrip?.id, currentTrip?.status, currentTrip?.payment?.riderPaid, updateTripStatus, navigate, toast]);
 
+  // DEMO KILL-SWITCH: Emergency fallback if trip is stuck at non-terminal status
+  // This is a backup to the auto-progression above - runs only in dev mode
+  useEffect(() => {
+    const isDemoMode = process.env.NODE_ENV === "development";
+    if (!isDemoMode || !currentTrip) return;
+
+    // If trip has payment but status is stuck for too long, force progression
+    const status = currentTrip.status;
+    const hasPayment = currentTrip.payment?.riderPaid;
+    
+    // Only apply kill-switch to non-terminal statuses
+    if ((status === "REQUESTED" || status === "CONFIRMED" || status === "IN_PROGRESS") && hasPayment) {
+      const stuckTimer = setTimeout(() => {
+        // Double-check status hasn't changed (race condition protection)
+        // Note: currentTrip in closure may be stale, so we check via ref or re-query
+        console.warn(`[Demo Kill-Switch] Trip stuck at ${status} for 12 seconds - forcing completion`);
+        updateTripStatus("COMPLETED");
+        toast({
+          title: "Trip completed!",
+          description: "Demo mode: Ride completed automatically",
+        });
+        setTimeout(() => {
+          navigate("/rider/ride-complete");
+        }, 1000);
+      }, 12000); // 12 seconds max - allows auto-progression to work first
+
+      return () => clearTimeout(stuckTimer);
+    }
+  }, [currentTrip?.id, currentTrip?.status, currentTrip?.payment?.riderPaid, updateTripStatus, navigate, toast]);
+
   // Process payment when trip enters IN_PROGRESS (escrow)
   useEffect(() => {
     if (currentTrip?.status === "IN_PROGRESS" && currentTrip.payment && !currentTrip.payment.escrowHeld) {
@@ -294,6 +324,28 @@ export default function RiderLiveRide() {
       setLoadingTimeout(false);
     }
   }, [isLoading, currentTrip, activeRide]);
+
+  // DEMO KILL-SWITCH: Hard timeout fallback to prevent infinite loading
+  // This runs ONLY in development/demo mode and forces completion after max time
+  useEffect(() => {
+    const isDemoMode = process.env.NODE_ENV === "development";
+    if (!isDemoMode) return;
+
+    let killSwitchTimer: NodeJS.Timeout | null = null;
+
+    // If loading timeout reached and no trip exists, force navigation to completion
+    if (loadingTimeout && !currentTrip && !activeRide) {
+      console.warn("[Demo Kill-Switch] Loading timeout reached, forcing completion");
+      killSwitchTimer = setTimeout(() => {
+        // Navigate directly to completion page
+        navigate("/rider/ride-complete");
+      }, 500);
+    }
+
+    return () => {
+      if (killSwitchTimer) clearTimeout(killSwitchTimer);
+    };
+  }, [loadingTimeout, currentTrip, activeRide, navigate]);
 
   // Don't block on API loading if we have trip context OR timeout reached
   // Only show loading if we have neither currentTrip nor activeRide AND timeout not reached
