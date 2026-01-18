@@ -6,7 +6,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { createServer as createNetServer } from "net";
-import { bootstrapFounderAdmin } from "./bootstrap";
+import { seedDevAdmin } from "./bootstrap";
 import { ensurePlatformWallet } from "./wallet-service";
 
 const app = express();
@@ -176,8 +176,13 @@ app.use((req, res, next) => {
 // Server initialization - all code executes at runtime (not build time)
 // Environment variables, database connections, and routes are initialized per request
 (async () => {
+  // Log NODE_ENV at startup
+  const nodeEnv = process.env.NODE_ENV || "development";
+  console.log(`[SERVER] Starting in NODE_ENV=${nodeEnv}`);
+  
   try {
-    await bootstrapFounderAdmin();
+    // STEP 3: Seed dev admin (runs AFTER Prisma connects, BEFORE app.listen)
+    await seedDevAdmin();
     await ensurePlatformWallet();
     await registerRoutes(httpServer, app);
 
