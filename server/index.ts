@@ -6,7 +6,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { createServer as createNetServer } from "net";
-import { seedDevAdmin } from "./bootstrap";
+import { seedDevAdmin, verifyDevAdminLogin } from "./bootstrap";
 import { ensurePlatformWallet } from "./wallet-service";
 
 const app = express();
@@ -183,6 +183,12 @@ app.use((req, res, next) => {
   try {
     // STEP 3: Seed dev admin (runs AFTER Prisma connects, BEFORE app.listen)
     await seedDevAdmin();
+    
+    // STEP 6: Verify admin login after seeding
+    if (nodeEnv === "development") {
+      await verifyDevAdminLogin();
+    }
+    
     await ensurePlatformWallet();
     await registerRoutes(httpServer, app);
 
@@ -230,6 +236,34 @@ app.use((req, res, next) => {
     // Determine host binding: use 127.0.0.1 in local dev for consistency, 0.0.0.0 in production
     const isLocalDev = !isProduction && !process.env.REPL_ID;
     const host = isLocalDev ? "127.0.0.1" : "0.0.0.0";
+    
+    // STEP 1: Check port conflicts BEFORE listening (DEV ONLY)
+    if (isLocalDev) {
+      const portInUse = await new Promise<boolean>((resolve) => {
+        const testServer = createNetServer();
+        testServer.once("error", (err: NodeJS.ErrnoException) => {
+          resolve(err.code === "EADDRINUSE");
+        });
+        testServer.once("listening", () => {
+          testServer.close();
+          resolve(false);
+        });
+        testServer.listen(port, host);
+      });
+      
+      if (portInUse) {
+        console.error(`\n❌ PORT CONFLICT: Port ${port} is already in use!`);
+        console.error(`   Backend requires port ${port} in DEV mode.`);
+        console.error(`   On Windows: netstat -ano | findstr :${port}`);
+        console.error(`   Then kill the process: taskkill /F /PID <PID>\n`);
+        process.exit(1);
+      }
+      
+      // Log DEV MODE confirmation
+      console.log("[DEV MODE CONFIRMED]");
+      console.log(`Backend: http://${host}:${port}`);
+      console.log(`Frontend: http://127.0.0.1:5173`);
+    }
     
     // reusePort is not supported on Windows, so only enable it on non-Windows platforms
     const listenOptions: any = {

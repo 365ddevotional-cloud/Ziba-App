@@ -1338,17 +1338,44 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Email and password are required" });
       }
 
+      // STEP 3: Remove ambiguity - detailed logging (DEV ONLY)
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[LOGIN] Incoming email: ${email}`);
+      }
+
       const account = await prisma.admin.findUnique({ where: { email } });
 
       if (!account) {
+        if (process.env.NODE_ENV === "development") {
+          console.log(`[LOGIN] Admin record exists: false`);
+        }
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[LOGIN] Admin record exists: true`);
+      }
+
       if (!account.passwordHash) {
+        if (process.env.NODE_ENV === "development") {
+          console.log(`[LOGIN] Password hash exists: false`);
+        }
         return res.status(401).json({ message: "Account not properly configured" });
       }
 
       const isValid = await verifyPassword(password, account.passwordHash);
+      
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[LOGIN] Password comparison result: ${isValid}`);
+        
+        if (!isValid) {
+          // Log hash sources (truncated) for debugging
+          const storedHashPreview = account.passwordHash.substring(0, 8) + "...";
+          console.log(`[LOGIN] Stored hash: ${storedHashPreview}`);
+          console.error(`[LOGIN] Password mismatch detected!`);
+        }
+      }
+      
       if (!isValid) {
         return res.status(401).json({ message: "Invalid credentials" });
       }

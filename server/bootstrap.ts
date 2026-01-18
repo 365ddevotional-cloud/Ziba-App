@@ -21,47 +21,67 @@ export async function seedDevAdmin(): Promise<void> {
   }
 
   try {
-    // Check if admin already exists
-    const existingAdmin = await prisma.admin.findUnique({
+    // STEP 2: FORCE RESET credentials in DEV (always reset, never skip)
+    // Hash password using bcrypt (saltRounds = 10, same as login verification)
+    const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
+    const hashPreview = hashedPassword.substring(0, 8) + "...";
+
+    // Use upsert to always ensure admin exists with correct credentials
+    const admin = await prisma.admin.upsert({
       where: { email: ADMIN_EMAIL },
+      update: {
+        passwordHash: hashedPassword, // FORCE RESET password in DEV
+      },
+      create: {
+        email: ADMIN_EMAIL,
+        passwordHash: hashedPassword,
+      },
     });
 
-    if (!existingAdmin) {
-      // Admin does NOT exist - create it
-      // Hash password using bcrypt (saltRounds = 10, same as login verification)
-      const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
-
-      await prisma.admin.create({
-        data: {
-          email: ADMIN_EMAIL,
-          passwordHash: hashedPassword,
-        },
-      });
-
-      // Log credentials ONCE when seeding (dev only)
-      console.log("✅ DEV ADMIN SEEDED");
-      console.log(`Email: ${ADMIN_EMAIL}`);
-      console.log(`Password: ${ADMIN_PASSWORD}`);
-    } else {
-      // Admin EXISTS - verify password hash exists
-      if (!existingAdmin.passwordHash) {
-        // Fix if password is missing
-        const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
-        await prisma.admin.update({
-          where: { email: ADMIN_EMAIL },
-          data: { passwordHash: hashedPassword },
-        });
-        console.log("✅ DEV ADMIN SEEDED (password restored)");
-        console.log(`Email: ${ADMIN_EMAIL}`);
-        console.log(`Password: ${ADMIN_PASSWORD}`);
-      } else {
-        console.log("ℹ️ DEV ADMIN ALREADY EXISTS");
-      }
-    }
+    // Log credentials with hash preview (DEV ONLY)
+    console.log("[DEV ADMIN SEEDED]");
+    console.log(`email=${ADMIN_EMAIL}`);
+    console.log(`password=${ADMIN_PASSWORD}`);
+    console.log(`hash=${hashPreview}`);
   } catch (error) {
     // In DEV, we want to know if seed fails
     console.error("[BOOTSTRAP] CRITICAL: Admin seed failed in DEV mode:", error);
     // Don't throw - allow server to start, but log clearly
+  }
+}
+
+/**
+ * Verify admin login after seeding (DEV ONLY)
+ */
+export async function verifyDevAdminLogin(): Promise<boolean> {
+  if (process.env.NODE_ENV !== "development") {
+    return false;
+  }
+
+  try {
+    const testPassword = ADMIN_PASSWORD;
+    const admin = await prisma.admin.findUnique({
+      where: { email: ADMIN_EMAIL },
+    });
+
+    if (!admin || !admin.passwordHash) {
+      console.error("[VERIFY] Admin not found or password missing");
+      return false;
+    }
+
+    const bcrypt = await import("bcryptjs");
+    const isValid = await bcrypt.compare(testPassword, admin.passwordHash);
+
+    if (isValid) {
+      console.log("[DEV ADMIN LOGIN VERIFIED ✅]");
+      return true;
+    } else {
+      console.error("[VERIFY] Password mismatch!");
+      return false;
+    }
+  } catch (error) {
+    console.error("[VERIFY] Login verification failed:", error);
+    return false;
   }
 }
 
