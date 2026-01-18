@@ -28,6 +28,11 @@ export async function bootstrapFounderAdmin(): Promise<void> {
     });
 
     // Verify the password hash works by testing it
+    if (!admin.passwordHash) {
+      console.error("[BOOTSTRAP] ERROR: Admin passwordHash is null after upsert!");
+      return;
+    }
+    
     const passwordIsValid = await bcrypt.compare(ADMIN_PASSWORD, admin.passwordHash);
     
     if (passwordIsValid) {
