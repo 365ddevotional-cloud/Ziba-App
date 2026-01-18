@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -39,11 +40,27 @@ export default function WalletPaymentMethods() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
+  const isDemoMode = process.env.NODE_ENV === "development";
   const { data, isLoading, error } = useQuery<PaymentMethodsData>({
     queryKey: ["/api/rider/payment-methods"],
     staleTime: 1000 * 60,
     retry: 1,
+    // In demo mode, don't block on API - render immediately with empty state
+    ...(isDemoMode && {
+      staleTime: 0,
+    }),
   });
+
+  // DEMO KILL-SWITCH: Skip loading after 2 seconds
+  const [skipLoading, setSkipLoading] = useState(false);
+  useEffect(() => {
+    if (isLoading && isDemoMode) {
+      const timer = setTimeout(() => {
+        setSkipLoading(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, isDemoMode]);
 
   const setDefaultMutation = useMutation({
     mutationFn: async ({ id, type }: { id: string; type: "card" | "bank" }) => {
@@ -93,7 +110,7 @@ export default function WalletPaymentMethods() {
       </header>
 
       <main className="flex-1 p-4 space-y-6">
-        {isLoading ? (
+        {isLoading && !skipLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>

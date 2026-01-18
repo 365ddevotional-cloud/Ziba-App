@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useRiderAuth } from "@/lib/rider-auth";
-import { useTrip } from "@/lib/trip-context";
+import { useTrip, TripData } from "@/lib/trip-context";
 import { useWallet } from "@/lib/wallet-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,7 +31,7 @@ interface RideData {
 export default function RiderHome() {
   const { user } = useRiderAuth();
   const [, navigate] = useLocation();
-  const { currentTrip } = useTrip();
+  const { currentTrip, setCurrentTrip } = useTrip();
   const { getRiderWallet } = useWallet();
 
   const { data: activeRide, isLoading: isLoadingRide } = useQuery<RideData | null>({
@@ -79,12 +79,40 @@ export default function RiderHome() {
               <h1 className="ziba-headline">Ride in progress</h1>
               <p className="ziba-subheadline">You have an active trip</p>
             </div>
-            <Link href="/rider/active-ride">
-              <Button className="w-full h-12" data-testid="button-view-ride">
-                View Ride Status
-                <ChevronRight className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
+            <Button 
+              className="w-full h-12" 
+              data-testid="button-view-ride"
+              onClick={() => {
+                // In demo mode, ensure trip exists before navigating
+                const isDemoMode = process.env.NODE_ENV === "development";
+                if (isDemoMode && !currentTrip && !activeRide) {
+                  // Create demo trip if missing
+                  const demoTrip: TripData = {
+                    id: `demo-${Date.now()}`,
+                    pickupLocation: "Current Location",
+                    dropoffLocation: "Destination",
+                    distance: 5.2,
+                    duration: 12,
+                    fare: 2500,
+                    status: "CONFIRMED",
+                    createdAt: new Date().toISOString(),
+                    paymentMethod: "wallet",
+                    payment: {
+                      fare: 2500,
+                      riderPaid: true,
+                      driverPaid: false,
+                      platformCommission: 375,
+                      escrowHeld: true,
+                    },
+                  };
+                  setCurrentTrip(demoTrip);
+                }
+                navigate("/rider/active-ride");
+              }}
+            >
+              View Ride Status
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
           </div>
         </main>
 

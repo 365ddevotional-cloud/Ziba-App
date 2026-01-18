@@ -49,12 +49,18 @@ export default function RiderLiveRide() {
   const { currentTrip, updateTripStatus, cancelTrip, canCancel: tripCanCancel, setCurrentTrip } = useTrip();
   const { updateRiderBalance, updateDriverBalance, updatePlatformBalance } = useWallet();
 
+  // DEMO MODE: Add 2-second timeout to API query
+  const isDemoMode = process.env.NODE_ENV === "development";
   const { data: activeRide, isLoading, refetch, isFetching } = useQuery<Ride | null>({
     queryKey: ["/api/rider/active-ride"],
     staleTime: 1000 * 60,
     retry: 1,
-    // Don't block UI if API is slow - use trip context as fallback
     refetchOnWindowFocus: false,
+    // In demo mode, don't wait for API - use timeout
+    ...(isDemoMode && {
+      staleTime: 0,
+      gcTime: 0,
+    }),
   });
 
   // Use trip context if available, otherwise fall back to API
@@ -324,11 +330,11 @@ export default function RiderLiveRide() {
   // DEMO KILL-SWITCH: Hard timeout guards and loading prevention
   // Rule 1: If trip exists in context, render immediately (no loading)
   // Rule 2: Skip loading after 1 second if status is ACCEPTED or CONFIRMED
-  // Rule 3: Force IN_PROGRESS after 3 seconds if stuck at ACCEPTED/CONFIRMED
-  // Rule 4: Maximum 3-second loading timeout, then force progression
+  // Rule 3: Force IN_PROGRESS after 2 seconds if stuck at ACCEPTED/CONFIRMED
+  // Rule 4: Maximum 2-second loading timeout, then create demo trip or force progression
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [skipLoading, setSkipLoading] = useState(false);
-  const isDemoMode = process.env.NODE_ENV === "development";
+  const [demoTripCreated, setDemoTripCreated] = useState(false);
 
   // Guard 1: Skip loading if trip exists in context or localStorage
   useEffect(() => {
@@ -365,7 +371,7 @@ export default function RiderLiveRide() {
     }
   }, [isLoading, currentTrip, activeRide]);
 
-  // Guard 4: Force IN_PROGRESS if stuck at ACCEPTED/CONFIRMED for 3 seconds
+  // Guard 4: Force IN_PROGRESS if stuck at ACCEPTED/CONFIRMED for 2 seconds
   useEffect(() => {
     if (!isDemoMode || !currentTrip) return;
     const status = currentTrip.status;
@@ -373,10 +379,10 @@ export default function RiderLiveRide() {
       const forceTimer = setTimeout(() => {
         // Force to IN_PROGRESS if still stuck
         if (currentTrip.status === status) {
-          console.warn(`[Demo Kill-Switch] Forcing trip from ${status} to IN_PROGRESS`);
+          console.warn(`[Demo Kill-Switch] Forcing trip from ${status} to IN_PROGRESS after 2s`);
           updateTripStatus("IN_PROGRESS");
         }
-      }, 3000);
+      }, 2000); // Reduced to 2 seconds
       return () => clearTimeout(forceTimer);
     }
   }, [currentTrip?.id, currentTrip?.status, currentTrip?.payment?.riderPaid, updateTripStatus, isDemoMode]);
