@@ -90,11 +90,11 @@ export default function AdminLoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="bg-ziba-dark border-ziba-border text-ziba-text-primary placeholder:text-ziba-text-secondary focus:border-ziba-accent"
+                  className="bg-white text-gray-900 placeholder-gray-400 border-ziba-border focus:border-ziba-accent"
                   style={{
-                    color: "#F9FAFB", // --ziba-text-primary - explicit text color for password dots
+                    color: "#111827", // Dark text color for visible password dots
                     caretColor: "#1ABC9C", // --ziba-accent - explicit caret/cursor color
-                    WebkitTextFillColor: "#F9FAFB", // Safari/Chrome password field fix - ensures dots are visible
+                    WebkitTextFillColor: "#111827", // Safari/Chrome password field fix - ensures dark dots are visible
                   }}
                   data-testid="input-admin-password"
                 />
