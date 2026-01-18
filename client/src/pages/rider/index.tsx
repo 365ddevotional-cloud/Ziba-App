@@ -17,6 +17,7 @@ import WalletAddCard from "./wallet-add-card";
 import WalletPaymentMethods from "./wallet-payment-methods";
 import WalletTransactionDetail from "./wallet-transaction-detail";
 import CoordinatorHome from "../coordinator/home";
+import RiderRideComplete from "../ride/complete-rider";
 import { Loader2 } from "lucide-react";
 
 function RiderAuthGuard({ children }: { children: React.ReactNode }) {
@@ -159,6 +160,11 @@ export default function RiderApp() {
       <Route path="/rider/support">
         <RiderAuthGuard>
           <RiderSupport />
+        </RiderAuthGuard>
+      </Route>
+      <Route path="/rider/ride-complete">
+        <RiderAuthGuard>
+          <RiderRideComplete />
         </RiderAuthGuard>
       </Route>
       <Route path="/coordinator/home">
