@@ -49,23 +49,72 @@ interface TripContextType {
 
 const TripContext = createContext<TripContextType | null>(null);
 
+const TRIP_STORAGE_KEY = "ziba_current_trip";
+
+// Helper to restore trip from localStorage (demo mode only)
+function restoreTripFromStorage(): TripData | null {
+  if (typeof window === "undefined" || process.env.NODE_ENV !== "development") {
+    return null;
+  }
+  try {
+    const stored = localStorage.getItem(TRIP_STORAGE_KEY);
+    if (stored) {
+      const trip = JSON.parse(stored) as TripData;
+      // Only restore if trip is not in terminal state
+      if (trip.status !== "COMPLETED" && trip.status !== "CANCELLED") {
+        return trip;
+      }
+    }
+  } catch (error) {
+    console.warn("[TripProvider] Failed to restore trip from localStorage:", error);
+  }
+  return null;
+}
+
+// Helper to persist trip to localStorage (demo mode only)
+function persistTripToStorage(trip: TripData | null) {
+  if (typeof window === "undefined" || process.env.NODE_ENV !== "development") {
+    return;
+  }
+  try {
+    if (trip) {
+      localStorage.setItem(TRIP_STORAGE_KEY, JSON.stringify(trip));
+    } else {
+      localStorage.removeItem(TRIP_STORAGE_KEY);
+    }
+  } catch (error) {
+    console.warn("[TripProvider] Failed to persist trip to localStorage:", error);
+  }
+}
+
 export function TripProvider({ children }: { children: ReactNode }) {
   // Dev-only safety assertion: verify TripProvider is mounted
   if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
     console.log("[TripProvider] TripProvider mounted");
   }
   
-  const [currentTrip, setCurrentTrip] = useState<TripData | null>(null);
+  // Restore trip from localStorage on mount (demo mode only)
+  const [currentTrip, setCurrentTripState] = useState<TripData | null>(() => restoreTripFromStorage());
+  
+  // Wrapper to persist changes to localStorage
+  const setCurrentTrip = (trip: TripData | null) => {
+    setCurrentTripState(trip);
+    persistTripToStorage(trip);
+  };
 
   const updateTripStatus = (status: TripStatus) => {
     if (currentTrip) {
-      setCurrentTrip({ ...currentTrip, status });
+      const updated = { ...currentTrip, status };
+      setCurrentTripState(updated);
+      persistTripToStorage(updated);
     }
   };
 
   const cancelTrip = () => {
     if (currentTrip) {
-      setCurrentTrip({ ...currentTrip, status: "CANCELLED" });
+      const updated = { ...currentTrip, status: "CANCELLED" as const };
+      setCurrentTripState(updated);
+      persistTripToStorage(updated);
     }
   };
 
@@ -76,11 +125,13 @@ export function TripProvider({ children }: { children: ReactNode }) {
 
   const assignDriver = (driver: DriverInfo) => {
     if (currentTrip) {
-      setCurrentTrip({
+      const updated = {
         ...currentTrip,
         driver,
-        status: "IN_PROGRESS",
-      });
+        status: "IN_PROGRESS" as const,
+      };
+      setCurrentTripState(updated);
+      persistTripToStorage(updated);
     }
   };
 
@@ -96,19 +147,26 @@ export function TripProvider({ children }: { children: ReactNode }) {
 
   const completeTrip = () => {
     if (currentTrip) {
-      setCurrentTrip({ ...currentTrip, status: "COMPLETED" });
+      const updated = { ...currentTrip, status: "COMPLETED" as const };
+      setCurrentTripState(updated);
+      persistTripToStorage(updated);
       // Clear trip after a delay to allow UI to show completion
       setTimeout(() => {
-        setCurrentTrip(null);
+        setCurrentTripState(null);
+        persistTripToStorage(null);
       }, 3000);
     }
   };
 
+  // Expose setCurrentTrip that persists to localStorage
   return (
     <TripContext.Provider
       value={{
         currentTrip,
-        setCurrentTrip,
+        setCurrentTrip: (trip: TripData | null) => {
+          setCurrentTripState(trip);
+          persistTripToStorage(trip);
+        },
         updateTripStatus,
         cancelTrip,
         canCancel,

@@ -64,27 +64,30 @@ export default function RiderLiveRide() {
   // Show driver info from trip context if available
   const driverInfo = currentTrip?.driver;
 
-  // Demo auto-progression: Auto-advance trip lifecycle after payment
+  // DEMO AUTO-PROGRESSION: Frontend-controlled trip lifecycle (dev mode only)
   // This ensures the demo ALWAYS completes, regardless of backend state
   useEffect(() => {
-    if (!currentTrip) return;
+    const isDemoMode = process.env.NODE_ENV === "development";
+    if (!isDemoMode || !currentTrip) return;
     
-    // Auto-progress if payment is done, regardless of initial status
-    // Handle REQUESTED, ACCEPTED, CONFIRMED -> IN_PROGRESS -> COMPLETED
     const initialStatus = currentTrip.status;
     const hasPayment = currentTrip.payment?.riderPaid;
     
-    // If no payment yet, wait for it (but don't block forever)
-    if (!hasPayment) return;
+    // In demo mode, if payment exists, always progress (even without explicit payment flag)
+    // This handles cases where payment might not be set correctly
+    if (!hasPayment && initialStatus === "COMPLETED") {
+      // Already completed, nothing to do
+      return;
+    }
     
     // Prevent multiple runs
     let isActive = true;
     let timer1: NodeJS.Timeout | null = null;
     let timer2: NodeJS.Timeout | null = null;
 
-    // If already IN_PROGRESS or COMPLETED, skip progression
     if (initialStatus === "IN_PROGRESS") {
-      // Auto-complete if already in progress
+      // Already in progress -> auto-complete after 6 seconds
+      console.log("[Demo Auto-Progression] Trip IN_PROGRESS, completing in 6s");
       timer2 = setTimeout(() => {
         if (!isActive) return;
         updateTripStatus("COMPLETED");
@@ -95,13 +98,19 @@ export default function RiderLiveRide() {
         setTimeout(() => {
           navigate("/rider/ride-complete");
         }, 2000);
-      }, 5000); // 5 seconds if already in progress
+      }, 6000); // 6 seconds ride duration
     } else if (initialStatus === "COMPLETED" || initialStatus === "CANCELLED") {
-      // Already terminal, do nothing
+      // Already terminal, navigate to completion if not already there
+      if (initialStatus === "COMPLETED") {
+        setTimeout(() => {
+          navigate("/rider/ride-complete");
+        }, 1000);
+      }
       return;
     } else {
       // REQUESTED, ACCEPTED, or CONFIRMED -> IN_PROGRESS -> COMPLETED
       // Auto-progress to IN_PROGRESS after 2 seconds
+      console.log(`[Demo Auto-Progression] Trip ${initialStatus}, starting in 2s, completing in 8s total`);
       timer1 = setTimeout(() => {
         if (!isActive) return;
         updateTripStatus("IN_PROGRESS");
@@ -111,7 +120,7 @@ export default function RiderLiveRide() {
         });
       }, 2000);
 
-      // Auto-complete after 7 seconds total (2s to start + 5s ride duration)
+      // Auto-complete after 8 seconds total (2s to start + 6s ride duration)
       timer2 = setTimeout(() => {
         if (!isActive) return;
         updateTripStatus("COMPLETED");
@@ -122,7 +131,7 @@ export default function RiderLiveRide() {
         setTimeout(() => {
           navigate("/rider/ride-complete");
         }, 2000);
-      }, 7000);
+      }, 8000);
     }
 
     return () => {
@@ -312,12 +321,43 @@ export default function RiderLiveRide() {
     },
   });
 
-  // Hard timeout fallback: Never wait more than 3 seconds for loading
+  // DEMO KILL-SWITCH: Hard timeout guards and loading prevention
+  // Rule 1: If trip exists in context, render immediately (no loading)
+  // Rule 2: Skip loading after 1 second if status is ACCEPTED or CONFIRMED
+  // Rule 3: Force IN_PROGRESS after 3 seconds if stuck at ACCEPTED/CONFIRMED
+  // Rule 4: Maximum 3-second loading timeout, then force progression
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const [skipLoading, setSkipLoading] = useState(false);
+  const isDemoMode = process.env.NODE_ENV === "development";
+
+  // Guard 1: Skip loading if trip exists in context or localStorage
+  useEffect(() => {
+    if (currentTrip || activeRide) {
+      setSkipLoading(true);
+      setLoadingTimeout(false);
+      return;
+    }
+    setSkipLoading(false);
+  }, [currentTrip, activeRide]);
+
+  // Guard 2: If status is ACCEPTED or CONFIRMED, skip loading after 1 second
+  useEffect(() => {
+    if (!isDemoMode) return;
+    const status = tripStatus;
+    if ((status === "CONFIRMED" || status === "REQUESTED") && isLoading) {
+      const skipTimer = setTimeout(() => {
+        setSkipLoading(true);
+      }, 1000); // Skip loading after 1 second
+      return () => clearTimeout(skipTimer);
+    }
+  }, [tripStatus, isLoading, isDemoMode]);
+
+  // Guard 3: Hard 3-second loading timeout
   useEffect(() => {
     if (isLoading && !currentTrip && !activeRide) {
       const timeout = setTimeout(() => {
         setLoadingTimeout(true);
+        setSkipLoading(true);
       }, 3000); // Max 3 seconds
       return () => clearTimeout(timeout);
     } else {
@@ -325,31 +365,38 @@ export default function RiderLiveRide() {
     }
   }, [isLoading, currentTrip, activeRide]);
 
-  // DEMO KILL-SWITCH: Hard timeout fallback to prevent infinite loading
-  // This runs ONLY in development/demo mode and forces completion after max time
+  // Guard 4: Force IN_PROGRESS if stuck at ACCEPTED/CONFIRMED for 3 seconds
   useEffect(() => {
-    const isDemoMode = process.env.NODE_ENV === "development";
+    if (!isDemoMode || !currentTrip) return;
+    const status = currentTrip.status;
+    if ((status === "CONFIRMED" || status === "REQUESTED") && currentTrip.payment?.riderPaid) {
+      const forceTimer = setTimeout(() => {
+        // Force to IN_PROGRESS if still stuck
+        if (currentTrip.status === status) {
+          console.warn(`[Demo Kill-Switch] Forcing trip from ${status} to IN_PROGRESS`);
+          updateTripStatus("IN_PROGRESS");
+        }
+      }, 3000);
+      return () => clearTimeout(forceTimer);
+    }
+  }, [currentTrip?.id, currentTrip?.status, currentTrip?.payment?.riderPaid, updateTripStatus, isDemoMode]);
+
+  // Guard 5: If loading timeout and no trip, navigate to completion
+  useEffect(() => {
     if (!isDemoMode) return;
-
-    let killSwitchTimer: NodeJS.Timeout | null = null;
-
-    // If loading timeout reached and no trip exists, force navigation to completion
     if (loadingTimeout && !currentTrip && !activeRide) {
       console.warn("[Demo Kill-Switch] Loading timeout reached, forcing completion");
-      killSwitchTimer = setTimeout(() => {
-        // Navigate directly to completion page
+      setTimeout(() => {
         navigate("/rider/ride-complete");
       }, 500);
     }
+  }, [loadingTimeout, currentTrip, activeRide, navigate, isDemoMode]);
 
-    return () => {
-      if (killSwitchTimer) clearTimeout(killSwitchTimer);
-    };
-  }, [loadingTimeout, currentTrip, activeRide, navigate]);
+  // CRITICAL: Never show loading spinner if trip exists OR skipLoading is true
+  // This makes infinite loading IMPOSSIBLE
+  const shouldShowLoading = isLoading && !currentTrip && !activeRide && !loadingTimeout && !skipLoading;
 
-  // Don't block on API loading if we have trip context OR timeout reached
-  // Only show loading if we have neither currentTrip nor activeRide AND timeout not reached
-  if (isLoading && !currentTrip && !activeRide && !loadingTimeout) {
+  if (shouldShowLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-3">
