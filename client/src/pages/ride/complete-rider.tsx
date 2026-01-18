@@ -126,8 +126,134 @@ export default function RiderRideComplete() {
     },
   });
 
+  // CRITICAL: If receipt exists in localStorage, render immediately (NO LOADING, NO API WAIT)
+  // This is the FIRST check after loading condition
+  if (receipt) {
+    const riderName = receipt.riderName || user?.fullName || "Rider";
+    const tripId = receipt.tripId;
+    const paymentMethod = receipt.paymentMethod;
+    const paymentStatus = receipt.status;
+    const completedAt = receipt.timestamp;
+
+    return (
+      <div className="min-h-screen bg-ziba-bg flex flex-col animate-in fade-in duration-500">
+        <main className="flex-1 p-5 space-y-6 pb-10 max-w-lg mx-auto w-full">
+          <div className="text-center py-8 space-y-5">
+            <div className="w-28 h-28 mx-auto rounded-full flex items-center justify-center bg-ziba-success-subtle ziba-success-glow">
+              <CheckCircle2 className="w-14 h-14 text-ziba-success" strokeWidth={2.5} />
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-ziba-text-primary">Ride Completed</h1>
+              <p className="text-ziba-text-secondary text-lg">
+                {format(new Date(completedAt), "MMM d, yyyy 'at' h:mm a")}
+              </p>
+            </div>
+          </div>
+
+          {/* Payment Receipt Card - Loaded from localStorage */}
+          <Card className="bg-ziba-card border-ziba ziba-glow-border">
+            <CardContent className="p-5 space-y-4">
+              <div className="flex items-center gap-3 pb-3 border-b border-ziba">
+                <FileText className="w-5 h-5 text-ziba-accent" />
+                <h2 className="text-lg font-bold text-ziba-text-primary">Payment Receipt</h2>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-ziba-text-secondary">Rider Name:</span>
+                  <span className="text-ziba-text-primary font-medium">{riderName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-ziba-text-secondary">Trip ID:</span>
+                  <span className="text-ziba-text-primary font-mono text-xs">{tripId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-ziba-text-secondary">Amount:</span>
+                  <span className="text-ziba-text-primary font-bold">
+                    ₦{receipt.amount.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-ziba-text-secondary">Payment Method:</span>
+                  <span className="text-ziba-text-primary font-medium">{paymentMethod}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-ziba">
+                  <span className="text-ziba-text-secondary font-semibold">Status:</span>
+                  <span className="text-ziba-success font-bold">{paymentStatus}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-ziba-card border-ziba">
+            <CardContent className="p-5 space-y-5">
+              <div className="flex items-start gap-4">
+                <div className="w-3.5 h-3.5 rounded-full bg-ziba-success mt-1.5 shrink-0 shadow-lg shadow-green-500/30" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-ziba-text-muted uppercase tracking-wider font-medium mb-1">Pickup</p>
+                  <p className="text-ziba-text-primary font-medium">{receipt.pickupLocation}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-3.5 h-3.5 rounded-full bg-ziba-accent mt-1.5 shrink-0 shadow-lg shadow-teal-500/30" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-ziba-text-muted uppercase tracking-wider font-medium mb-1">Drop-off</p>
+                  <p className="text-ziba-text-primary font-medium">{receipt.dropoffLocation}</p>
+                </div>
+              </div>
+              
+              <div className="pt-5 border-t border-ziba space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-ziba-text-secondary">
+                    <CreditCard className="w-5 h-5" />
+                    <span className="font-medium">Total Fare</span>
+                  </div>
+                  <span className="text-2xl font-bold text-ziba-text-primary">
+                    NGN {receipt.amount.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-ziba-text-secondary">
+                    <CreditCard className="w-5 h-5" />
+                    <span>Payment Method</span>
+                  </div>
+                  <span className="text-ziba-text-primary font-semibold">
+                    {paymentMethod}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-ziba-text-secondary">
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>Payment Status</span>
+                  </div>
+                  <span className="text-ziba-success font-semibold">
+                    {paymentStatus}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-4 pt-6">
+            <Link href="/rider/home">
+              <Button className="w-full h-14 ziba-btn-primary text-base font-semibold" data-testid="button-book-another">
+                <Car className="w-5 h-5 mr-2" />
+                Book Another Ride
+              </Button>
+            </Link>
+            <Link href="/rider/history">
+              <Button variant="outline" className="w-full h-14 ziba-btn-secondary text-base" data-testid="button-view-history">
+                <History className="w-5 h-5 mr-2" />
+                View Ride History
+              </Button>
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   // NEVER show loading if receipt exists in localStorage
-  if (isLoading && !receipt && !displayRide && !isDemoMode) {
+  if (isLoading && !displayRide && !isDemoMode) {
     return (
       <div className="min-h-screen bg-ziba-bg flex items-center justify-center">
         <div className="text-center space-y-4">
