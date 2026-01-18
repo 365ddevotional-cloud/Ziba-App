@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Loader2, LogIn, Shield, Car } from "lucide-react";
+import { Loader2, LogIn, Shield, Car, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const { toast } = useToast();
@@ -83,21 +84,37 @@ export default function AdminLoginPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-ziba-text-primary">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="bg-white text-gray-900 placeholder-gray-400 border-ziba-border focus:border-ziba-accent"
-                  style={{
-                    color: "#111827", // Dark text color for visible password dots
-                    caretColor: "#1ABC9C", // --ziba-accent - explicit caret/cursor color
-                    WebkitTextFillColor: "#111827", // Safari/Chrome password field fix - ensures dark dots are visible
-                  }}
-                  data-testid="input-admin-password"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="bg-white text-gray-900 placeholder-gray-400 border-ziba-border focus:border-ziba-accent pr-10"
+                    style={{
+                      color: "#111827", // Dark text color for visible password/text
+                      caretColor: "#1ABC9C", // --ziba-accent - explicit caret/cursor color
+                      WebkitTextFillColor: "#111827", // Safari/Chrome password field fix - ensures dark text is visible
+                    }}
+                    data-testid="input-admin-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none focus:text-gray-700 transition-colors"
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    data-testid="button-toggle-password"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <Button 
                 type="submit" 
