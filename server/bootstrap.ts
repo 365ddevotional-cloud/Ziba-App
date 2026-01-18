@@ -8,37 +8,34 @@ export async function bootstrapFounderAdmin(): Promise<void> {
   }
 
   try {
-    // Check if founder admin exists, if not create it
-    const existingAdmin = await prisma.admin.findUnique({
-      where: { email: "founder@ziba.app" },
+    const ADMIN_EMAIL = "founder@ziba.app";
+    const ADMIN_PASSWORD = "Ziba-admin-2013";
+    
+    // Hash password using same method as login (bcrypt, 10 rounds)
+    const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
+    
+    // Use upsert to ensure admin exists with correct password (dev mode only)
+    // This will create if not exists, or update password if exists
+    const admin = await prisma.admin.upsert({
+      where: { email: ADMIN_EMAIL },
+      update: {
+        passwordHash: hashedPassword, // Always ensure correct password in dev mode
+      },
+      create: {
+        email: ADMIN_EMAIL,
+        passwordHash: hashedPassword,
+      },
     });
 
-    if (!existingAdmin) {
-      // Password: Ziba-admin-2013
-      const hashedPassword = await bcrypt.hash("Ziba-admin-2013", 10);
-      
-      await prisma.admin.create({
-        data: {
-          email: "founder@ziba.app",
-          passwordHash: hashedPassword,
-        },
-      });
-      
-      console.log("[BOOTSTRAP] Created founder admin: founder@ziba.app (password: Ziba-admin-2013)");
+    // Verify the password hash works by testing it
+    const passwordIsValid = await bcrypt.compare(ADMIN_PASSWORD, admin.passwordHash);
+    
+    if (passwordIsValid) {
+      console.log("[BOOTSTRAP] DEV: Admin user seeded or verified");
+      console.log(`[BOOTSTRAP] Email: ${ADMIN_EMAIL}`);
+      console.log(`[BOOTSTRAP] Password verification: SUCCESS`);
     } else {
-      // Update password if it exists but might be wrong (dev mode only)
-      const testHash = await bcrypt.hash("Ziba-admin-2013", 10);
-      const isValid = await bcrypt.compare("Ziba-admin-2013", existingAdmin.passwordHash || "");
-      
-      if (!isValid) {
-        await prisma.admin.update({
-          where: { email: "founder@ziba.app" },
-          data: { passwordHash: testHash },
-        });
-        console.log("[BOOTSTRAP] Updated founder admin password: founder@ziba.app");
-      } else {
-        console.log("[BOOTSTRAP] Founder admin already exists: founder@ziba.app");
-      }
+      console.error("[BOOTSTRAP] WARNING: Password verification failed after upsert!");
     }
   } catch (error) {
     console.error("[BOOTSTRAP] Error during admin bootstrap:", error);
