@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useRiderAuth } from "@/lib/rider-auth";
 import { useTrip } from "@/lib/trip-context";
+import { loadReceiptFromStorage, DemoReceipt } from "@/lib/demo-completion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,11 +56,19 @@ export default function RiderRideComplete() {
   const [showFeedback, setShowFeedback] = useState(false);
   const isDemoMode = process.env.NODE_ENV === "development";
 
+  // CRITICAL: Load receipt from localStorage FIRST (synchronous, no loading)
+  const [receipt, setReceipt] = useState<DemoReceipt | null>(() => {
+    if (isDemoMode && typeof window !== "undefined") {
+      return loadReceiptFromStorage();
+    }
+    return null;
+  });
+
   const { data: ride, isLoading, isError, error } = useQuery<CompletedRide>({
     queryKey: ["/api/rider/last-completed-ride"],
     staleTime: 1000 * 60,
     retry: false,
-    // In demo mode, don't block on API - use trip context as fallback
+    // In demo mode, don't block on API - use trip context/receipt as fallback
     ...(isDemoMode && {
       staleTime: 0,
     }),
@@ -117,7 +126,8 @@ export default function RiderRideComplete() {
     },
   });
 
-  if (isLoading && !skipLoading && !displayRide) {
+  // NEVER show loading if receipt exists in localStorage
+  if (isLoading && !receipt && !displayRide && !isDemoMode) {
     return (
       <div className="min-h-screen bg-ziba-bg flex items-center justify-center">
         <div className="text-center space-y-4">

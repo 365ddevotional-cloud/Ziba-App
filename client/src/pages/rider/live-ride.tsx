@@ -2,6 +2,8 @@ import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useTrip, TripStatus, TripData } from "@/lib/trip-context";
+import { completeDemoTrip } from "@/lib/demo-completion";
+import { useRiderAuth } from "@/lib/rider-auth";
 import { useWallet, PLATFORM_COMMISSION_RATE } from "@/lib/wallet-context";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -48,6 +50,7 @@ export default function RiderLiveRide() {
   const [, navigate] = useLocation();
   const { currentTrip, updateTripStatus, cancelTrip, canCancel: tripCanCancel, setCurrentTrip } = useTrip();
   const { updateRiderBalance, updateDriverBalance, updatePlatformBalance } = useWallet();
+  const { user } = useRiderAuth();
 
   // DEMO MODE: Hard guard - check localStorage immediately on mount
   const isDemoMode = process.env.NODE_ENV === "development";
@@ -100,6 +103,7 @@ export default function RiderLiveRide() {
     
     const initialStatus = currentTrip.status;
     const hasPayment = currentTrip.payment?.riderPaid;
+    const tripId = currentTrip.id; // Capture trip ID for completion
     
     // In demo mode, if payment exists, always progress (even without explicit payment flag)
     // This handles cases where payment might not be set correctly
@@ -114,31 +118,40 @@ export default function RiderLiveRide() {
     let timer2: NodeJS.Timeout | null = null;
 
     if (initialStatus === "IN_PROGRESS") {
-      // Already in progress -> auto-complete after 6 seconds
-      console.log("[Demo Auto-Progression] Trip IN_PROGRESS, completing in 6s");
+      // Already in progress -> auto-complete after 3 seconds (per requirements)
+      console.log("[Demo Auto-Progression] Trip IN_PROGRESS, completing in 3s");
       timer2 = setTimeout(() => {
-        if (!isActive) return;
-        updateTripStatus("COMPLETED");
-        toast({
-          title: "Trip completed!",
-          description: "Thanks for riding with Ziba",
-        });
-        setTimeout(() => {
-          navigate("/rider/ride-complete");
-        }, 2000);
-      }, 6000); // 6 seconds ride duration
+        if (!isActive || !currentTrip) return;
+        
+        // SINGLE ENTRY POINT: Complete trip synchronously
+        const riderName = user?.fullName || "Rider";
+        // Use trip from closure - it may already be IN_PROGRESS if status changed
+        const tripToComplete = { ...currentTrip, status: "IN_PROGRESS" as const };
+        completeDemoTrip(tripToComplete, riderName);
+        
+        // Update trip status to COMPLETED
+        const completedTrip = { ...currentTrip, status: "COMPLETED" as const };
+        setCurrentTrip(completedTrip);
+        
+        // Navigate immediately - DO NOT wait
+        navigate("/rider/ride-complete");
+      }, 3000); // 3 seconds max per requirements
     } else if (initialStatus === "COMPLETED" || initialStatus === "CANCELLED") {
-      // Already terminal, navigate to completion if not already there
+      // Already terminal, navigate to completion immediately
       if (initialStatus === "COMPLETED") {
-        setTimeout(() => {
-          navigate("/rider/ride-complete");
-        }, 1000);
+        // Ensure receipt exists in localStorage
+        if (currentTrip && typeof window !== "undefined") {
+          const riderName = user?.fullName || "Rider";
+          completeDemoTrip(currentTrip, riderName);
+        }
+        // Navigate immediately
+        navigate("/rider/ride-complete");
       }
       return;
     } else {
       // REQUESTED, ACCEPTED, or CONFIRMED -> IN_PROGRESS -> COMPLETED
       // Auto-progress to IN_PROGRESS after 2 seconds
-      console.log(`[Demo Auto-Progression] Trip ${initialStatus}, starting in 2s, completing in 8s total`);
+      console.log(`[Demo Auto-Progression] Trip ${initialStatus}, starting in 2s, completing in 5s total`);
       timer1 = setTimeout(() => {
         if (!isActive) return;
         updateTripStatus("IN_PROGRESS");
@@ -148,18 +161,23 @@ export default function RiderLiveRide() {
         });
       }, 2000);
 
-      // Auto-complete after 8 seconds total (2s to start + 6s ride duration)
+      // Auto-complete after 5 seconds total (2s to start + 3s ride duration)
       timer2 = setTimeout(() => {
-        if (!isActive) return;
-        updateTripStatus("COMPLETED");
-        toast({
-          title: "Trip completed!",
-          description: "Thanks for riding with Ziba",
-        });
-        setTimeout(() => {
-          navigate("/rider/ride-complete");
-        }, 2000);
-      }, 8000);
+        if (!isActive || !currentTrip) return;
+        
+        // SINGLE ENTRY POINT: Complete trip synchronously
+        const riderName = user?.fullName || "Rider";
+        // Trip should be IN_PROGRESS by now (from timer1), but ensure it
+        const tripToComplete = { ...currentTrip, status: "IN_PROGRESS" as const };
+        completeDemoTrip(tripToComplete, riderName);
+        
+        // Update trip status to COMPLETED
+        const completedTrip = { ...currentTrip, status: "COMPLETED" as const };
+        setCurrentTrip(completedTrip);
+        
+        // Navigate immediately - DO NOT wait
+        navigate("/rider/ride-complete");
+      }, 5000); // 5 seconds total (2s to start + 3s ride duration)
     }
 
     return () => {
