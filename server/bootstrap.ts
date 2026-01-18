@@ -1,49 +1,60 @@
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 
+/**
+ * Deterministic admin seed for DEV MODE ONLY
+ * Ensures founder@ziba.app always exists with known credentials on server start
+ */
 export async function bootstrapFounderAdmin(): Promise<void> {
-  // Only run in development mode
+  // GUARD: Never run in production
   if (process.env.NODE_ENV !== "development") {
     return;
   }
 
+  const ADMIN_EMAIL = "founder@ziba.app";
+  const ADMIN_PASSWORD = "Ziba-admin-2013";
+
   try {
-    const ADMIN_EMAIL = "founder@ziba.app";
-    const ADMIN_PASSWORD = "Ziba-admin-2013";
-    
-    // Hash password using same method as login (bcrypt, 10 rounds)
-    const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
-    
-    // Use upsert to ensure admin exists with correct password (dev mode only)
-    // This will create if not exists, or update password if exists
-    const admin = await prisma.admin.upsert({
+    // Check if admin already exists
+    const existingAdmin = await prisma.admin.findUnique({
       where: { email: ADMIN_EMAIL },
-      update: {
-        passwordHash: hashedPassword, // Always ensure correct password in dev mode
-      },
-      create: {
-        email: ADMIN_EMAIL,
-        passwordHash: hashedPassword,
-      },
     });
 
-    // Verify the password hash works by testing it
-    if (!admin.passwordHash) {
-      console.error("[BOOTSTRAP] ERROR: Admin passwordHash is null after upsert!");
-      return;
-    }
-    
-    const passwordIsValid = await bcrypt.compare(ADMIN_PASSWORD, admin.passwordHash);
-    
-    if (passwordIsValid) {
-      console.log("[BOOTSTRAP] DEV: Admin user seeded or verified");
-      console.log(`[BOOTSTRAP] Email: ${ADMIN_EMAIL}`);
-      console.log(`[BOOTSTRAP] Password verification: SUCCESS`);
+    if (!existingAdmin) {
+      // Admin does NOT exist - create it
+      // Hash password using bcrypt (saltRounds = 10, same as login verification)
+      const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
+
+      await prisma.admin.create({
+        data: {
+          email: ADMIN_EMAIL,
+          passwordHash: hashedPassword,
+        },
+      });
+
+      // Log credentials ONCE when seeding (dev only)
+      console.log("✅ DEV ADMIN SEEDED");
+      console.log(`Email: ${ADMIN_EMAIL}`);
+      console.log(`Password: ${ADMIN_PASSWORD}`);
     } else {
-      console.error("[BOOTSTRAP] WARNING: Password verification failed after upsert!");
+      // Admin EXISTS - just log (no password reset unless hash is missing/corrupt)
+      if (!existingAdmin.passwordHash) {
+        // Only fix if password is missing
+        const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
+        await prisma.admin.update({
+          where: { email: ADMIN_EMAIL },
+          data: { passwordHash: hashedPassword },
+        });
+        console.log("✅ DEV ADMIN SEEDED (password restored)");
+        console.log(`Email: ${ADMIN_EMAIL}`);
+        console.log(`Password: ${ADMIN_PASSWORD}`);
+      } else {
+        console.log("ℹ️ DEV ADMIN ALREADY EXISTS");
+      }
     }
   } catch (error) {
-    console.error("[BOOTSTRAP] Error during admin bootstrap:", error);
-    // Don't throw - allow server to start even if bootstrap fails
+    // Don't throw - allow server to start even if seed fails
+    // But log the error for debugging
+    console.error("[BOOTSTRAP] Error during admin seed:", error);
   }
 }
